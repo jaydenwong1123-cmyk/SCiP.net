@@ -1,0 +1,37 @@
+"use client";
+
+import { useActionState } from "react";
+import { createClearanceRequestAction } from "./actions";
+import { CLEARANCE_LEVELS } from "@/lib/clearance";
+
+export function ClearanceRequestForm({ currentClearance }: { currentClearance: number }) {
+  const [state, formAction, pending] = useActionState(createClearanceRequestAction, null);
+  const higherLevels = CLEARANCE_LEVELS.filter((l) => l.rank > currentClearance);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <div>
+        <label className="block text-sm mb-1" htmlFor="requestedLevel">
+          REQUESTED CLEARANCE
+        </label>
+        <select id="requestedLevel" name="requestedLevel" required className="term-input">
+          {higherLevels.map((l) => (
+            <option key={l.rank} value={l.rank}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm mb-1" htmlFor="reason">
+          JUSTIFICATION
+        </label>
+        <textarea id="reason" name="reason" required rows={5} className="term-input resize-y" />
+      </div>
+      {state?.error && <p className="text-[var(--term-red)] text-sm">{state.error}</p>}
+      <button type="submit" disabled={pending} className="term-button">
+        {pending ? "SUBMITTING..." : "SUBMIT REQUEST"}
+      </button>
+    </form>
+  );
+}

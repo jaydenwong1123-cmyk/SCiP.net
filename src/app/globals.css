@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+:root {
+  --term-bg: #050705;
+  --term-fg: #33ff66;
+  --term-fg-dim: #1e8f3d;
+  --term-fg-bright: #aaffc4;
+  --term-border: #1e8f3d;
+  --term-red: #ff5555;
+  --term-amber: #ffcc55;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  min-height: 100%;
+}
+
+body {
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(51, 255, 102, 0.05) 0px,
+    rgba(51, 255, 102, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 50;
+  mix-blend-mode: overlay;
+}
+
+::selection {
+  background: var(--term-fg);
+  color: var(--term-bg);
+}
+
+a {
+  color: var(--term-fg-bright);
+}
+
+.term-panel {
+  border: 1px solid var(--term-border);
+  background: rgba(51, 255, 102, 0.03);
+  padding: 1rem;
+  box-shadow: 0 0 12px rgba(51, 255, 102, 0.08) inset;
+}
+
+.term-input {
+  background: #000;
+  border: 1px solid var(--term-border);
+  color: var(--term-fg);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  width: 100%;
+  outline: none;
+}
+
+.term-input:focus {
+  border-color: var(--term-fg-bright);
+  box-shadow: 0 0 6px rgba(51, 255, 102, 0.4);
+}
+
+.term-button {
+  background: transparent;
+  border: 1px solid var(--term-fg);
+  color: var(--term-fg);
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.term-button:hover {
+  background: var(--term-fg);
+  color: var(--term-bg);
+}
+
+.term-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.term-cursor::after {
+  content: "_";
+  animation: term-blink 1s steps(1) infinite;
+}
+
+@keyframes term-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.term-link {
+  text-decoration: none;
+  border-bottom: 1px dotted var(--term-fg-dim);
+}
+
+.term-link:hover {
+  border-bottom-color: var(--term-fg-bright);
+}

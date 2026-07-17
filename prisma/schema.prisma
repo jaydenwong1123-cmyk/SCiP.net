@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String?
+  clearance    Int      @default(1)
+  canPostScp   Boolean  @default(false)
+  isOwner      Boolean  @default(false)
+  personalFile String   @default("")
+  createdAt    DateTime @default(now())
+
+  usedInvite      InviteCode?       @relation("InviteCodeUser")
+  sentMessages     Message[]         @relation("MessageSender")
+  receivedMessages Message[]         @relation("MessageRecipient")
+  scpFiles        ScpFile[]
+  broadcasts      Broadcast[]
+  clearanceRequests ClearanceRequest[] @relation("ClearanceRequestUser")
+  reviewedRequests  ClearanceRequest[] @relation("ClearanceRequestReviewer")
+}
+
+model InviteCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  usedById String?  @unique
+  usedBy   User?    @relation("InviteCodeUser", fields: [usedById], references: [id])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  subject     String
+  body        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  senderId    String
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id])
+  recipientId String
+  recipient   User     @relation("MessageRecipient", fields: [recipientId], references: [id])
+}
+
+model ScpFile {
+  id                String   @id @default(cuid())
+  title             String
+  body              String
+  clearanceRequired Int
+  createdAt         DateTime @default(now())
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+}
+
+model Broadcast {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+}
+
+model ClearanceRequest {
+  id              String    @id @default(cuid())
+  requestedLevel  Int
+  reason          String
+  status          String    @default("pending")
+  createdAt       DateTime  @default(now())
+  reviewedAt      DateTime?
+
+  userId       String
+  user         User     @relation("ClearanceRequestUser", fields: [userId], references: [id])
+  reviewedById String?
+  reviewedBy   User?    @relation("ClearanceRequestReviewer", fields: [reviewedById], references: [id])
+}
