@@ -14,10 +14,26 @@ export default async function PersonnelFilePage({
   const { id } = await params;
   const person = await db.user.findUnique({
     where: { id },
-    select: { id: true, displayName: true, clearance: true, personalFile: true, isOwner: true },
+    select: {
+      id: true,
+      displayName: true,
+      clearance: true,
+      personalFile: true,
+      isOwner: true,
+      isAdmin: true,
+      isStaff: true,
+    },
   });
 
   if (!person || !person.displayName) notFound();
+
+  const role = person.isOwner
+    ? "FOUNDATION OWNER"
+    : person.isAdmin
+      ? "ADMIN"
+      : person.isStaff
+        ? "STAFF"
+        : null;
 
   return (
     <div className="term-panel space-y-4">
@@ -31,7 +47,7 @@ export default async function PersonnelFilePage({
       </div>
       <p className="text-sm text-[var(--term-fg-dim)]">
         CLEARANCE: {clearanceLabel(person.clearance)}
-        {person.isOwner ? " — FOUNDATION OWNER" : ""}
+        {role ? ` — ${role}` : ""}
       </p>
       <pre className="whitespace-pre-wrap font-mono text-sm term-panel min-h-[10rem]">
         {person.personalFile

@@ -17,6 +17,7 @@ model User {
   canPostScp   Boolean  @default(false)
   isOwner      Boolean  @default(false)
   isAdmin      Boolean  @default(false)
+  isStaff      Boolean  @default(false)
   personalFile String   @default("")
   createdAt    DateTime @default(now())
 

@@ -1,18 +1,18 @@
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
+import { MemberRow } from "./member-row";
 import {
-  setClearanceAction,
-  setDisplayNameAction,
-  toggleCanPostScpAction,
-  toggleAdminAction,
   generateInviteCodeAction,
   revokeInviteCodeAction,
   reviewClearanceRequestAction,
 } from "./actions";
 
 export default async function AdminPage() {
-  const viewer = await requireAdmin();
+  const viewer = await requireStaff();
+  const canManageStaff = viewer.isOwner || viewer.isAdmin;
+  const canManageAdmin = viewer.isOwner;
+  const canGrantTopClearance = viewer.isOwner || viewer.isAdmin;
 
   const [members, inviteCodes, pendingRequests] = await Promise.all([
     db.user.findMany({
@@ -30,12 +30,15 @@ export default async function AdminPage() {
     }),
   ]);
 
-  const editableLevels = CLEARANCE_LEVELS.filter((l) => l.rank < 7);
+  const editableLevels = CLEARANCE_LEVELS.map((l) => ({
+    rank: l.rank,
+    label: l.label,
+  }));
 
   return (
     <div className="space-y-4">
       <div className="term-panel">
-        <h1 className="text-lg tracking-widest">:: OWNER ADMINISTRATION ::</h1>
+        <h1 className="text-lg tracking-widest">:: ADMINISTRATION ::</h1>
       </div>
 
       <div className="term-panel space-y-3">
@@ -66,61 +69,28 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      <div className="term-panel space-y-3">
+      <div className="term-panel space-y-2">
         <h2 className="text-sm text-[var(--term-fg-dim)]">MEMBER MANAGEMENT</h2>
-        <div className="space-y-2">
+        <p className="text-xs text-[var(--term-fg-dim)]">
+          CLICK A MEMBER TO OPEN ACTIONS.
+        </p>
+        <div>
           {members.map((m) => (
-            <div
+            <MemberRow
               key={m.id}
-              className="flex flex-wrap items-center gap-3 text-sm border-b border-[var(--term-border)]/30 py-2"
-            >
-              <span className="min-w-[10rem]">
-                {m.displayName ?? "(not yet registered)"}
-                {m.isAdmin && <span className="text-[var(--term-amber)]"> [ADMIN]</span>}
-              </span>
-              <form action={setDisplayNameAction} className="flex items-center gap-2">
-                <input type="hidden" name="userId" value={m.id} />
-                <input
-                  type="text"
-                  name="displayName"
-                  defaultValue={m.displayName ?? ""}
-                  placeholder="DISPLAY NAME"
-                  maxLength={60}
-                  className="term-input py-1 w-40"
-                />
-                <button className="term-button text-xs">RENAME</button>
-              </form>
-              <form action={setClearanceAction} className="flex items-center gap-2">
-                <input type="hidden" name="userId" value={m.id} />
-                <select name="clearance" defaultValue={m.clearance} className="term-input py-1">
-                  {editableLevels.map((l) => (
-                    <option key={l.rank} value={l.rank}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-                <button className="term-button text-xs">SET</button>
-              </form>
-              <form action={toggleCanPostScpAction}>
-                <input type="hidden" name="userId" value={m.id} />
-                <input type="hidden" name="canPostScp" value={(!m.canPostScp).toString()} />
-                <button className="term-button text-xs">
-                  {m.canPostScp ? "REVOKE SCP-POST" : "GRANT SCP-POST"}
-                </button>
-              </form>
-              {viewer.isOwner && (
-                <form action={toggleAdminAction}>
-                  <input type="hidden" name="userId" value={m.id} />
-                  <input type="hidden" name="isAdmin" value={(!m.isAdmin).toString()} />
-                  <button
-                    className="term-button text-xs"
-                    style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
-                  >
-                    {m.isAdmin ? "REVOKE ADMIN" : "GRANT ADMIN"}
-                  </button>
-                </form>
-              )}
-            </div>
+              member={{
+                id: m.id,
+                displayName: m.displayName,
+                clearance: m.clearance,
+                canPostScp: m.canPostScp,
+                isAdmin: m.isAdmin,
+                isStaff: m.isStaff,
+              }}
+              levels={editableLevels}
+              canGrantTopClearance={canGrantTopClearance}
+              canManageStaff={canManageStaff}
+              canManageAdmin={canManageAdmin}
+            />
           ))}
         </div>
       </div>

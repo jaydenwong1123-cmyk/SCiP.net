@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/session";
+import { requireUser, requireStaff } from "@/lib/session";
 import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
 
 export async function createScpFileAction(
@@ -50,7 +50,7 @@ export async function createScpFileAction(
 }
 
 export async function deleteScpFileAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

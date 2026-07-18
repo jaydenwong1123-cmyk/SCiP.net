@@ -21,7 +21,7 @@ export default async function ScpDetailPage({
 
   if (!file || file.clearanceRequired > user.clearance) notFound();
 
-  const canManage = user.isOwner || user.isAdmin;
+  const canManage = user.isOwner || user.isAdmin || user.isStaff;
 
   return (
     <div className="term-panel space-y-4">

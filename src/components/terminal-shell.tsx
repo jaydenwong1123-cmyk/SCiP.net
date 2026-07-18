@@ -20,6 +20,7 @@ export function TerminalShell({
     clearance: number;
     isOwner: boolean;
     isAdmin: boolean;
+    isStaff: boolean;
   };
 }) {
   return (
@@ -34,7 +35,7 @@ export function TerminalShell({
             USER: <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
             [{clearanceLabel(user.clearance)}]
           </span>
-          {(user.isOwner || user.isAdmin) && (
+          {(user.isOwner || user.isAdmin || user.isStaff) && (
             <Link href="/admin" className="term-link">
               ADMIN
             </Link>

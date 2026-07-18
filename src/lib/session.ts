@@ -15,15 +15,43 @@ export async function requireUser() {
   return user;
 }
 
+// Role hierarchy:
+//   Owner  (isOwner)  — seeded, supreme. Only the owner can grant/revoke Admin.
+//   Admin  (isAdmin)  — owner-level powers: delete accounts, grant L-OMNI,
+//                       grant/revoke Staff, plus everything Staff can do.
+//   Staff  (isStaff)  — elevated panel access: rename, set clearance (below
+//                       L-OMNI), toggle SCP-post, delete SCP files, invite
+//                       codes, review clearance requests.
+
+export function hasAdminPowers(user: { isOwner: boolean; isAdmin: boolean }) {
+  return user.isOwner || user.isAdmin;
+}
+
+export function hasStaffPowers(user: {
+  isOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+}) {
+  return user.isOwner || user.isAdmin || user.isStaff;
+}
+
+// Only the seeded owner.
 export async function requireOwner() {
   const user = await requireUser();
   if (!user.isOwner) redirect("/");
   return user;
 }
 
-// Owners and members granted admin can access administration + delete SCP files.
-export async function requireAdmin() {
+// Owner-level powers (owner or admin).
+export async function requireAdminPowers() {
   const user = await requireUser();
-  if (!user.isOwner && !user.isAdmin) redirect("/");
+  if (!hasAdminPowers(user)) redirect("/");
+  return user;
+}
+
+// Any elevated role (owner, admin, or staff) — panel access + staff actions.
+export async function requireStaff() {
+  const user = await requireUser();
+  if (!hasStaffPowers(user)) redirect("/");
   return user;
 }
