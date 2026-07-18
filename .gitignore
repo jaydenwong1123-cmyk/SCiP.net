@@ -48,3 +48,8 @@ next-env.d.ts
 
 .vercel
 .env*
+
+image.png
+*.png
+!src/**/*.png
+!public/**
