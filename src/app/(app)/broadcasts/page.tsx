@@ -3,9 +3,11 @@ import { db } from "@/lib/db";
 import { canPostBroadcast } from "@/lib/clearance";
 import { renderRedacted } from "@/lib/redact";
 import { BroadcastForm } from "./broadcast-form";
+import { deleteBroadcastAction } from "./actions";
 
 export default async function BroadcastsPage() {
   const user = await requireUser();
+  const canManage = user.isOwner || user.isAdmin;
   const broadcasts = await db.broadcast.findMany({
     orderBy: { createdAt: "desc" },
     include: { author: { select: { displayName: true } } },
@@ -36,6 +38,17 @@ export default async function BroadcastsPage() {
             <pre className="whitespace-pre-wrap font-mono text-sm">
               {renderRedacted(b.body, user.clearance)}
             </pre>
+            {canManage && (
+              <form action={deleteBroadcastAction} className="pt-2">
+                <input type="hidden" name="id" value={b.id} />
+                <button
+                  className="term-button text-xs"
+                  style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                >
+                  [DELETE BROADCAST]
+                </button>
+              </form>
+            )}
           </div>
         ))}
       </div>

@@ -6,6 +6,8 @@ import {
   generateInviteCodeAction,
   revokeInviteCodeAction,
   reviewClearanceRequestAction,
+  setOwnDisplayNameAction,
+  setOwnClearanceAction,
 } from "./actions";
 
 export default async function AdminPage() {
@@ -40,6 +42,41 @@ export default async function AdminPage() {
       <div className="term-panel">
         <h1 className="text-lg tracking-widest">:: ADMINISTRATION ::</h1>
       </div>
+
+      {viewer.isOwner && (
+        <div className="term-panel space-y-3">
+          <h2 className="text-sm text-[var(--term-fg-dim)]">
+            OWNER SELF-MANAGEMENT
+          </h2>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <form action={setOwnDisplayNameAction} className="flex items-center gap-2">
+              <input
+                type="text"
+                name="displayName"
+                defaultValue={viewer.displayName ?? ""}
+                placeholder="YOUR DISPLAY NAME"
+                maxLength={60}
+                className="term-input py-1 w-48"
+              />
+              <button className="term-button text-xs">RENAME SELF</button>
+            </form>
+            <form action={setOwnClearanceAction} className="flex items-center gap-2">
+              <select
+                name="clearance"
+                defaultValue={viewer.clearance}
+                className="term-input py-1"
+              >
+                {editableLevels.map((l) => (
+                  <option key={l.rank} value={l.rank}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              <button className="term-button text-xs">SET OWN CLEARANCE</button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="term-panel space-y-3">
         <h2 className="text-sm text-[var(--term-fg-dim)]">

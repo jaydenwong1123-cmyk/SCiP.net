@@ -47,6 +47,35 @@ export async function setDisplayNameAction(formData: FormData) {
   revalidatePath("/personnel");
 }
 
+export async function setOwnDisplayNameAction(formData: FormData) {
+  const owner = await requireOwner();
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  if (!displayName) return;
+
+  await db.user.update({
+    where: { id: owner.id },
+    data: { displayName: displayName.slice(0, 60) },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
+}
+
+export async function setOwnClearanceAction(formData: FormData) {
+  const owner = await requireOwner();
+  const clearance = Number(formData.get("clearance"));
+  if (!Number.isInteger(clearance)) return;
+  if (clearance < MIN_CLEARANCE || clearance > OWNER_CLEARANCE) return;
+
+  await db.user.update({
+    where: { id: owner.id },
+    data: { clearance },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
+}
+
 export async function toggleCanPostScpAction(formData: FormData) {
   await requireStaff();
   const userId = String(formData.get("userId") ?? "");

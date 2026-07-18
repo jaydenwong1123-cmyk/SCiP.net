@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, requireAdminPowers } from "@/lib/session";
 import { canPostBroadcast } from "@/lib/clearance";
 
 export async function createBroadcastAction(
@@ -31,4 +31,15 @@ export async function createBroadcastAction(
 
   revalidatePath("/broadcasts");
   redirect("/broadcasts");
+}
+
+export async function deleteBroadcastAction(formData: FormData) {
+  // Owner or admin may delete broadcasts.
+  await requireAdminPowers();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  await db.broadcast.deleteMany({ where: { id } });
+
+  revalidatePath("/broadcasts");
 }
