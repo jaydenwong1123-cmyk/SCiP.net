@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import {
   setClearanceAction,
+  setDisplayNameAction,
   toggleCanPostScpAction,
   toggleAdminAction,
   generateInviteCodeAction,
@@ -77,6 +78,18 @@ export default async function AdminPage() {
                 {m.displayName ?? "(not yet registered)"}
                 {m.isAdmin && <span className="text-[var(--term-amber)]"> [ADMIN]</span>}
               </span>
+              <form action={setDisplayNameAction} className="flex items-center gap-2">
+                <input type="hidden" name="userId" value={m.id} />
+                <input
+                  type="text"
+                  name="displayName"
+                  defaultValue={m.displayName ?? ""}
+                  placeholder="DISPLAY NAME"
+                  maxLength={60}
+                  className="term-input py-1 w-40"
+                />
+                <button className="term-button text-xs">RENAME</button>
+              </form>
               <form action={setClearanceAction} className="flex items-center gap-2">
                 <input type="hidden" name="userId" value={m.id} />
                 <select name="clearance" defaultValue={m.clearance} className="term-input py-1">

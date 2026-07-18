@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireOwner } from "@/lib/session";
+import { requireOwner, requireAdmin } from "@/lib/session";
 import { generateInviteCode } from "@/lib/codeword";
 import { MAX_CLEARANCE, MIN_CLEARANCE, OWNER_CLEARANCE } from "@/lib/clearance";
 
@@ -17,6 +17,22 @@ export async function setClearanceAction(formData: FormData) {
   await db.user.update({
     where: { id: userId, isOwner: false },
     data: { clearance },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
+}
+
+export async function setDisplayNameAction(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const displayName = String(formData.get("displayName") ?? "").trim();
+
+  if (!userId || !displayName) return;
+
+  await db.user.update({
+    where: { id: userId },
+    data: { displayName: displayName.slice(0, 60) },
   });
 
   revalidatePath("/admin");
