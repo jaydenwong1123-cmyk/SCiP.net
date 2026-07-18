@@ -38,6 +38,22 @@ export async function toggleCanPostScpAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function toggleAdminAction(formData: FormData) {
+  // Only the owner may grant or revoke admin rights.
+  await requireOwner();
+  const userId = String(formData.get("userId") ?? "");
+  const isAdmin = formData.get("isAdmin") === "true";
+
+  if (!userId) return;
+
+  await db.user.update({
+    where: { id: userId, isOwner: false },
+    data: { isAdmin },
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function generateInviteCodeAction() {
   await requireOwner();
   await db.inviteCode.create({ data: { code: generateInviteCode() } });

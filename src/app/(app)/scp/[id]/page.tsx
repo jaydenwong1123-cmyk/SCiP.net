@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
+import { renderRedacted } from "@/lib/redact";
+import { deleteScpFileAction } from "../actions";
 
 export default async function ScpDetailPage({
   params,
@@ -19,6 +21,8 @@ export default async function ScpDetailPage({
 
   if (!file || file.clearanceRequired > user.clearance) notFound();
 
+  const canManage = user.isOwner || user.isAdmin;
+
   return (
     <div className="term-panel space-y-4">
       <div className="flex items-center justify-between">
@@ -31,7 +35,20 @@ export default async function ScpDetailPage({
         CLEARANCE REQUIRED: {clearanceLabel(file.clearanceRequired)} — AUTHOR:{" "}
         {file.author.displayName}
       </p>
-      <pre className="whitespace-pre-wrap font-mono text-sm">{file.body}</pre>
+      <pre className="whitespace-pre-wrap font-mono text-sm">
+        {renderRedacted(file.body, user.clearance)}
+      </pre>
+      {canManage && (
+        <form
+          action={deleteScpFileAction}
+          className="pt-2 border-t border-[var(--term-border)]/30"
+        >
+          <input type="hidden" name="id" value={file.id} />
+          <button className="term-button text-xs" style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}>
+            [DELETE FILE]
+          </button>
+        </form>
+      )}
     </div>
   );
 }

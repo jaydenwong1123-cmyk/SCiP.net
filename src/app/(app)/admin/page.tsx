@@ -1,16 +1,17 @@
-import { requireOwner } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import {
   setClearanceAction,
   toggleCanPostScpAction,
+  toggleAdminAction,
   generateInviteCodeAction,
   revokeInviteCodeAction,
   reviewClearanceRequestAction,
 } from "./actions";
 
 export default async function AdminPage() {
-  await requireOwner();
+  const viewer = await requireAdmin();
 
   const [members, inviteCodes, pendingRequests] = await Promise.all([
     db.user.findMany({
@@ -72,7 +73,10 @@ export default async function AdminPage() {
               key={m.id}
               className="flex flex-wrap items-center gap-3 text-sm border-b border-[var(--term-border)]/30 py-2"
             >
-              <span className="min-w-[10rem]">{m.displayName ?? "(not yet registered)"}</span>
+              <span className="min-w-[10rem]">
+                {m.displayName ?? "(not yet registered)"}
+                {m.isAdmin && <span className="text-[var(--term-amber)]"> [ADMIN]</span>}
+              </span>
               <form action={setClearanceAction} className="flex items-center gap-2">
                 <input type="hidden" name="userId" value={m.id} />
                 <select name="clearance" defaultValue={m.clearance} className="term-input py-1">
@@ -91,6 +95,18 @@ export default async function AdminPage() {
                   {m.canPostScp ? "REVOKE SCP-POST" : "GRANT SCP-POST"}
                 </button>
               </form>
+              {viewer.isOwner && (
+                <form action={toggleAdminAction}>
+                  <input type="hidden" name="userId" value={m.id} />
+                  <input type="hidden" name="isAdmin" value={(!m.isAdmin).toString()} />
+                  <button
+                    className="term-button text-xs"
+                    style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
+                  >
+                    {m.isAdmin ? "REVOKE ADMIN" : "GRANT ADMIN"}
+                  </button>
+                </form>
+              )}
             </div>
           ))}
         </div>

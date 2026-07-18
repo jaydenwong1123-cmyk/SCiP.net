@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { requireUser } from "@/lib/session";
 import { clearanceLabel } from "@/lib/clearance";
+import { renderRedacted } from "@/lib/redact";
 
 export default async function PersonnelFilePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const viewer = await requireUser();
   const { id } = await params;
   const person = await db.user.findUnique({
     where: { id },
@@ -31,7 +34,9 @@ export default async function PersonnelFilePage({
         {person.isOwner ? " — FOUNDATION OWNER" : ""}
       </p>
       <pre className="whitespace-pre-wrap font-mono text-sm term-panel min-h-[10rem]">
-        {person.personalFile || "[NO FILE ON RECORD]"}
+        {person.personalFile
+          ? renderRedacted(person.personalFile, viewer.clearance)
+          : "[NO FILE ON RECORD]"}
       </pre>
     </div>
   );

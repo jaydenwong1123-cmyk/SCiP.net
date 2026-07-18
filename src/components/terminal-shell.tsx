@@ -15,7 +15,12 @@ export function TerminalShell({
   user,
 }: {
   children: React.ReactNode;
-  user: { displayName: string | null; clearance: number; isOwner: boolean };
+  user: {
+    displayName: string | null;
+    clearance: number;
+    isOwner: boolean;
+    isAdmin: boolean;
+  };
 }) {
   return (
     <div className="min-h-screen flex flex-col max-w-5xl mx-auto p-4 gap-4">
@@ -29,7 +34,7 @@ export function TerminalShell({
             USER: <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
             [{clearanceLabel(user.clearance)}]
           </span>
-          {user.isOwner && (
+          {(user.isOwner || user.isAdmin) && (
             <Link href="/admin" className="term-link">
               ADMIN
             </Link>

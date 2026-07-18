@@ -20,3 +20,10 @@ export async function requireOwner() {
   if (!user.isOwner) redirect("/");
   return user;
 }
+
+// Owners and members granted admin can access administration + delete SCP files.
+export async function requireAdmin() {
+  const user = await requireUser();
+  if (!user.isOwner && !user.isAdmin) redirect("/");
+  return user;
+}

@@ -105,6 +105,15 @@ a {
   }
 }
 
+.redacted {
+  background: #e6e6e6;
+  color: #e6e6e6;
+  user-select: none;
+  cursor: help;
+  border-radius: 1px;
+  padding: 0 1px;
+}
+
 .term-link {
   text-decoration: none;
   border-bottom: 1px dotted var(--term-fg-dim);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, requireAdmin } from "@/lib/session";
 import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
 
 export async function createScpFileAction(
@@ -44,6 +44,17 @@ export async function createScpFileAction(
       authorId: user.id,
     },
   });
+
+  revalidatePath("/scp");
+  redirect("/scp");
+}
+
+export async function deleteScpFileAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  await db.scpFile.deleteMany({ where: { id } });
 
   revalidatePath("/scp");
   redirect("/scp");
