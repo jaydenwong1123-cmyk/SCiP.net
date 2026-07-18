@@ -9,6 +9,7 @@ import {
 } from "@/lib/session";
 import { generateInviteCode } from "@/lib/codeword";
 import { MAX_CLEARANCE, MIN_CLEARANCE, OWNER_CLEARANCE } from "@/lib/clearance";
+import { isValidDepartment } from "@/lib/departments";
 
 export async function setClearanceAction(formData: FormData) {
   const actor = await requireStaff();
@@ -70,6 +71,23 @@ export async function setOwnClearanceAction(formData: FormData) {
   await db.user.update({
     where: { id: owner.id },
     data: { clearance },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
+}
+
+export async function setMemberDepartmentAction(formData: FormData) {
+  // Staff and above may assign any department, including restricted ones.
+  await requireStaff();
+  const userId = String(formData.get("userId") ?? "");
+  const department = String(formData.get("department") ?? "");
+  if (!userId) return;
+  if (department !== "" && !isValidDepartment(department)) return;
+
+  await db.user.update({
+    where: { id: userId },
+    data: { department: department === "" ? null : department },
   });
 
   revalidatePath("/admin");

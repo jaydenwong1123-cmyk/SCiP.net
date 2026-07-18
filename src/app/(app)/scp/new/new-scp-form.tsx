@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { createScpFileAction } from "../actions";
 import { CLEARANCE_LEVELS } from "@/lib/clearance";
+import { CLASSIFICATIONS } from "@/lib/classification";
 
 export function NewScpForm({ maxClearance }: { maxClearance: number }) {
   const [state, formAction, pending] = useActionState(createScpFileAction, null);
@@ -15,6 +16,18 @@ export function NewScpForm({ maxClearance }: { maxClearance: number }) {
           TITLE
         </label>
         <input id="title" name="title" required className="term-input" placeholder="SCP-XXXX" />
+      </div>
+      <div>
+        <label className="block text-sm mb-1" htmlFor="classification">
+          OBJECT CLASS
+        </label>
+        <select id="classification" name="classification" required className="term-input">
+          {CLASSIFICATIONS.map((c) => (
+            <option key={c.name} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label className="block text-sm mb-1" htmlFor="clearanceRequired">

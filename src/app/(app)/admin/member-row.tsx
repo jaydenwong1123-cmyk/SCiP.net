@@ -4,11 +4,13 @@ import { useState } from "react";
 import {
   setClearanceAction,
   setDisplayNameAction,
+  setMemberDepartmentAction,
   toggleCanPostScpAction,
   toggleStaffAction,
   toggleAdminAction,
   deleteAccountAction,
 } from "./actions";
+import { ALL_DEPARTMENTS } from "@/lib/departments";
 
 type Member = {
   id: string;
@@ -17,6 +19,7 @@ type Member = {
   canPostScp: boolean;
   isAdmin: boolean;
   isStaff: boolean;
+  department: string | null;
 };
 
 type Level = { rank: number; label: string };
@@ -89,6 +92,23 @@ export function MemberRow({
               ))}
             </select>
             <button className="term-button text-xs">SET CLEARANCE</button>
+          </form>
+
+          <form action={setMemberDepartmentAction} className="flex items-center gap-2">
+            <input type="hidden" name="userId" value={member.id} />
+            <select
+              name="department"
+              defaultValue={member.department ?? ""}
+              className="term-input py-1"
+            >
+              <option value="">— NO DEPARTMENT —</option>
+              {ALL_DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <button className="term-button text-xs">SET DEPT</button>
           </form>
 
           <form action={toggleCanPostScpAction}>

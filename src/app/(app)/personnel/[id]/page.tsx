@@ -18,6 +18,7 @@ export default async function PersonnelFilePage({
       id: true,
       displayName: true,
       clearance: true,
+      department: true,
       personalFile: true,
       isOwner: true,
       isAdmin: true,
@@ -48,6 +49,7 @@ export default async function PersonnelFilePage({
       <p className="text-sm text-[var(--term-fg-dim)]">
         CLEARANCE: {clearanceLabel(person.clearance)}
         {role ? ` — ${role}` : ""}
+        {person.department ? ` — ${person.department}` : ""}
       </p>
       <pre className="whitespace-pre-wrap font-mono text-sm term-panel min-h-[10rem]">
         {person.personalFile

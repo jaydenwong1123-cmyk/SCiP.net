@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, requireStaff } from "@/lib/session";
 import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
+import { DEFAULT_CLASSIFICATION, isValidClassification } from "@/lib/classification";
 
 export async function createScpFileAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -18,6 +19,10 @@ export async function createScpFileAction(
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const clearanceRequired = Number(formData.get("clearanceRequired"));
+  const classificationRaw = String(formData.get("classification") ?? "");
+  const classification = isValidClassification(classificationRaw)
+    ? classificationRaw
+    : DEFAULT_CLASSIFICATION;
 
   if (!title || !body) {
     return { ok: false, error: "TITLE AND BODY ARE REQUIRED." };
@@ -41,6 +46,7 @@ export async function createScpFileAction(
       title: title.slice(0, 200),
       body: body.slice(0, 20000),
       clearanceRequired,
+      classification,
       authorId: user.id,
     },
   });

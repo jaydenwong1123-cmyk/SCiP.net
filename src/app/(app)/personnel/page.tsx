@@ -10,6 +10,7 @@ export default async function PersonnelPage() {
       id: true,
       displayName: true,
       clearance: true,
+      department: true,
       isOwner: true,
       isAdmin: true,
       isStaff: true,
@@ -41,6 +42,9 @@ export default async function PersonnelPage() {
               <span>
                 {p.displayName}
                 {role && <span className="text-[var(--term-amber)]"> [{role}]</span>}
+                {p.department && (
+                  <span className="text-[var(--term-fg-dim)]"> — {p.department}</span>
+                )}
               </span>
               <span className="text-[var(--term-fg-dim)]">
                 [{clearanceLabel(p.clearance)}]

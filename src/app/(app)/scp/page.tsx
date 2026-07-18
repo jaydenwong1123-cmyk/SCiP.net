@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
+import { classificationColor } from "@/lib/classification";
 
 export default async function ScpListPage() {
   const user = await requireUser();
@@ -31,9 +32,19 @@ export default async function ScpListPage() {
             href={`/scp/${f.id}`}
             className="flex justify-between text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
           >
-            <span>{f.title}</span>
+            <span className="flex items-center gap-2">
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ backgroundColor: classificationColor(f.classification) }}
+                aria-hidden
+              />
+              {f.title}
+            </span>
             <span className="text-[var(--term-fg-dim)]">
-              [{clearanceLabel(f.clearanceRequired)}] — {f.author.displayName}
+              <span style={{ color: classificationColor(f.classification) }}>
+                {f.classification.toUpperCase()}
+              </span>{" "}
+              · [{clearanceLabel(f.clearanceRequired)}] — {f.author.displayName}
             </span>
           </Link>
         ))}

@@ -18,6 +18,7 @@ model User {
   isOwner      Boolean  @default(false)
   isAdmin      Boolean  @default(false)
   isStaff      Boolean  @default(false)
+  department   String?
   personalFile String   @default("")
   createdAt    DateTime @default(now())
 
@@ -58,6 +59,7 @@ model ScpFile {
   title             String
   body              String
   clearanceRequired Int
+  classification    String   @default("Safe")
   createdAt         DateTime @default(now())
 
   authorId String

@@ -122,6 +122,7 @@ export default async function AdminPage() {
                 canPostScp: m.canPostScp,
                 isAdmin: m.isAdmin,
                 isStaff: m.isStaff,
+                department: m.department,
               }}
               levels={editableLevels}
               canGrantTopClearance={canGrantTopClearance}
