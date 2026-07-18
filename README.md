@@ -61,7 +61,7 @@ SQLite's local file can't survive Vercel's ephemeral filesystem, so production u
 
 ## How clearance works
 
-Ranks run 1–7, labeled L-1 through L-5, then L-O5, then L-OWNI (rank 7 — reserved
+Ranks run 1–7, labeled L-1 through L-5, then L-O5, then L-OMNI (rank 7 — reserved
 for the single owner account). The owner adjusts anyone's clearance from `/admin`,
 which also handles inviting new members, granting/revoking SCP-file posting rights,
 and approving/denying clearance-change requests submitted via `/clearance-request`.

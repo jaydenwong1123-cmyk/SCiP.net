@@ -5,7 +5,7 @@ export const CLEARANCE_LEVELS = [
   { rank: 4, label: "L-4" },
   { rank: 5, label: "L-5" },
   { rank: 6, label: "L-O5" },
-  { rank: 7, label: "L-OWNI" },
+  { rank: 7, label: "L-OMNI" },
 ] as const;
 
 export const MIN_CLEARANCE = 1;
