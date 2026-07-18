@@ -1,13 +1,16 @@
 import { Fragment, type ReactNode } from "react";
+import { parseClearanceToken, clearanceLabel } from "@/lib/clearance";
 
 // Redaction markup:
-//   [*SECRET*]        -> always redacted (white box), nobody can read it
-//   [*SECRET*][3]     -> only viewers with clearance >= 3 see "SECRET";
-//                        everyone below sees a redacted white box
+//   [*SECRET*]         -> always redacted (white box), nobody can read it
+//   [*SECRET*][3]      -> only viewers with clearance >= L-3 see "SECRET"
+//   [*SECRET*][L-O5]   -> only L-O5 (rank 6) and above; others see a box
+//   [*SECRET*][OMNI]   -> only L-OMNI (rank 7); others see a box
 //
+// The level tag accepts a rank number or a clearance label (L-O5, O5, OMNI…).
 // Redaction is resolved on the server so hidden text is never sent to a
 // browser that isn't cleared to read it.
-const REDACT_RE = /\[\*([\s\S]+?)\*\](?:\[(\d+)\])?/g;
+const REDACT_RE = /\[\*([\s\S]+?)\*\](?:\[([^\]]+)\])?/g;
 
 export function renderRedacted(
   text: string,
@@ -25,7 +28,7 @@ export function renderRedacted(
     }
 
     const content = match[1];
-    const level = match[2] ? parseInt(match[2], 10) : null;
+    const level = match[2] ? parseClearanceToken(match[2]) : null;
     const canSee = level !== null && viewerClearance >= level;
 
     if (canSee) {
@@ -37,7 +40,7 @@ export function renderRedacted(
         <span
           key={key++}
           className="redacted"
-          title={level !== null ? `[REDACTED — REQUIRES L-${level}]` : "[REDACTED]"}
+          title={level !== null ? `[REDACTED — REQUIRES ${clearanceLabel(level)}]` : "[REDACTED]"}
         >
           {"█".repeat(width)}
         </span>

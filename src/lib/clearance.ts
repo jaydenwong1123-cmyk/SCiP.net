@@ -20,3 +20,25 @@ export function clearanceLabel(rank: number): string {
 export function canPostBroadcast(rank: number): boolean {
   return rank >= BROADCAST_POST_CLEARANCE;
 }
+
+// Resolve a redaction level token to a clearance rank. Accepts either a plain
+// rank number ("6") or a clearance label in any common form:
+//   "6", "L-O5", "LO5", "O5", "L-OMNI", "OMNI", "L5", "5"
+// Returns null if the token doesn't map to a known level.
+export function parseClearanceToken(token: string): number | null {
+  const raw = token.trim();
+  if (raw === "") return null;
+
+  // Plain rank number (1-7).
+  if (/^\d+$/.test(raw)) {
+    const n = parseInt(raw, 10);
+    return n >= MIN_CLEARANCE && n <= MAX_CLEARANCE ? n : null;
+  }
+
+  // Normalize label: uppercase, strip spaces / dashes / leading "L".
+  const norm = raw.toUpperCase().replace(/[\s-]/g, "").replace(/^L/, "");
+  const match = CLEARANCE_LEVELS.find(
+    (l) => l.label.toUpperCase().replace(/[\s-]/g, "").replace(/^L/, "") === norm
+  );
+  return match ? match.rank : null;
+}
