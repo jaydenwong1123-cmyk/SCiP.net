@@ -1,6 +1,22 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
+import { MEMBER_NOTE_CLEARANCE } from "@/lib/clearance";
+
+// Personnel who may flag/annotate members: L-5 and above, plus staff/admin/owner.
+export function canAnnotateMembers(user: {
+  clearance: number;
+  isOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+}): boolean {
+  return (
+    user.clearance >= MEMBER_NOTE_CLEARANCE ||
+    user.isOwner ||
+    user.isAdmin ||
+    user.isStaff
+  );
+}
 
 export async function getCurrentUser() {
   const session = await auth();

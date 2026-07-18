@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { requireUser, canAnnotateMembers } from "@/lib/session";
 import { clearanceLabel } from "@/lib/clearance";
 
 export default async function PersonnelPage() {
+  const viewer = await requireUser();
   const personnel = await db.user.findMany({
     where: { displayName: { not: null } },
     orderBy: [{ clearance: "desc" }, { displayName: "asc" }],
@@ -16,6 +18,18 @@ export default async function PersonnelPage() {
       isStaff: true,
     },
   });
+
+  // Authorized personnel see a flag marker beside flagged members (but never on
+  // their own row). The subject can't tell they're flagged.
+  const showFlags = canAnnotateMembers(viewer);
+  const flaggedIds = new Set<string>();
+  if (showFlags) {
+    const flagged = await db.memberNote.findMany({
+      where: { flagged: true, subjectId: { not: viewer.id } },
+      select: { subjectId: true },
+    });
+    for (const f of flagged) flaggedIds.add(f.subjectId);
+  }
 
   return (
     <div className="space-y-4">
@@ -40,6 +54,9 @@ export default async function PersonnelPage() {
               className="flex justify-between text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
             >
               <span>
+                {flaggedIds.has(p.id) && (
+                  <span className="text-[var(--term-red)]" title="FLAGGED">⚑ </span>
+                )}
                 {p.displayName}
                 {role && <span className="text-[var(--term-amber)]"> [{role}]</span>}
                 {p.department && (

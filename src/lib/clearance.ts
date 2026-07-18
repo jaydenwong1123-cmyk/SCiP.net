@@ -12,6 +12,7 @@ export const MIN_CLEARANCE = 1;
 export const MAX_CLEARANCE = 7;
 export const OWNER_CLEARANCE = 7;
 export const BROADCAST_POST_CLEARANCE = 5;
+export const MEMBER_NOTE_CLEARANCE = 5;
 
 export function clearanceLabel(rank: number): string {
   return CLEARANCE_LEVELS.find((l) => l.rank === rank)?.label ?? `L-${rank}`;

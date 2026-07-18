@@ -29,6 +29,20 @@ model User {
   broadcasts      Broadcast[]
   clearanceRequests ClearanceRequest[] @relation("ClearanceRequestUser")
   reviewedRequests  ClearanceRequest[] @relation("ClearanceRequestReviewer")
+  notesAbout       MemberNote[]      @relation("MemberNoteSubject")
+  notesAuthored    MemberNote[]      @relation("MemberNoteAuthor")
+}
+
+model MemberNote {
+  id        String   @id @default(cuid())
+  body      String
+  flagged   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  subjectId String
+  subject   User   @relation("MemberNoteSubject", fields: [subjectId], references: [id])
+  authorId  String
+  author    User   @relation("MemberNoteAuthor", fields: [authorId], references: [id])
 }
 
 model InviteCode {
