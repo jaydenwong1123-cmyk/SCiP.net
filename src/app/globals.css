@@ -6,8 +6,10 @@
   --term-fg-dim: #1e8f3d;
   --term-fg-bright: #aaffc4;
   --term-border: #1e8f3d;
+  --term-glow-rgb: 51, 255, 102;
   --term-red: #ff5555;
   --term-amber: #ffcc55;
+  --term-font: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * {
@@ -18,7 +20,7 @@ html,
 body {
   background: var(--term-bg);
   color: var(--term-fg);
-  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--term-font);
   min-height: 100%;
 }
 
@@ -34,13 +36,27 @@ body::before {
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(51, 255, 102, 0.05) 0px,
-    rgba(51, 255, 102, 0.05) 1px,
+    rgba(var(--term-glow-rgb), 0.05) 0px,
+    rgba(var(--term-glow-rgb), 0.05) 1px,
     transparent 1px,
     transparent 3px
   );
   z-index: 50;
   mix-blend-mode: overlay;
+}
+
+/* Faint vignette + edge glow for depth. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 49;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
 }
 
 ::selection {
@@ -53,15 +69,46 @@ a {
 }
 
 .term-panel {
-  border: 1px solid var(--term-border);
-  background: rgba(51, 255, 102, 0.03);
+  position: relative;
+  border: 2px solid var(--term-border);
+  outline: 1px solid rgba(var(--term-glow-rgb), 0.18);
+  outline-offset: 3px;
+  background: linear-gradient(
+    rgba(var(--term-glow-rgb), 0.04),
+    rgba(var(--term-glow-rgb), 0.02)
+  );
   padding: 1rem;
-  box-shadow: 0 0 12px rgba(51, 255, 102, 0.08) inset;
+  box-shadow:
+    0 0 14px rgba(var(--term-glow-rgb), 0.1) inset,
+    0 0 10px rgba(var(--term-glow-rgb), 0.06);
+}
+
+/* Bright bracket accents on opposite corners for a detailed HUD look. */
+.term-panel::before,
+.term-panel::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--term-fg);
+  pointer-events: none;
+}
+
+.term-panel::before {
+  top: -2px;
+  left: -2px;
+  border-width: 2px 0 0 2px;
+}
+
+.term-panel::after {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 2px 2px 0;
 }
 
 .term-input {
   background: #000;
-  border: 1px solid var(--term-border);
+  border: 2px solid var(--term-border);
   color: var(--term-fg);
   padding: 0.5rem 0.75rem;
   font-family: inherit;
@@ -71,12 +118,12 @@ a {
 
 .term-input:focus {
   border-color: var(--term-fg-bright);
-  box-shadow: 0 0 6px rgba(51, 255, 102, 0.4);
+  box-shadow: 0 0 6px rgba(var(--term-glow-rgb), 0.4);
 }
 
 .term-button {
   background: transparent;
-  border: 1px solid var(--term-fg);
+  border: 2px solid var(--term-fg);
   color: var(--term-fg);
   padding: 0.5rem 1rem;
   font-family: inherit;

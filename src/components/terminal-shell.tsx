@@ -43,6 +43,9 @@ export function TerminalShell({
           <Link href="/profile" className="term-link">
             PROFILE
           </Link>
+          <Link href="/settings" className="term-link">
+            SETTINGS
+          </Link>
           <LogoutButton />
         </div>
       </header>
