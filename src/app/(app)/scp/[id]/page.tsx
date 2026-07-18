@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { classificationColor } from "@/lib/classification";
-import { renderRedacted } from "@/lib/redact";
+import { renderRedacted, canBypassRedaction } from "@/lib/redact";
 import { deleteScpFileAction } from "../actions";
 
 export default async function ScpDetailPage({
@@ -43,8 +43,8 @@ export default async function ScpDetailPage({
         — CLEARANCE REQUIRED: {clearanceLabel(file.clearanceRequired)} — AUTHOR:{" "}
         {file.author.displayName}
       </p>
-      <pre className="whitespace-pre-wrap font-mono text-sm">
-        {renderRedacted(file.body, user.clearance)}
+      <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+        {renderRedacted(file.body, user.clearance, canBypassRedaction(user))}
       </pre>
       {canManage && (
         <form

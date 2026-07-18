@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canPostBroadcast } from "@/lib/clearance";
-import { renderRedacted } from "@/lib/redact";
+import { renderRedacted, canBypassRedaction } from "@/lib/redact";
 import { BroadcastForm } from "./broadcast-form";
 import { deleteBroadcastAction } from "./actions";
 
@@ -35,8 +35,8 @@ export default async function BroadcastsPage() {
               <span>{b.createdAt.toISOString().slice(0, 16).replace("T", " ")}</span>
             </div>
             <p className="font-bold">{b.title}</p>
-            <pre className="whitespace-pre-wrap font-mono text-sm">
-              {renderRedacted(b.body, user.clearance)}
+            <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+              {renderRedacted(b.body, user.clearance, canBypassRedaction(user))}
             </pre>
             {canManage && (
               <form action={deleteBroadcastAction} className="pt-2">

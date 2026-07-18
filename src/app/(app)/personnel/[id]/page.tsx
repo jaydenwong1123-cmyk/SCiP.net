@@ -3,7 +3,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { clearanceLabel } from "@/lib/clearance";
-import { renderRedacted } from "@/lib/redact";
+import { renderRedacted, canBypassRedaction } from "@/lib/redact";
 
 export default async function PersonnelFilePage({
   params,
@@ -51,9 +51,9 @@ export default async function PersonnelFilePage({
         {role ? ` — ${role}` : ""}
         {person.department ? ` — ${person.department}` : ""}
       </p>
-      <pre className="whitespace-pre-wrap font-mono text-sm term-panel min-h-[10rem]">
+      <pre className="whitespace-pre-wrap break-words font-mono text-sm term-panel min-h-[10rem]">
         {person.personalFile
-          ? renderRedacted(person.personalFile, viewer.clearance)
+          ? renderRedacted(person.personalFile, viewer.clearance, canBypassRedaction(viewer))
           : "[NO FILE ON RECORD]"}
       </pre>
     </div>

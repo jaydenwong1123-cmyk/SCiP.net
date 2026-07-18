@@ -53,8 +53,8 @@ export default async function MessageDetailPage({
         FROM: {message.sender.displayName} — TO: {message.recipient.displayName} —{" "}
         {message.createdAt.toISOString().slice(0, 16).replace("T", " ")}
       </p>
-      <p className="font-bold">{message.subject}</p>
-      <pre className="whitespace-pre-wrap font-mono text-sm">{message.body}</pre>
+      <p className="font-bold break-words">{message.subject}</p>
+      <pre className="whitespace-pre-wrap break-words font-mono text-sm">{message.body}</pre>
     </div>
   );
 }

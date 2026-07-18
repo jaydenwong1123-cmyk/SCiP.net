@@ -1,5 +1,25 @@
 import { Fragment, type ReactNode } from "react";
-import { parseClearanceToken, clearanceLabel } from "@/lib/clearance";
+import {
+  parseClearanceToken,
+  clearanceLabel,
+  OWNER_CLEARANCE,
+} from "@/lib/clearance";
+
+// Viewers who may read every redaction, including full (level-less) ones:
+// L-OMNI clearance, staff, admins, and the owner.
+export function canBypassRedaction(user: {
+  clearance: number;
+  isOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+}): boolean {
+  return (
+    user.clearance >= OWNER_CLEARANCE ||
+    user.isOwner ||
+    user.isAdmin ||
+    user.isStaff
+  );
+}
 
 // Redaction markup:
 //   [*SECRET*]         -> always redacted (white box), nobody can read it
@@ -14,7 +34,8 @@ const REDACT_RE = /\[\*([\s\S]+?)\*\](?:\[([^\]]+)\])?/g;
 
 export function renderRedacted(
   text: string,
-  viewerClearance: number
+  viewerClearance: number,
+  canSeeAll = false
 ): ReactNode[] {
   const nodes: ReactNode[] = [];
   let last = 0;
@@ -29,7 +50,9 @@ export function renderRedacted(
 
     const content = match[1];
     const level = match[2] ? parseClearanceToken(match[2]) : null;
-    const canSee = level !== null && viewerClearance >= level;
+    // Cleared viewers (L-OMNI / staff / admin / owner) see everything, including
+    // full redactions with no level tag.
+    const canSee = canSeeAll || (level !== null && viewerClearance >= level);
 
     if (canSee) {
       nodes.push(<Fragment key={key++}>{content}</Fragment>);
