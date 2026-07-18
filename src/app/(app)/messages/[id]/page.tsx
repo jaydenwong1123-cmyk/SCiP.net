@@ -28,13 +28,26 @@ export default async function MessageDetailPage({
     await markReadAction(message.id);
   }
 
+  // Reply goes to the other party in the thread.
+  const otherPartyId =
+    message.senderId === user.id ? message.recipientId : message.senderId;
+  const replySubject = message.subject.startsWith("RE: ")
+    ? message.subject
+    : `RE: ${message.subject}`;
+  const replyHref = `/messages/compose?to=${otherPartyId}&subject=${encodeURIComponent(replySubject)}`;
+
   return (
     <div className="term-panel space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg tracking-widest">:: MESSAGE ::</h1>
-        <Link href="/messages" className="term-link text-sm">
-          [BACK]
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href={replyHref} className="term-link text-sm">
+            [REPLY]
+          </Link>
+          <Link href="/messages" className="term-link text-sm">
+            [BACK]
+          </Link>
+        </div>
       </div>
       <p className="text-sm text-[var(--term-fg-dim)]">
         FROM: {message.sender.displayName} — TO: {message.recipient.displayName} —{" "}
