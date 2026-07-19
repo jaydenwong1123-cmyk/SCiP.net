@@ -3,8 +3,9 @@ import { enforceMaintenance } from "@/lib/site-config";
 import { TerminalShell } from "@/components/terminal-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await enforceMaintenance();
-  const user = await requireUser();
+  // Independent gates — run concurrently instead of one after the other so the
+  // layout waits on a single round trip, not two stacked ones.
+  const [, user] = await Promise.all([enforceMaintenance(), requireUser()]);
 
   return (
     <TerminalShell

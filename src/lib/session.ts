@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
@@ -18,11 +19,13 @@ export function canAnnotateMembers(user: {
   );
 }
 
-export async function getCurrentUser() {
+// Memoized per request: the layout and the page both resolve the current user,
+// so without this cache each navigation issues the same DB lookup twice.
+export const getCurrentUser = cache(async () => {
   const session = await auth();
   if (!session?.user?.id) return null;
   return db.user.findUnique({ where: { id: session.user.id } });
-}
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();
