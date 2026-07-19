@@ -2,11 +2,24 @@
 
 import { useActionState } from "react";
 import { createClearanceRequestAction } from "./actions";
-import { CLEARANCE_LEVELS } from "@/lib/clearance";
+import { CLEARANCE_LEVELS, MAX_REQUESTABLE_CLEARANCE } from "@/lib/clearance";
 
 export function ClearanceRequestForm({ currentClearance }: { currentClearance: number }) {
   const [state, formAction, pending] = useActionState(createClearanceRequestAction, null);
-  const higherLevels = CLEARANCE_LEVELS.filter((l) => l.rank > currentClearance);
+  // Members may only request levels above their own and up to the requestable
+  // cap — Level 4 and above must be assigned by staff.
+  const higherLevels = CLEARANCE_LEVELS.filter(
+    (l) => l.rank > currentClearance && l.rank <= MAX_REQUESTABLE_CLEARANCE
+  );
+
+  if (higherLevels.length === 0) {
+    return (
+      <p className="text-sm text-[var(--term-fg-dim)]">
+        NO SELF-REQUESTABLE CLEARANCE AVAILABLE. LEVEL 4 AND ABOVE MUST BE
+        ASSIGNED BY STAFF.
+      </p>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-3">

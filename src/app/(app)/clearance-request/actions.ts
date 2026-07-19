@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
+import {
+  MAX_CLEARANCE,
+  MIN_CLEARANCE,
+  MAX_REQUESTABLE_CLEARANCE,
+} from "@/lib/clearance";
 
 export async function createClearanceRequestAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -23,6 +27,12 @@ export async function createClearanceRequestAction(
   }
   if (requestedLevel <= user.clearance) {
     return { ok: false, error: "REQUESTED LEVEL MUST BE ABOVE YOUR CURRENT CLEARANCE." };
+  }
+  if (requestedLevel > MAX_REQUESTABLE_CLEARANCE) {
+    return {
+      ok: false,
+      error: "LEVEL 4 AND ABOVE MUST BE ASSIGNED BY STAFF — NOT REQUESTABLE.",
+    };
   }
   if (!reason) {
     return { ok: false, error: "REASON IS REQUIRED." };

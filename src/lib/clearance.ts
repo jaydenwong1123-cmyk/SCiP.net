@@ -10,6 +10,9 @@ export const CLEARANCE_LEVELS = [
 
 export const MIN_CLEARANCE = 1;
 export const MAX_CLEARANCE = 7;
+// Members may self-request clearance only up to this level; Level 4 and above
+// must be assigned by staff and cannot be requested.
+export const MAX_REQUESTABLE_CLEARANCE = 3;
 export const OWNER_CLEARANCE = 7;
 export const BROADCAST_POST_CLEARANCE = 5;
 export const MEMBER_NOTE_CLEARANCE = 5;
