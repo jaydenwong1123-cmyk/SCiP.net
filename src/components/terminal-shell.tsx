@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceLabel, canAccessSecureChannel } from "@/lib/clearance";
+import { Tutorial } from "@/components/tutorial";
 
 const NAV_ITEMS = [
   { href: "/personnel", label: "PERSONNEL" },
@@ -53,12 +54,23 @@ export function TerminalShell({
         </div>
       </header>
 
-      <nav className="term-panel flex flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm">
+      <nav className="term-panel flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm">
         {NAV_ITEMS.map((item) => (
           <Link key={item.href} href={item.href} className="term-link">
             [{item.label}]
           </Link>
         ))}
+        {canAccessSecureChannel(user.clearance) && (
+          <Link
+            href="/secure-channel"
+            className="term-link text-[var(--term-amber)]"
+          >
+            [⚿ SECURE CHANNEL]
+          </Link>
+        )}
+        <span className="ml-auto">
+          <Tutorial />
+        </span>
       </nav>
 
       <main className="flex-1">{children}</main>

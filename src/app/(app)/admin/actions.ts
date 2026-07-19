@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import {
   requireOwner,
@@ -10,6 +11,37 @@ import {
 import { generateInviteCode } from "@/lib/codeword";
 import { MAX_CLEARANCE, MIN_CLEARANCE, OWNER_CLEARANCE } from "@/lib/clearance";
 import { isValidDepartment } from "@/lib/departments";
+import { updateSiteConfig, MAINT_COOKIE } from "@/lib/site-config";
+
+export async function setMaintenanceAction(formData: FormData) {
+  await requireOwner();
+  const wantsMaintenance = formData.get("maintenanceMode") === "on";
+  const bypassCode = String(formData.get("bypassCode") ?? "").trim().slice(0, 64);
+  const maintenanceMessage = String(formData.get("maintenanceMessage") ?? "")
+    .trim()
+    .slice(0, 300);
+
+  // Never enable the lockdown without a code — that would lock everyone out,
+  // including the owner.
+  const maintenanceMode = wantsMaintenance && bypassCode.length > 0;
+
+  await updateSiteConfig({ maintenanceMode, bypassCode, maintenanceMessage });
+
+  // Grant the owner the bypass cookie immediately so enabling the lockdown
+  // doesn't kick them out of their own admin session.
+  if (maintenanceMode) {
+    const jar = await cookies();
+    jar.set(MAINT_COOKIE, bypassCode, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
 
 export async function setClearanceAction(formData: FormData) {
   const actor = await requireStaff();
@@ -177,6 +209,8 @@ export async function deleteAccountAction(formData: FormData) {
   });
   await db.scpFile.deleteMany({ where: { authorId: userId } });
   await db.broadcast.deleteMany({ where: { authorId: userId } });
+  await db.incidentReport.deleteMany({ where: { authorId: userId } });
+  await db.secureMessage.deleteMany({ where: { authorId: userId } });
   await db.clearanceRequest.deleteMany({ where: { userId } });
   await db.clearanceRequest.updateMany({
     where: { reviewedById: userId },

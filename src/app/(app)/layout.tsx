@@ -1,7 +1,9 @@
 import { requireUser } from "@/lib/session";
+import { enforceMaintenance } from "@/lib/site-config";
 import { TerminalShell } from "@/components/terminal-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  await enforceMaintenance();
   const user = await requireUser();
 
   return (

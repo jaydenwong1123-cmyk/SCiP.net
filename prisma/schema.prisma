@@ -35,6 +35,7 @@ model User {
   scpFiles        ScpFile[]
   broadcasts      Broadcast[]
   incidentReports IncidentReport[]
+  secureMessages  SecureMessage[]
   clearanceRequests ClearanceRequest[] @relation("ClearanceRequestUser")
   reviewedRequests  ClearanceRequest[] @relation("ClearanceRequestReviewer")
   notesAbout       MemberNote[]      @relation("MemberNoteSubject")
@@ -117,6 +118,26 @@ model ClearanceRequest {
   user         User     @relation("ClearanceRequestUser", fields: [userId], references: [id])
   reviewedById String?
   reviewedBy   User?    @relation("ClearanceRequestReviewer", fields: [reviewedById], references: [id])
+}
+
+// Secure communications channel for L-5+ clearance. A single shared, encrypted-
+// styled feed that only cleared personnel can read or post to.
+model SecureMessage {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+}
+
+// Single-row site configuration (id is always "singleton"). Controls the
+// owner-triggered maintenance lockdown and its bypass access code.
+model SiteConfig {
+  id                 String  @id @default("singleton")
+  maintenanceMode    Boolean @default(false)
+  bypassCode         String  @default("")
+  maintenanceMessage String  @default("")
 }
 
 model IncidentReport {

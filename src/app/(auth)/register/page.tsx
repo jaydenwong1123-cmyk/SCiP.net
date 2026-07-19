@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAction, type RegisterResult } from "../actions";
+import { DISCORD_INVITE_URL } from "@/lib/links";
 
 const initialState: RegisterResult | null = null;
 
@@ -13,6 +14,25 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="term-panel w-full max-w-md space-y-4">
         <h1 className="text-lg tracking-widest">:: NEW PERSONNEL REGISTRATION ::</h1>
+
+        <div className="border-2 border-[var(--term-amber)] p-3 space-y-1">
+          <p className="text-[var(--term-amber)] text-sm tracking-wide">
+            ◈ REQUIRED: JOIN THE FOUNDATION DISCORD
+          </p>
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            All personnel must be present in our secure Discord channel before
+            operating on the network.
+          </p>
+          <a
+            href={DISCORD_INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="term-button inline-block text-center w-full text-sm"
+            style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
+          >
+            ▶ JOIN DISCORD SERVER
+          </a>
+        </div>
 
         {state?.ok ? (
           <div className="space-y-3">

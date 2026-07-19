@@ -1,6 +1,7 @@
 import { requireStaff } from "@/lib/session";
 import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
+import { getSiteConfig } from "@/lib/site-config";
 import { MemberRow } from "./member-row";
 import {
   generateInviteCodeAction,
@@ -8,6 +9,7 @@ import {
   reviewClearanceRequestAction,
   setOwnDisplayNameAction,
   setOwnClearanceAction,
+  setMaintenanceAction,
 } from "./actions";
 
 export default async function AdminPage() {
@@ -70,6 +72,8 @@ export default async function AdminPage() {
     rank: l.rank,
     label: l.label,
   }));
+
+  const siteConfig = viewer.isOwner ? await getSiteConfig() : null;
 
   return (
     <div className="space-y-4">
@@ -135,6 +139,66 @@ export default async function AdminPage() {
               <button className="term-button text-xs">SET OWN CLEARANCE</button>
             </form>
           </div>
+        </div>
+      )}
+
+      {viewer.isOwner && siteConfig && (
+        <div className="term-panel space-y-3">
+          <h2 className="text-sm text-[var(--term-amber)]">
+            SITE CONTROL — MAINTENANCE LOCKDOWN
+          </h2>
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            When enabled, the site shows a maintenance notice and only visitors
+            with the access code can enter. A code is required to enable it.
+            {siteConfig.maintenanceMode && (
+              <span className="text-[var(--term-amber)]">
+                {" "}CURRENTLY: LOCKED DOWN.
+              </span>
+            )}
+          </p>
+          <form action={setMaintenanceAction} className="space-y-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="maintenanceMode"
+                defaultChecked={siteConfig.maintenanceMode}
+              />
+              <span>ENABLE MAINTENANCE MODE</span>
+            </label>
+            <div>
+              <label className="block text-xs text-[var(--term-fg-dim)] mb-1" htmlFor="bypassCode">
+                ACCESS CODE (required to enable)
+              </label>
+              <input
+                id="bypassCode"
+                name="bypassCode"
+                defaultValue={siteConfig.bypassCode}
+                maxLength={64}
+                placeholder="e.g. OMEGA-7"
+                className="term-input py-1 w-64"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--term-fg-dim)] mb-1" htmlFor="maintenanceMessage">
+                NOTICE MESSAGE (shown to visitors)
+              </label>
+              <input
+                id="maintenanceMessage"
+                name="maintenanceMessage"
+                defaultValue={siteConfig.maintenanceMessage}
+                maxLength={300}
+                placeholder="THE NETWORK IS OFFLINE FOR A SCHEDULED UPDATE."
+                className="term-input py-1 w-full"
+              />
+            </div>
+            <button
+              className="term-button text-xs"
+              style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
+            >
+              SAVE SITE CONTROL
+            </button>
+          </form>
         </div>
       )}
 

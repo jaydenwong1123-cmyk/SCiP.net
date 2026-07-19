@@ -160,6 +160,48 @@ a {
   }
 }
 
+/* Secure L-5+ channel: a heavier, amber-accented "encrypted" panel. */
+.secure-panel {
+  position: relative;
+  border: 2px solid var(--term-amber);
+  outline: 1px solid rgba(255, 204, 85, 0.25);
+  outline-offset: 3px;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 204, 85, 0.03) 0px,
+      rgba(255, 204, 85, 0.03) 10px,
+      transparent 10px,
+      transparent 20px
+    ),
+    linear-gradient(rgba(255, 204, 85, 0.05), rgba(255, 204, 85, 0.02));
+  padding: 1rem;
+  box-shadow:
+    0 0 16px rgba(255, 204, 85, 0.12) inset,
+    0 0 12px rgba(255, 204, 85, 0.08);
+}
+
+.secure-badge {
+  color: var(--term-amber);
+  border: 1px solid var(--term-amber);
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0.1em;
+  animation: secure-pulse 2s ease-in-out infinite;
+}
+
+@keyframes secure-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 640px) {
+  .secure-panel {
+    padding: 0.75rem;
+    outline-offset: 2px;
+  }
+}
+
 .redacted {
   background: #e6e6e6;
   color: #e6e6e6;
