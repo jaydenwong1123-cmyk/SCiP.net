@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasStaffPowers } from "@/lib/session";
 import { canAccessSecureChannel, clearanceDisplay } from "@/lib/clearance";
 
 type Tile = {
@@ -32,7 +32,7 @@ export default async function MenuPage() {
     });
   }
 
-  if (user.isOwner || user.isAdmin || user.isStaff) {
+  if (hasStaffPowers(user)) {
     tiles.push({
       href: "/admin",
       label: "ADMIN",

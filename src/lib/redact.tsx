@@ -6,16 +6,18 @@ import {
 } from "@/lib/clearance";
 
 // Viewers who may read every redaction, including full (level-less) ones:
-// L-OMNI clearance, staff, admins, and the owner.
+// L-OMNI clearance, staff, admins, the owner and the co-owner.
 export function canBypassRedaction(user: {
   clearance: number;
   isOwner: boolean;
+  isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
 }): boolean {
   return (
     user.clearance >= OWNER_CLEARANCE ||
     user.isOwner ||
+    user.isCoOwner ||
     user.isAdmin ||
     user.isStaff
   );

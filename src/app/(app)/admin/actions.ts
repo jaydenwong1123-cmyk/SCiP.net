@@ -5,8 +5,10 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import {
   requireOwner,
+  requireRootOwner,
   requireAdminPowers,
   requireStaff,
+  hasOwnerPowers,
 } from "@/lib/session";
 import { generateInviteCode } from "@/lib/codeword";
 import {
@@ -56,12 +58,13 @@ export async function setClearanceAction(formData: FormData) {
   if (!userId || !parsed) return;
   const { clearance, designation } = parsed;
 
-  // Only owner/admin may grant the top clearance (L-OMNI). Staff cap below it.
-  const canGrantTop = actor.isOwner || actor.isAdmin;
+  // Only owner/co-owner/admin may grant the top clearance (L-OMNI). Staff cap
+  // below it.
+  const canGrantTop = hasOwnerPowers(actor) || actor.isAdmin;
   if (clearance >= OWNER_CLEARANCE && !canGrantTop) return;
 
   await db.user.update({
-    where: { id: userId, isOwner: false },
+    where: { id: userId, isOwner: false, isCoOwner: false },
     data: { clearance, designation },
   });
 
@@ -156,7 +159,7 @@ export async function toggleStaffAction(formData: FormData) {
   if (!userId) return;
 
   await db.user.update({
-    where: { id: userId, isOwner: false },
+    where: { id: userId, isOwner: false, isCoOwner: false },
     data: { isStaff },
   });
 
@@ -172,11 +175,40 @@ export async function toggleAdminAction(formData: FormData) {
   if (!userId) return;
 
   await db.user.update({
-    where: { id: userId, isOwner: false },
+    where: { id: userId, isOwner: false, isCoOwner: false },
     data: { isAdmin },
   });
 
   revalidatePath("/admin");
+}
+
+export async function toggleCoOwnerAction(formData: FormData) {
+  // Only the seeded owner may appoint or remove the Co-Owner — a co-owner
+  // cannot hand the role to someone else or entrench themselves.
+  await requireRootOwner();
+  const userId = String(formData.get("userId") ?? "");
+  const isCoOwner = formData.get("isCoOwner") === "true";
+
+  if (!userId) return;
+
+  const target = await db.user.findUnique({ where: { id: userId } });
+  if (!target || target.isOwner) return; // the owner already outranks the role
+
+  if (isCoOwner) {
+    // At most one co-owner: demote any current holder first.
+    await db.user.updateMany({
+      where: { isCoOwner: true },
+      data: { isCoOwner: false },
+    });
+  }
+
+  await db.user.update({
+    where: { id: userId, isOwner: false },
+    data: { isCoOwner },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
 }
 
 export async function setSuspendedAction(formData: FormData) {
@@ -187,10 +219,11 @@ export async function setSuspendedAction(formData: FormData) {
   if (!userId || userId === actor.id) return;
 
   const target = await db.user.findUnique({ where: { id: userId } });
-  if (!target || target.isOwner) return; // never suspend the owner
+  // Never suspend the owner or the co-owner.
+  if (!target || hasOwnerPowers(target)) return;
 
   await db.user.update({
-    where: { id: userId, isOwner: false },
+    where: { id: userId, isOwner: false, isCoOwner: false },
     data: {
       suspended: suspend,
       suspendedReason: suspend ? (reason ? reason.slice(0, 300) : null) : null,
@@ -207,7 +240,8 @@ export async function deleteAccountAction(formData: FormData) {
   if (!userId || userId === actor.id) return;
 
   const target = await db.user.findUnique({ where: { id: userId } });
-  if (!target || target.isOwner) return; // never delete the owner
+  // Never delete the owner or the co-owner.
+  if (!target || hasOwnerPowers(target)) return;
 
   // No FK cascade under relationMode="prisma": clean up related rows manually.
   await db.message.deleteMany({
@@ -282,11 +316,11 @@ export async function reviewClearanceRequestAction(formData: FormData) {
   });
 
   if (decision === "approve" && request.requestedLevel <= MAX_CLEARANCE) {
-    // Staff cannot push a member to the top clearance; owner/admin can.
-    const canGrantTop = reviewer.isOwner || reviewer.isAdmin;
+    // Staff cannot push a member to the top clearance; owner-level/admin can.
+    const canGrantTop = hasOwnerPowers(reviewer) || reviewer.isAdmin;
     if (request.requestedLevel < OWNER_CLEARANCE || canGrantTop) {
       await db.user.update({
-        where: { id: request.userId, isOwner: false },
+        where: { id: request.userId, isOwner: false, isCoOwner: false },
         data: { clearance: request.requestedLevel, designation: null },
       });
     }

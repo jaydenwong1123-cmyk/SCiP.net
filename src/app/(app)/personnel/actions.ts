@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireUser, canAnnotateMembers } from "@/lib/session";
+import { requireUser, canAnnotateMembers, hasStaffPowers } from "@/lib/session";
 
 export async function addMemberNoteAction(formData: FormData) {
   const author = await requireUser();
@@ -41,7 +41,7 @@ export async function deleteMemberNoteAction(formData: FormData) {
   if (!note) return;
 
   // Authors can delete their own notes; staff/admin/owner can delete any.
-  const canDeleteAny = viewer.isOwner || viewer.isAdmin || viewer.isStaff;
+  const canDeleteAny = hasStaffPowers(viewer);
   if (note.authorId !== viewer.id && !canDeleteAny) return;
 
   await db.memberNote.delete({ where: { id: noteId } });

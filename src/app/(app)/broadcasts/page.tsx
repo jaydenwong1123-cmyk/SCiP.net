@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/session";
+import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canPostBroadcast } from "@/lib/clearance";
 import { renderRedacted, canBypassRedaction } from "@/lib/redact";
@@ -7,7 +7,7 @@ import { deleteBroadcastAction } from "./actions";
 
 export default async function BroadcastsPage() {
   const user = await requireUser();
-  const canManage = user.isOwner || user.isAdmin;
+  const canManage = hasAdminPowers(user);
   const broadcasts = await db.broadcast.findMany({
     orderBy: { createdAt: "desc" },
     include: { author: { select: { displayName: true } } },

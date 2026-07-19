@@ -14,6 +14,7 @@ export function TerminalShell({
     clearance: number;
     designation: string | null;
     isOwner: boolean;
+    isCoOwner: boolean;
     isAdmin: boolean;
     isStaff: boolean;
   };

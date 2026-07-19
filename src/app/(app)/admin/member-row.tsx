@@ -8,6 +8,7 @@ import {
   toggleCanPostScpAction,
   toggleStaffAction,
   toggleAdminAction,
+  toggleCoOwnerAction,
   setSuspendedAction,
   deleteAccountAction,
 } from "./actions";
@@ -20,6 +21,7 @@ type Member = {
   clearance: number;
   designation: string | null;
   canPostScp: boolean;
+  isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
   department: string | null;
@@ -31,15 +33,26 @@ export function MemberRow({
   canGrantTopClearance,
   canManageStaff,
   canManageAdmin,
+  canManageCoOwner,
 }: {
   member: Member;
   canGrantTopClearance: boolean;
   canManageStaff: boolean;
   canManageAdmin: boolean;
+  canManageCoOwner: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  const role = member.isAdmin ? "ADMIN" : member.isStaff ? "STAFF" : null;
+  const role = member.isCoOwner
+    ? "CO-OWNER"
+    : member.isAdmin
+      ? "ADMIN"
+      : member.isStaff
+        ? "STAFF"
+        : null;
+  // A co-owner is owner-equivalent: only the seeded owner may touch them, and
+  // then only to revoke the role.
+  const locked = member.isCoOwner && !canManageCoOwner;
   // L-OMNI (value "7") may only be granted by owner/admin.
   const selectableOptions = CLEARANCE_ASSIGN_OPTIONS.filter(
     (o) => canGrantTopClearance || o.value !== "7"
@@ -67,7 +80,30 @@ export function MemberRow({
         </span>
       </button>
 
-      {open && (
+      {open && member.isCoOwner && (
+        <div className="flex flex-wrap items-center gap-3 pt-3 pl-5 text-sm">
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            CO-OWNER — OWNER-EQUIVALENT AUTHORITY.
+            {locked
+              ? " ONLY THE OWNER MAY REVOKE THIS ROLE."
+              : " REVOKE THE ROLE TO MANAGE THIS ACCOUNT."}
+          </p>
+          {canManageCoOwner && (
+            <form action={toggleCoOwnerAction}>
+              <input type="hidden" name="userId" value={member.id} />
+              <input type="hidden" name="isCoOwner" value="false" />
+              <button
+                className="term-button text-xs"
+                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+              >
+                REVOKE CO-OWNER
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {open && !member.isCoOwner && (
         <div className="flex flex-wrap items-center gap-3 pt-3 pl-5 text-sm">
           <form action={setDisplayNameAction} className="flex items-center gap-2">
             <input type="hidden" name="userId" value={member.id} />
@@ -157,6 +193,30 @@ export function MemberRow({
                 style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
               >
                 {member.isAdmin ? "REVOKE ADMIN" : "GRANT ADMIN"}
+              </button>
+            </form>
+          )}
+
+          {canManageCoOwner && (
+            <form
+              action={toggleCoOwnerAction}
+              onSubmit={(e) => {
+                if (
+                  !confirm(
+                    `Make ${member.displayName ?? "this member"} Co-Owner? They gain full owner-level authority, and any current Co-Owner is demoted.`
+                  )
+                ) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <input type="hidden" name="userId" value={member.id} />
+              <input type="hidden" name="isCoOwner" value="true" />
+              <button
+                className="term-button text-xs"
+                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+              >
+                GRANT CO-OWNER
               </button>
             </form>
           )}

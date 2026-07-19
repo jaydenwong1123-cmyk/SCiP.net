@@ -14,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         clearance: user.clearance,
         designation: user.designation,
         isOwner: user.isOwner,
+        isCoOwner: user.isCoOwner,
         isAdmin: user.isAdmin,
         isStaff: user.isStaff,
       }}

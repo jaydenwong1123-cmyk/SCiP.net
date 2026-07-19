@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { requireStaff } from "@/lib/session";
+import { requireStaff, hasOwnerPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import {
   CLEARANCE_LEVELS,
@@ -23,9 +23,12 @@ import {
 
 export default async function AdminPage() {
   const viewer = await requireStaff();
-  const canManageStaff = viewer.isOwner || viewer.isAdmin;
-  const canManageAdmin = viewer.isOwner;
-  const canGrantTopClearance = viewer.isOwner || viewer.isAdmin;
+  const ownerPowers = hasOwnerPowers(viewer);
+  const canManageStaff = ownerPowers || viewer.isAdmin;
+  const canManageAdmin = ownerPowers;
+  // Appointing the single Co-Owner is reserved for the seeded owner.
+  const canManageCoOwner = viewer.isOwner;
+  const canGrantTopClearance = ownerPowers || viewer.isAdmin;
 
   const [
     members,
@@ -83,7 +86,7 @@ export default async function AdminPage() {
     { label: "MESSAGES", value: messageCount },
   ];
 
-  const siteConfig = viewer.isOwner ? await getSiteConfig() : null;
+  const siteConfig = ownerPowers ? await getSiteConfig() : null;
 
   return (
     <div className="space-y-4">
@@ -131,10 +134,10 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {viewer.isOwner && (
+      {ownerPowers && (
         <div className="term-panel space-y-3">
           <h2 className="text-sm text-[var(--term-fg-dim)]">
-            OWNER SELF-MANAGEMENT
+            {viewer.isOwner ? "OWNER" : "CO-OWNER"} SELF-MANAGEMENT
           </h2>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <form action={setOwnDisplayNameAction} className="flex items-center gap-2">
@@ -166,7 +169,7 @@ export default async function AdminPage() {
         </div>
       )}
 
-      {viewer.isOwner && siteConfig && (
+      {ownerPowers && siteConfig && (
         <div className="term-panel space-y-3">
           <h2 className="text-sm text-[var(--term-amber)]">
             SITE CONTROL — MAINTENANCE LOCKDOWN
@@ -287,6 +290,7 @@ export default async function AdminPage() {
                 clearance: m.clearance,
                 designation: m.designation,
                 canPostScp: m.canPostScp,
+                isCoOwner: m.isCoOwner,
                 isAdmin: m.isAdmin,
                 isStaff: m.isStaff,
                 department: m.department,
@@ -295,6 +299,7 @@ export default async function AdminPage() {
               canGrantTopClearance={canGrantTopClearance}
               canManageStaff={canManageStaff}
               canManageAdmin={canManageAdmin}
+              canManageCoOwner={canManageCoOwner}
             />
           ))}
         </div>

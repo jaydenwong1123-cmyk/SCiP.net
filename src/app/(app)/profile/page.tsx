@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/session";
+import { requireUser, hasOwnerPowers } from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
 import {
   OPEN_DEPARTMENTS,
@@ -10,11 +10,12 @@ import { updateDepartmentAction } from "./actions";
 
 export default async function ProfilePage() {
   const user = await requireUser();
-  // The owner may freely change to any department; members are locked out of a
-  // staff-assigned restricted department.
+  // Owner-level personnel may freely change to any department; members are
+  // locked out of a staff-assigned restricted department.
+  const ownerPowers = hasOwnerPowers(user);
   const restrictedLocked =
-    !user.isOwner && !!user.department && isRestrictedDepartment(user.department);
-  const departmentOptions = user.isOwner ? ALL_DEPARTMENTS : OPEN_DEPARTMENTS;
+    !ownerPowers && !!user.department && isRestrictedDepartment(user.department);
+  const departmentOptions = ownerPowers ? ALL_DEPARTMENTS : OPEN_DEPARTMENTS;
 
   return (
     <div className="term-panel space-y-4">

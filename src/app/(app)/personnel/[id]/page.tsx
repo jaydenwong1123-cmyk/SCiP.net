@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireUser, canAnnotateMembers } from "@/lib/session";
+import { requireUser, canAnnotateMembers, hasStaffPowers } from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
 import { renderRedacted, canBypassRedaction } from "@/lib/redact";
 import { addMemberNoteAction, deleteMemberNoteAction } from "../actions";
@@ -39,7 +39,7 @@ export default async function PersonnelFilePage({
         include: { author: { select: { displayName: true } } },
       })
     : [];
-  const canDeleteAny = viewer.isOwner || viewer.isAdmin || viewer.isStaff;
+  const canDeleteAny = hasStaffPowers(viewer);
 
   return (
     <div className="space-y-4">

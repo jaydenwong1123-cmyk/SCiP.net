@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasStaffPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { classificationColor } from "@/lib/classification";
@@ -22,7 +22,7 @@ export default async function ScpDetailPage({
 
   if (!file || file.clearanceRequired > user.clearance) notFound();
 
-  const canManage = user.isOwner || user.isAdmin || user.isStaff;
+  const canManage = hasStaffPowers(user);
 
   return (
     <div className="term-panel space-y-4">

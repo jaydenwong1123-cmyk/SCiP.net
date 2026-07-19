@@ -8,14 +8,13 @@ import { MEMBER_NOTE_CLEARANCE } from "@/lib/clearance";
 export function canAnnotateMembers(user: {
   clearance: number;
   isOwner: boolean;
+  isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
 }): boolean {
   return (
     user.clearance >= MEMBER_NOTE_CLEARANCE ||
-    user.isOwner ||
-    user.isAdmin ||
-    user.isStaff
+    hasStaffPowers(user)
   );
 }
 
@@ -37,27 +36,49 @@ export async function requireUser() {
 }
 
 // Role hierarchy:
-//   Owner  (isOwner)  — seeded, supreme. Only the owner can grant/revoke Admin.
-//   Admin  (isAdmin)  — owner-level powers: delete accounts, grant L-OMNI,
-//                       grant/revoke Staff, plus everything Staff can do.
-//   Staff  (isStaff)  — elevated panel access: rename, set clearance (below
-//                       L-OMNI), toggle SCP-post, delete SCP files, invite
-//                       codes, review clearance requests.
+//   Owner    (isOwner)   — seeded, supreme. Only the owner can grant/revoke
+//                          Admin, and only the owner can appoint the Co-Owner.
+//   Co-Owner (isCoOwner) — everything the owner can do, held by at most one
+//                          member. Cannot be demoted/suspended/deleted by
+//                          anyone but the owner, and cannot appoint itself a
+//                          replacement.
+//   Admin    (isAdmin)   — owner-level powers: delete accounts, grant L-OMNI,
+//                          grant/revoke Staff, plus everything Staff can do.
+//   Staff    (isStaff)   — elevated panel access: rename, set clearance (below
+//                          L-OMNI), toggle SCP-post, delete SCP files, invite
+//                          codes, review clearance requests.
 
-export function hasAdminPowers(user: { isOwner: boolean; isAdmin: boolean }) {
-  return user.isOwner || user.isAdmin;
+// Owner-equivalent: the seeded owner or the appointed co-owner.
+export function hasOwnerPowers(user: { isOwner: boolean; isCoOwner: boolean }) {
+  return user.isOwner || user.isCoOwner;
+}
+
+export function hasAdminPowers(user: {
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+}) {
+  return hasOwnerPowers(user) || user.isAdmin;
 }
 
 export function hasStaffPowers(user: {
   isOwner: boolean;
+  isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
 }) {
-  return user.isOwner || user.isAdmin || user.isStaff;
+  return hasAdminPowers(user) || user.isStaff;
 }
 
-// Only the seeded owner.
+// Owner or co-owner.
 export async function requireOwner() {
+  const user = await requireUser();
+  if (!hasOwnerPowers(user)) redirect("/");
+  return user;
+}
+
+// Strictly the seeded owner — appointing/removing the co-owner only.
+export async function requireRootOwner() {
   const user = await requireUser();
   if (!user.isOwner) redirect("/");
   return user;

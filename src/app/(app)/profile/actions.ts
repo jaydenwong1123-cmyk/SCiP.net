@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasOwnerPowers } from "@/lib/session";
 import {
   isOpenDepartment,
   isRestrictedDepartment,
@@ -13,9 +13,9 @@ export async function updateDepartmentAction(formData: FormData) {
   const user = await requireUser();
   const department = String(formData.get("department") ?? "");
 
-  // The owner may self-assign any valid department (or clear to none),
-  // bypassing the member restrictions below.
-  if (user.isOwner) {
+  // Owner-level personnel may self-assign any valid department (or clear to
+  // none), bypassing the member restrictions below.
+  if (hasOwnerPowers(user)) {
     if (department !== "" && !isValidDepartment(department)) return;
   } else {
     // Members may only self-assign open departments (or clear to none). If they
