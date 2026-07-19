@@ -101,13 +101,14 @@ export async function setOwnDisplayNameAction(formData: FormData) {
 
 export async function setOwnClearanceAction(formData: FormData) {
   const owner = await requireOwner();
-  const clearance = Number(formData.get("clearance"));
-  if (!Number.isInteger(clearance)) return;
+  const parsed = parseClearanceAssignment(String(formData.get("clearance") ?? ""));
+  if (!parsed) return;
+  const { clearance, designation } = parsed;
   if (clearance < MIN_CLEARANCE || clearance > OWNER_CLEARANCE) return;
 
   await db.user.update({
     where: { id: owner.id },
-    data: { clearance, designation: null },
+    data: { clearance, designation },
   });
 
   revalidatePath("/admin");

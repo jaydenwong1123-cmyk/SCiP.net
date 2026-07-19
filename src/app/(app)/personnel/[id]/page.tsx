@@ -30,14 +30,6 @@ export default async function PersonnelFilePage({
 
   if (!person || !person.displayName) notFound();
 
-  const role = person.isOwner
-    ? "FOUNDATION OWNER"
-    : person.isAdmin
-      ? "ADMIN"
-      : person.isStaff
-        ? "STAFF"
-        : null;
-
   // Notes are visible only to authorized personnel, and never to the subject.
   const showNotes = canAnnotateMembers(viewer) && viewer.id !== person.id;
   const notes = showNotes
@@ -62,7 +54,6 @@ export default async function PersonnelFilePage({
         </div>
         <p className="text-sm text-[var(--term-fg-dim)]">
           CLEARANCE: {clearanceDisplay(person.clearance, person.designation)}
-          {role ? ` — ${role}` : ""}
           {person.department ? ` — ${person.department}` : ""}
         </p>
         <pre className="whitespace-pre-wrap break-words font-mono text-sm term-panel min-h-[10rem]">

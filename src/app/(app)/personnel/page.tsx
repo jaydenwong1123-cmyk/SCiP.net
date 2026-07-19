@@ -41,13 +41,6 @@ export default async function PersonnelPage() {
       <div className="term-panel space-y-2">
         {personnel.length === 0 && <p className="text-sm">NO PERSONNEL ON RECORD.</p>}
         {personnel.map((p) => {
-          const role = p.isOwner
-            ? "OWNER"
-            : p.isAdmin
-              ? "ADMIN"
-              : p.isStaff
-                ? "STAFF"
-                : null;
           return (
             <Link
               key={p.id}
@@ -59,7 +52,6 @@ export default async function PersonnelPage() {
                   <span className="text-[var(--term-red)]" title="FLAGGED">⚑ </span>
                 )}
                 {p.displayName}
-                {role && <span className="text-[var(--term-amber)]"> [{role}]</span>}
                 {p.department && (
                   <span className="text-[var(--term-fg-dim)]"> — {p.department}</span>
                 )}

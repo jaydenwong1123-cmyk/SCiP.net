@@ -1,6 +1,13 @@
 import { requireStaff } from "@/lib/session";
 import { db } from "@/lib/db";
-import { CLEARANCE_LEVELS, clearanceLabel, clearanceDisplay } from "@/lib/clearance";
+import {
+  CLEARANCE_LEVELS,
+  CLEARANCE_ASSIGN_OPTIONS,
+  E5_DESIGNATION,
+  clearanceLabel,
+  clearanceDisplay,
+  clearanceAssignValue,
+} from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberRow } from "./member-row";
 import {
@@ -29,6 +36,7 @@ export default async function AdminPage() {
     incidentCount,
     messageCount,
     activeInviteCount,
+    e5Count,
   ] = await Promise.all([
     db.user.findMany({
       where: { isOwner: false },
@@ -52,6 +60,7 @@ export default async function AdminPage() {
     db.incidentReport.count(),
     db.message.count(),
     db.inviteCode.count({ where: { active: true, usedById: null } }),
+    db.user.count({ where: { designation: E5_DESIGNATION } }),
   ]);
 
   // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
@@ -65,15 +74,11 @@ export default async function AdminPage() {
     { label: "SUSPENDED", value: suspendedCount },
     { label: "PENDING REQ", value: pendingRequests.length },
     { label: "ACTIVE INVITES", value: activeInviteCount },
+    { label: "L-E5", value: e5Count },
     { label: "SCP FILES", value: scpCount },
     { label: "INCIDENTS", value: incidentCount },
     { label: "MESSAGES", value: messageCount },
   ];
-
-  const editableLevels = CLEARANCE_LEVELS.map((l) => ({
-    rank: l.rank,
-    label: l.label,
-  }));
 
   const siteConfig = viewer.isOwner ? await getSiteConfig() : null;
 
@@ -106,6 +111,9 @@ export default async function AdminPage() {
               <span className="text-[var(--term-fg)]">{tierMap.get(l.rank) ?? 0}</span>
             </span>
           ))}
+          <span>
+            L-E5=<span className="text-[var(--term-fg)]">{e5Count}</span>
+          </span>
         </div>
       </div>
 
@@ -129,12 +137,12 @@ export default async function AdminPage() {
             <form action={setOwnClearanceAction} className="flex items-center gap-2">
               <select
                 name="clearance"
-                defaultValue={viewer.clearance}
+                defaultValue={clearanceAssignValue(viewer.clearance, viewer.designation)}
                 className="term-input py-1"
               >
-                {editableLevels.map((l) => (
-                  <option key={l.rank} value={l.rank}>
-                    {l.label}
+                {CLEARANCE_ASSIGN_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
                   </option>
                 ))}
               </select>
