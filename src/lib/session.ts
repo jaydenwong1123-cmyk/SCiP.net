@@ -27,6 +27,8 @@ export async function getCurrentUser() {
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // A member suspended mid-session loses access immediately.
+  if (user.suspended) redirect("/suspended");
   if (!user.displayName) redirect("/set-name");
   return user;
 }

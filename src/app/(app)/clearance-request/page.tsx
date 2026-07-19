@@ -8,6 +8,7 @@ export default async function ClearanceRequestPage() {
   const myRequests = await db.clearanceRequest.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
+    include: { reviewedBy: { select: { displayName: true } } },
   });
   const hasPending = myRequests.some((r) => r.status === "pending");
 
@@ -31,20 +32,32 @@ export default async function ClearanceRequestPage() {
         <h2 className="text-sm text-[var(--term-fg-dim)]">REQUEST HISTORY</h2>
         {myRequests.length === 0 && <p className="text-sm">NO PAST REQUESTS.</p>}
         {myRequests.map((r) => (
-          <div key={r.id} className="text-sm py-1 border-b border-[var(--term-border)]/30">
-            REQUESTED {clearanceLabel(r.requestedLevel)} —{" "}
-            <span
-              className={
-                r.status === "approved"
-                  ? "text-[var(--term-fg-bright)]"
-                  : r.status === "denied"
-                  ? "text-[var(--term-red)]"
-                  : "text-[var(--term-amber)]"
-              }
-            >
-              {r.status.toUpperCase()}
-            </span>{" "}
-            — {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+          <div key={r.id} className="text-sm py-1 border-b border-[var(--term-border)]/30 space-y-0.5">
+            <div>
+              REQUESTED {clearanceLabel(r.requestedLevel)} —{" "}
+              <span
+                className={
+                  r.status === "approved"
+                    ? "text-[var(--term-fg-bright)]"
+                    : r.status === "denied"
+                    ? "text-[var(--term-red)]"
+                    : "text-[var(--term-amber)]"
+                }
+              >
+                {r.status.toUpperCase()}
+              </span>{" "}
+              — {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+              {r.reviewedBy && (
+                <span className="text-[var(--term-fg-dim)]">
+                  {" "}· BY {r.reviewedBy.displayName}
+                </span>
+              )}
+            </div>
+            {r.reviewNote && (
+              <div className="text-[var(--term-fg-dim)] pl-2">
+                ▸ NOTE: {r.reviewNote}
+              </div>
+            )}
           </div>
         ))}
       </div>

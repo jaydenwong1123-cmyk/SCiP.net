@@ -5,10 +5,10 @@ import { ComposeForm } from "./compose-form";
 export default async function ComposePage({
   searchParams,
 }: {
-  searchParams: Promise<{ to?: string; subject?: string }>;
+  searchParams: Promise<{ to?: string; subject?: string; thread?: string }>;
 }) {
   const user = await requireUser();
-  const { to, subject } = await searchParams;
+  const { to, subject, thread } = await searchParams;
   const recipients = await db.user.findMany({
     where: { displayName: { not: null }, id: { not: user.id } },
     orderBy: { displayName: "asc" },
@@ -25,6 +25,7 @@ export default async function ComposePage({
         recipients={recipients}
         defaultRecipientId={defaultRecipientId}
         defaultSubject={subject ?? ""}
+        threadId={thread ?? ""}
       />
     </div>
   );

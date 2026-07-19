@@ -8,6 +8,7 @@ import {
   toggleCanPostScpAction,
   toggleStaffAction,
   toggleAdminAction,
+  setSuspendedAction,
   deleteAccountAction,
 } from "./actions";
 import { ALL_DEPARTMENTS } from "@/lib/departments";
@@ -20,6 +21,7 @@ type Member = {
   isAdmin: boolean;
   isStaff: boolean;
   department: string | null;
+  suspended: boolean;
 };
 
 type Level = { rank: number; label: string };
@@ -57,6 +59,9 @@ export function MemberRow({
         </span>
         {role && (
           <span className="text-[var(--term-amber)]">[{role}]</span>
+        )}
+        {member.suspended && (
+          <span className="text-[var(--term-red)]">[SUSPENDED]</span>
         )}
         <span className="ml-auto text-xs text-[var(--term-fg-dim)]">
           {open ? "CLOSE" : "MANAGE"}
@@ -153,6 +158,32 @@ export function MemberRow({
                 style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
               >
                 {member.isAdmin ? "REVOKE ADMIN" : "GRANT ADMIN"}
+              </button>
+            </form>
+          )}
+
+          {member.suspended ? (
+            <form action={setSuspendedAction}>
+              <input type="hidden" name="userId" value={member.id} />
+              <input type="hidden" name="suspend" value="false" />
+              <button className="term-button text-xs">REINSTATE</button>
+            </form>
+          ) : (
+            <form action={setSuspendedAction} className="flex items-center gap-2">
+              <input type="hidden" name="userId" value={member.id} />
+              <input type="hidden" name="suspend" value="true" />
+              <input
+                type="text"
+                name="reason"
+                placeholder="REASON (OPTIONAL)"
+                maxLength={300}
+                className="term-input py-1 w-40"
+              />
+              <button
+                className="term-button text-xs"
+                style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
+              >
+                SUSPEND
               </button>
             </form>
           )}

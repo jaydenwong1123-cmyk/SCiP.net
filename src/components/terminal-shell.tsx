@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: "/personnel", label: "PERSONNEL" },
   { href: "/messages", label: "MESSAGES" },
   { href: "/scp", label: "SCP FILES" },
+  { href: "/incidents", label: "INCIDENTS" },
   { href: "/broadcasts", label: "BROADCASTS" },
   { href: "/clearance-request", label: "CLEARANCE" },
 ];
@@ -24,13 +25,15 @@ export function TerminalShell({
   };
 }) {
   return (
-    <div className="min-h-screen flex flex-col max-w-5xl mx-auto p-4 gap-4">
-      <header className="term-panel flex flex-wrap items-center justify-between gap-2">
+    <div className="min-h-screen flex flex-col max-w-5xl mx-auto p-2 sm:p-4 gap-3 sm:gap-4">
+      <header className="term-panel flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
-          <span className="text-lg tracking-widest">SCiP.NET</span>
-          <span className="text-[var(--term-fg-dim)] ml-2">// SECURE TERMINAL</span>
+          <span className="text-base sm:text-lg tracking-widest">SCiP.NET</span>
+          <span className="hidden sm:inline text-[var(--term-fg-dim)] ml-2">
+            {"// SECURE TERMINAL"}
+          </span>
         </div>
-        <div className="text-sm flex items-center gap-4">
+        <div className="text-xs sm:text-sm flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4">
           <span>
             USER: <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
             [{clearanceLabel(user.clearance)}]
@@ -50,7 +53,7 @@ export function TerminalShell({
         </div>
       </header>
 
-      <nav className="term-panel flex flex-wrap gap-4 text-sm">
+      <nav className="term-panel flex flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm">
         {NAV_ITEMS.map((item) => (
           <Link key={item.href} href={item.href} className="term-link">
             [{item.label}]

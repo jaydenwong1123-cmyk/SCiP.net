@@ -7,15 +7,18 @@ export function ComposeForm({
   recipients,
   defaultRecipientId = "",
   defaultSubject = "",
+  threadId = "",
 }: {
   recipients: { id: string; displayName: string | null }[];
   defaultRecipientId?: string;
   defaultSubject?: string;
+  threadId?: string;
 }) {
   const [state, formAction, pending] = useActionState(sendMessageAction, null);
 
   return (
     <form action={formAction} className="space-y-3">
+      {threadId && <input type="hidden" name="threadId" value={threadId} />}
       <div>
         <label className="block text-sm mb-1" htmlFor="recipientId">
           TO

@@ -36,6 +36,9 @@ export async function registerAction(
   if (!invite || !invite.active || invite.usedById) {
     return { ok: false, error: "INVALID OR ALREADY-USED INVITE CODE." };
   }
+  if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
+    return { ok: false, error: "THIS INVITE CODE HAS EXPIRED." };
+  }
 
   const email = `${username}@${EMAIL_DOMAIN}`;
   const existing = await db.user.findUnique({ where: { email } });

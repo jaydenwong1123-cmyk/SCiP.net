@@ -13,6 +13,7 @@ export async function sendMessageAction(
   const recipientId = String(formData.get("recipientId") ?? "");
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
+  const replyToThread = String(formData.get("threadId") ?? "").trim();
 
   if (!recipientId || !subject || !body) {
     return { ok: false, error: "RECIPIENT, SUBJECT, AND BODY ARE ALL REQUIRED." };
@@ -23,26 +24,50 @@ export async function sendMessageAction(
     return { ok: false, error: "RECIPIENT NOT FOUND." };
   }
 
-  await db.message.create({
+  // Only continue an existing thread the sender actually took part in.
+  let threadId: string | undefined;
+  if (replyToThread) {
+    const root = await db.message.findFirst({
+      where: {
+        OR: [{ id: replyToThread }, { threadId: replyToThread }],
+        AND: { OR: [{ senderId: user.id }, { recipientId: user.id }] },
+      },
+      select: { threadId: true, id: true },
+    });
+    if (root) threadId = root.threadId ?? root.id;
+  }
+
+  const created = await db.message.create({
     data: {
       senderId: user.id,
       recipientId,
       subject: subject.slice(0, 200),
       body: body.slice(0, 10000),
+      threadId,
     },
   });
+
+  // Thread-starting message: anchor the thread to its own id.
+  if (!threadId) {
+    await db.message.update({
+      where: { id: created.id },
+      data: { threadId: created.id },
+    });
+  }
 
   revalidatePath("/messages");
   redirect("/messages");
 }
 
-export async function markReadAction(messageId: string) {
+// Mark every message the viewer received in a conversation as read.
+export async function markThreadReadAction(threadKey: string) {
   const user = await requireUser();
-  const message = await db.message.findUnique({ where: { id: messageId } });
-  if (!message || message.recipientId !== user.id) return;
-
-  await db.message.update({
-    where: { id: messageId },
+  await db.message.updateMany({
+    where: {
+      recipientId: user.id,
+      read: false,
+      OR: [{ threadId: threadKey }, { id: threadKey }],
+    },
     data: { read: true },
   });
   revalidatePath("/messages");

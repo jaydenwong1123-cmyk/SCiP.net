@@ -141,6 +141,28 @@ export async function toggleAdminAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function setSuspendedAction(formData: FormData) {
+  const actor = await requireStaff();
+  const userId = String(formData.get("userId") ?? "");
+  const suspend = formData.get("suspend") === "true";
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!userId || userId === actor.id) return;
+
+  const target = await db.user.findUnique({ where: { id: userId } });
+  if (!target || target.isOwner) return; // never suspend the owner
+
+  await db.user.update({
+    where: { id: userId, isOwner: false },
+    data: {
+      suspended: suspend,
+      suspendedReason: suspend ? (reason ? reason.slice(0, 300) : null) : null,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
+}
+
 export async function deleteAccountAction(formData: FormData) {
   const actor = await requireAdminPowers();
   const userId = String(formData.get("userId") ?? "");
@@ -170,9 +192,25 @@ export async function deleteAccountAction(formData: FormData) {
   revalidatePath("/personnel");
 }
 
-export async function generateInviteCodeAction() {
+export async function generateInviteCodeAction(formData: FormData) {
   await requireStaff();
-  await db.inviteCode.create({ data: { code: generateInviteCode() } });
+
+  const countRaw = Number(formData.get("count"));
+  const count =
+    Number.isInteger(countRaw) && countRaw >= 1 && countRaw <= 50 ? countRaw : 1;
+
+  const expiryDays = Number(formData.get("expiryDays"));
+  let expiresAt: Date | null = null;
+  if (Number.isInteger(expiryDays) && expiryDays >= 1 && expiryDays <= 365) {
+    expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
+  }
+
+  await db.inviteCode.createMany({
+    data: Array.from({ length: count }, () => ({
+      code: generateInviteCode(),
+      expiresAt,
+    })),
+  });
   revalidatePath("/admin");
 }
 
@@ -188,6 +226,7 @@ export async function reviewClearanceRequestAction(formData: FormData) {
   const reviewer = await requireStaff();
   const requestId = String(formData.get("requestId") ?? "");
   const decision = String(formData.get("decision") ?? "");
+  const reviewNote = String(formData.get("reviewNote") ?? "").trim();
 
   const request = await db.clearanceRequest.findUnique({ where: { id: requestId } });
   if (!request || request.status !== "pending") return;
@@ -196,6 +235,7 @@ export async function reviewClearanceRequestAction(formData: FormData) {
     where: { id: requestId },
     data: {
       status: decision === "approve" ? "approved" : "denied",
+      reviewNote: reviewNote ? reviewNote.slice(0, 500) : null,
       reviewedById: reviewer.id,
       reviewedAt: new Date(),
     },

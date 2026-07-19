@@ -29,6 +29,7 @@ export function SettingsForm() {
 
   // Load saved values on mount.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(localStorage.getItem(THEME_STORAGE_KEY) ?? DEFAULT_THEME);
     setFont(localStorage.getItem(FONT_STORAGE_KEY) ?? DEFAULT_FONT);
   }, []);

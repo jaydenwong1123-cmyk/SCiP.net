@@ -83,6 +83,14 @@ a {
     0 0 10px rgba(var(--term-glow-rgb), 0.06);
 }
 
+/* Tighten the HUD on narrow screens so the outline offset doesn't overflow. */
+@media (max-width: 640px) {
+  .term-panel {
+    padding: 0.75rem;
+    outline-offset: 2px;
+  }
+}
+
 /* Bright bracket accents on opposite corners for a detailed HUD look. */
 .term-panel::before,
 .term-panel::after {

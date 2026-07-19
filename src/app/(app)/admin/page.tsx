@@ -16,7 +16,18 @@ export default async function AdminPage() {
   const canManageAdmin = viewer.isOwner;
   const canGrantTopClearance = viewer.isOwner || viewer.isAdmin;
 
-  const [members, inviteCodes, pendingRequests] = await Promise.all([
+  const [
+    members,
+    inviteCodes,
+    pendingRequests,
+    tierCounts,
+    suspendedCount,
+    staffCount,
+    scpCount,
+    incidentCount,
+    messageCount,
+    activeInviteCount,
+  ] = await Promise.all([
     db.user.findMany({
       where: { isOwner: false },
       orderBy: { displayName: "asc" },
@@ -30,7 +41,30 @@ export default async function AdminPage() {
       orderBy: { createdAt: "asc" },
       include: { user: { select: { displayName: true, clearance: true } } },
     }),
+    db.user.groupBy({ by: ["clearance"], _count: true }),
+    db.user.count({ where: { suspended: true } }),
+    db.user.count({ where: { OR: [{ isStaff: true }, { isAdmin: true }] } }),
+    db.scpFile.count(),
+    db.incidentReport.count(),
+    db.message.count(),
+    db.inviteCode.count({ where: { active: true, usedById: null } }),
   ]);
+
+  // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
+  const now = Date.now();
+  const totalMembers = tierCounts.reduce((sum, t) => sum + t._count, 0);
+  const tierMap = new Map(tierCounts.map((t) => [t.clearance, t._count]));
+
+  const stats = [
+    { label: "MEMBERS", value: totalMembers },
+    { label: "STAFF/ADMIN", value: staffCount },
+    { label: "SUSPENDED", value: suspendedCount },
+    { label: "PENDING REQ", value: pendingRequests.length },
+    { label: "ACTIVE INVITES", value: activeInviteCount },
+    { label: "SCP FILES", value: scpCount },
+    { label: "INCIDENTS", value: incidentCount },
+    { label: "MESSAGES", value: messageCount },
+  ];
 
   const editableLevels = CLEARANCE_LEVELS.map((l) => ({
     rank: l.rank,
@@ -41,6 +75,32 @@ export default async function AdminPage() {
     <div className="space-y-4">
       <div className="term-panel">
         <h1 className="text-lg tracking-widest">:: ADMINISTRATION ::</h1>
+      </div>
+
+      <div className="term-panel space-y-3">
+        <h2 className="text-sm text-[var(--term-fg-dim)]">SITE OVERVIEW</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {stats.map((s) => (
+            <div
+              key={s.label}
+              className="border border-[var(--term-border)]/40 p-2 text-center"
+            >
+              <div className="text-2xl text-[var(--term-fg-bright)]">{s.value}</div>
+              <div className="text-[10px] text-[var(--term-fg-dim)] tracking-wider">
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--term-fg-dim)]">
+          <span>CLEARANCE DISTRIBUTION:</span>
+          {CLEARANCE_LEVELS.map((l) => (
+            <span key={l.rank}>
+              {l.label}=
+              <span className="text-[var(--term-fg)]">{tierMap.get(l.rank) ?? 0}</span>
+            </span>
+          ))}
+        </div>
       </div>
 
       {viewer.isOwner && (
@@ -84,25 +144,42 @@ export default async function AdminPage() {
         </h2>
         {pendingRequests.length === 0 && <p className="text-sm">NONE PENDING.</p>}
         {pendingRequests.map((r) => (
-          <div key={r.id} className="border-b border-[var(--term-border)]/30 py-2 space-y-1">
+          <form
+            key={r.id}
+            action={reviewClearanceRequestAction}
+            className="border-b border-[var(--term-border)]/30 py-2 space-y-2"
+          >
             <p className="text-sm">
               {r.user.displayName} ({clearanceLabel(r.user.clearance)}) requests{" "}
               {clearanceLabel(r.requestedLevel)}
             </p>
             <p className="text-sm text-[var(--term-fg-dim)]">{r.reason}</p>
+            <input type="hidden" name="requestId" value={r.id} />
+            <input
+              type="text"
+              name="reviewNote"
+              placeholder="REVIEWER NOTE (OPTIONAL, SHOWN TO MEMBER)"
+              maxLength={500}
+              className="term-input py-1 text-sm"
+            />
             <div className="flex gap-2">
-              <form action={reviewClearanceRequestAction}>
-                <input type="hidden" name="requestId" value={r.id} />
-                <input type="hidden" name="decision" value="approve" />
-                <button className="term-button text-xs">APPROVE</button>
-              </form>
-              <form action={reviewClearanceRequestAction}>
-                <input type="hidden" name="requestId" value={r.id} />
-                <input type="hidden" name="decision" value="deny" />
-                <button className="term-button text-xs">DENY</button>
-              </form>
+              <button
+                name="decision"
+                value="approve"
+                className="term-button text-xs"
+              >
+                APPROVE
+              </button>
+              <button
+                name="decision"
+                value="deny"
+                className="term-button text-xs"
+                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+              >
+                DENY
+              </button>
             </div>
-          </div>
+          </form>
         ))}
       </div>
 
@@ -123,6 +200,7 @@ export default async function AdminPage() {
                 isAdmin: m.isAdmin,
                 isStaff: m.isStaff,
                 department: m.department,
+                suspended: m.suspended,
               }}
               levels={editableLevels}
               canGrantTopClearance={canGrantTopClearance}
@@ -134,29 +212,69 @@ export default async function AdminPage() {
       </div>
 
       <div className="term-panel space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm text-[var(--term-fg-dim)]">INVITE CODES</h2>
-          <form action={generateInviteCodeAction}>
-            <button className="term-button text-xs">+ GENERATE</button>
-          </form>
-        </div>
+        <h2 className="text-sm text-[var(--term-fg-dim)]">INVITE CODES</h2>
+        <form
+          action={generateInviteCodeAction}
+          className="flex flex-wrap items-end gap-2 text-sm"
+        >
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--term-fg-dim)]">HOW MANY</span>
+            <input
+              type="number"
+              name="count"
+              defaultValue={1}
+              min={1}
+              max={50}
+              className="term-input py-1 w-20"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--term-fg-dim)]">
+              EXPIRES (DAYS, BLANK = NEVER)
+            </span>
+            <input
+              type="number"
+              name="expiryDays"
+              min={1}
+              max={365}
+              placeholder="∞"
+              className="term-input py-1 w-28"
+            />
+          </label>
+          <button className="term-button text-xs">+ GENERATE</button>
+        </form>
         <div className="space-y-1">
-          {inviteCodes.map((c) => (
-            <div key={c.id} className="flex items-center justify-between text-sm py-1">
-              <span className={c.active ? "" : "text-[var(--term-fg-dim)] line-through"}>
-                {c.code}
-              </span>
-              <span className="text-[var(--term-fg-dim)]">
-                {c.usedBy ? `USED BY ${c.usedBy.displayName}` : c.active ? "UNUSED" : "REVOKED"}
-              </span>
-              {c.active && !c.usedById && (
-                <form action={revokeInviteCodeAction}>
-                  <input type="hidden" name="id" value={c.id} />
-                  <button className="term-button text-xs">REVOKE</button>
-                </form>
-              )}
-            </div>
-          ))}
+          {inviteCodes.map((c) => {
+            const expired =
+              !!c.expiresAt && c.expiresAt.getTime() < now && !c.usedById;
+            const status = c.usedBy
+              ? `USED BY ${c.usedBy.displayName}`
+              : !c.active
+                ? "REVOKED"
+                : expired
+                  ? "EXPIRED"
+                  : c.expiresAt
+                    ? `EXPIRES ${c.expiresAt.toISOString().slice(0, 10)}`
+                    : "UNUSED";
+            const dead = c.usedBy || !c.active || expired;
+            return (
+              <div
+                key={c.id}
+                className="flex flex-wrap items-center gap-x-3 justify-between text-sm py-1"
+              >
+                <span className={dead ? "text-[var(--term-fg-dim)] line-through" : ""}>
+                  {c.code}
+                </span>
+                <span className="text-[var(--term-fg-dim)]">{status}</span>
+                {c.active && !c.usedById && !expired && (
+                  <form action={revokeInviteCodeAction}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <button className="term-button text-xs">REVOKE</button>
+                  </form>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

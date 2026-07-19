@@ -20,6 +20,8 @@ model User {
   isStaff      Boolean  @default(false)
   department   String?
   personalFile String   @default("")
+  suspended        Boolean  @default(false)
+  suspendedReason  String?
   createdAt    DateTime @default(now())
 
   usedInvite      InviteCode?       @relation("InviteCodeUser")
@@ -27,6 +29,7 @@ model User {
   receivedMessages Message[]         @relation("MessageRecipient")
   scpFiles        ScpFile[]
   broadcasts      Broadcast[]
+  incidentReports IncidentReport[]
   clearanceRequests ClearanceRequest[] @relation("ClearanceRequestUser")
   reviewedRequests  ClearanceRequest[] @relation("ClearanceRequestReviewer")
   notesAbout       MemberNote[]      @relation("MemberNoteSubject")
@@ -50,6 +53,7 @@ model InviteCode {
   code      String   @unique
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+  expiresAt DateTime?
 
   usedById String?  @unique
   usedBy   User?    @relation("InviteCodeUser", fields: [usedById], references: [id])
@@ -61,11 +65,16 @@ model Message {
   body        String
   read        Boolean  @default(false)
   createdAt   DateTime @default(now())
+  // Root message id of the conversation this message belongs to. Set to the
+  // message's own id for a thread-starting message; replies inherit the root's.
+  threadId    String?
 
   senderId    String
   sender      User     @relation("MessageSender", fields: [senderId], references: [id])
   recipientId String
   recipient   User     @relation("MessageRecipient", fields: [recipientId], references: [id])
+
+  @@index([threadId])
 }
 
 model ScpFile {
@@ -95,6 +104,7 @@ model ClearanceRequest {
   requestedLevel  Int
   reason          String
   status          String    @default("pending")
+  reviewNote      String?
   createdAt       DateTime  @default(now())
   reviewedAt      DateTime?
 
@@ -102,4 +112,17 @@ model ClearanceRequest {
   user         User     @relation("ClearanceRequestUser", fields: [userId], references: [id])
   reviewedById String?
   reviewedBy   User?    @relation("ClearanceRequestReviewer", fields: [reviewedById], references: [id])
+}
+
+model IncidentReport {
+  id                String   @id @default(cuid())
+  title             String
+  location          String   @default("")
+  body              String
+  severity          String   @default("Minor")
+  clearanceRequired Int      @default(1)
+  createdAt         DateTime @default(now())
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
 }

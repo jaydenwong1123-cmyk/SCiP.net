@@ -1,14 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { BootSequence } from "./boot-sequence";
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // Play the boot sequence once per browser session. `null` = undecided (avoids
+  // flashing either view before we've checked sessionStorage).
+  const [booted, setBooted] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // One-time read of the per-session boot flag on mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBooted(sessionStorage.getItem("scip-booted") === "1");
+  }, []);
+
+  function finishBoot() {
+    sessionStorage.setItem("scip-booted", "1");
+    setBooted(true);
+  }
+
+  if (booted === null) return <div className="min-h-screen" />;
+  if (!booted) return <BootSequence onDone={finishBoot} />;
 
   async function handleSubmit(formData: FormData) {
     setPending(true);
