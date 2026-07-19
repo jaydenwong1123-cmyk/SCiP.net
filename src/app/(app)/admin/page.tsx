@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import { requireStaff, hasOwnerPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import {
@@ -50,7 +51,14 @@ export default async function AdminPage() {
     }),
     db.inviteCode.findMany({
       orderBy: { createdAt: "desc" },
-      include: { usedBy: { select: { displayName: true } } },
+      include: {
+        usedBy: { select: { displayName: true } },
+        createdBy: { select: { displayName: true } },
+        redemptions: {
+          select: { user: { select: { displayName: true, email: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+      },
     }),
     db.clearanceRequest.findMany({
       where: { status: "pending" },
@@ -65,7 +73,14 @@ export default async function AdminPage() {
     db.scpFile.count(),
     db.incidentReport.count(),
     db.message.count(),
-    db.inviteCode.count({ where: { active: true, usedById: null } }),
+    // "Active" now means uses remain, not merely that nobody has redeemed it —
+    // a multi-use code stays available until exhausted.
+    db.inviteCode.count({
+      where: {
+        active: true,
+        useCount: { lt: db.inviteCode.fields.maxUses },
+      },
+    }),
     db.user.count({ where: { designation: E5_DESIGNATION } }),
     db.user.count({ where: { designation: R5_DESIGNATION } }),
   ]);
@@ -90,8 +105,11 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-4">
-      <div className="term-panel">
+      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg tracking-widest">:: ADMINISTRATION ::</h1>
+        <Link href="/admin/audit" className="term-link text-sm">
+          [ACCESS &amp; ACTION LOG]
+        </Link>
       </div>
 
       <div className="term-panel space-y-3">
@@ -324,6 +342,19 @@ export default async function AdminPage() {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-[var(--term-fg-dim)]">
+              USES PER CODE
+            </span>
+            <input
+              type="number"
+              name="maxUses"
+              defaultValue={1}
+              min={1}
+              max={100}
+              className="term-input py-1 w-24"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--term-fg-dim)]">
               EXPIRES (DAYS, BLANK = NEVER)
             </span>
             <input
@@ -335,34 +366,91 @@ export default async function AdminPage() {
               className="term-input py-1 w-28"
             />
           </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--term-fg-dim)]">
+              LABEL (OPTIONAL)
+            </span>
+            <input
+              type="text"
+              name="note"
+              maxLength={120}
+              placeholder="e.g. MTF NU-7 INTAKE"
+              className="term-input py-1 w-56"
+            />
+          </label>
           <button className="term-button text-xs">+ GENERATE</button>
         </form>
+
         <div className="space-y-1">
+          {inviteCodes.length === 0 && (
+            <p className="text-sm text-[var(--term-fg-dim)]">
+              NO INVITE CODES HAVE BEEN GENERATED.
+            </p>
+          )}
           {inviteCodes.map((c) => {
-            const expired =
-              !!c.expiresAt && c.expiresAt.getTime() < now && !c.usedById;
-            const status = c.usedBy
-              ? `USED BY ${c.usedBy.displayName}`
+            const exhausted = c.useCount >= c.maxUses;
+            const expired = !!c.expiresAt && c.expiresAt.getTime() < now && !exhausted;
+            const dead = exhausted || !c.active || expired;
+
+            // A multi-use code reports remaining uses; a single-use one keeps
+            // the original "USED BY <name>" phrasing.
+            const status = exhausted
+              ? c.maxUses === 1 && c.usedBy
+                ? `USED BY ${c.usedBy.displayName}`
+                : `EXHAUSTED (${c.useCount}/${c.maxUses})`
               : !c.active
-                ? "REVOKED"
+                ? `REVOKED${c.revokedReason ? `: ${c.revokedReason}` : ""}`
                 : expired
                   ? "EXPIRED"
-                  : c.expiresAt
-                    ? `EXPIRES ${c.expiresAt.toISOString().slice(0, 10)}`
-                    : "UNUSED";
-            const dead = c.usedBy || !c.active || expired;
+                  : c.maxUses > 1
+                    ? `${c.maxUses - c.useCount} OF ${c.maxUses} LEFT${
+                        c.expiresAt
+                          ? ` — EXPIRES ${c.expiresAt.toISOString().slice(0, 10)}`
+                          : ""
+                      }`
+                    : c.expiresAt
+                      ? `EXPIRES ${c.expiresAt.toISOString().slice(0, 10)}`
+                      : "UNUSED";
+
             return (
               <div
                 key={c.id}
-                className="flex flex-wrap items-center gap-x-3 justify-between text-sm py-1"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-between text-sm term-row border-b border-[var(--term-border)]/20"
               >
-                <span className={dead ? "text-[var(--term-fg-dim)] line-through" : ""}>
-                  {c.code}
+                <span className="flex flex-col">
+                  <span className={dead ? "text-[var(--term-fg-dim)] line-through" : ""}>
+                    {c.code}
+                  </span>
+                  {(c.note || c.createdBy) && (
+                    <span className="text-[10px] text-[var(--term-fg-dim)]">
+                      {c.note}
+                      {c.note && c.createdBy ? " — " : ""}
+                      {c.createdBy ? `BY ${c.createdBy.displayName}` : ""}
+                    </span>
+                  )}
+                  {c.redemptions.length > 0 && (
+                    <span className="text-[10px] text-[var(--term-fg-dim)]">
+                      REDEEMED BY:{" "}
+                      {c.redemptions
+                        .map((r) => r.user.displayName ?? r.user.email)
+                        .join(", ")}
+                    </span>
+                  )}
                 </span>
-                <span className="text-[var(--term-fg-dim)]">{status}</span>
-                {c.active && !c.usedById && !expired && (
-                  <form action={revokeInviteCodeAction}>
+                <span className="text-[var(--term-fg-dim)] text-xs">{status}</span>
+                {c.active && !exhausted && !expired && (
+                  <form
+                    action={revokeInviteCodeAction}
+                    className="flex items-center gap-2"
+                  >
                     <input type="hidden" name="id" value={c.id} />
+                    <input
+                      type="text"
+                      name="reason"
+                      maxLength={200}
+                      placeholder="REASON (OPTIONAL)"
+                      className="term-input py-0.5 text-xs w-44"
+                    />
                     <button className="term-button text-xs">REVOKE</button>
                   </form>
                 )}

@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import {
   THEMES,
   FONTS,
+  DENSITIES,
   THEME_MAP,
   FONT_MAP,
+  DENSITY_MAP,
   THEME_STORAGE_KEY,
   FONT_STORAGE_KEY,
+  DENSITY_STORAGE_KEY,
   DEFAULT_THEME,
   DEFAULT_FONT,
+  DEFAULT_DENSITY,
 } from "@/lib/appearance";
 
 function applyTheme(themeKey: string) {
@@ -23,15 +27,23 @@ function applyFont(fontKey: string) {
   document.documentElement.style.setProperty("--term-font", stack);
 }
 
+function applyDensity(densityKey: string) {
+  const vars = DENSITY_MAP[densityKey] ?? DENSITY_MAP[DEFAULT_DENSITY];
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+}
+
 export function SettingsForm() {
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [font, setFont] = useState(DEFAULT_FONT);
+  const [density, setDensity] = useState(DEFAULT_DENSITY);
 
   // Load saved values on mount.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(localStorage.getItem(THEME_STORAGE_KEY) ?? DEFAULT_THEME);
     setFont(localStorage.getItem(FONT_STORAGE_KEY) ?? DEFAULT_FONT);
+    setDensity(localStorage.getItem(DENSITY_STORAGE_KEY) ?? DEFAULT_DENSITY);
   }, []);
 
   function chooseTheme(key: string) {
@@ -46,9 +58,16 @@ export function SettingsForm() {
     applyFont(key);
   }
 
+  function chooseDensity(key: string) {
+    setDensity(key);
+    localStorage.setItem(DENSITY_STORAGE_KEY, key);
+    applyDensity(key);
+  }
+
   function resetAll() {
     chooseTheme(DEFAULT_THEME);
     chooseFont(DEFAULT_FONT);
+    chooseDensity(DEFAULT_DENSITY);
   }
 
   return (
@@ -107,6 +126,33 @@ export function SettingsForm() {
               >
                 {active ? `[${f.label}]` : f.label}
                 <span className="block text-xs opacity-70">AaBb 0123</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm text-[var(--term-fg-dim)]">DISPLAY DENSITY</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {DENSITIES.map((d) => {
+            const active = d.key === density;
+            return (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => chooseDensity(d.key)}
+                aria-pressed={active}
+                className="term-button text-xs text-left"
+                style={{
+                  borderColor: active ? "var(--term-fg-bright)" : "var(--term-border)",
+                  boxShadow: active ? "0 0 8px rgba(var(--term-glow-rgb), 0.4)" : "none",
+                }}
+              >
+                {active ? `[${d.label}]` : d.label}
+                <span className="block text-[10px] opacity-70 mt-1 normal-case">
+                  {d.hint}
+                </span>
               </button>
             );
           })}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser, hasStaffPowers } from "@/lib/session";
+import { db } from "@/lib/db";
 import { canAccessSecureChannel, clearanceDisplay } from "@/lib/clearance";
 
 type Tile = {
@@ -8,14 +9,34 @@ type Tile = {
   code: string;
   desc: string;
   accent?: "amber" | "red";
+  // Count surfaced as a badge on the tile. Omitted or 0 renders nothing.
+  badge?: number;
+  badgeLabel?: string;
 };
 
 export default async function MenuPage() {
   const user = await requireUser();
+  const staff = hasStaffPowers(user);
+
+  // Counts backing the tile badges. Fetched together so the menu still costs
+  // a single round trip.
+  const [unreadMessages, pendingRequests] = await Promise.all([
+    db.message.count({ where: { recipientId: user.id, read: false } }),
+    staff
+      ? db.clearanceRequest.count({ where: { status: "pending" } })
+      : Promise.resolve(0),
+  ]);
 
   const tiles: Tile[] = [
     { href: "/personnel", label: "PERSONNEL", code: "SEC-01", desc: "Personnel registry & clearance records" },
-    { href: "/messages", label: "MESSAGES", code: "SEC-02", desc: "Encrypted internal correspondence" },
+    {
+      href: "/messages",
+      label: "MESSAGES",
+      code: "SEC-02",
+      desc: "Encrypted internal correspondence",
+      badge: unreadMessages,
+      badgeLabel: "unread",
+    },
     { href: "/scp", label: "SCP FILES", code: "SEC-03", desc: "Anomaly containment documentation" },
     { href: "/incidents", label: "INCIDENTS", code: "SEC-04", desc: "Breach & incident reports" },
     { href: "/broadcasts", label: "BROADCASTS", code: "SEC-05", desc: "Site-wide directives & bulletins" },
@@ -32,13 +53,15 @@ export default async function MenuPage() {
     });
   }
 
-  if (hasStaffPowers(user)) {
+  if (staff) {
     tiles.push({
       href: "/admin",
       label: "ADMIN",
       code: "ADM",
       desc: "RAISA Control",
       accent: "red",
+      badge: pendingRequests,
+      badgeLabel: "pending clearance requests",
     });
   }
 
@@ -73,6 +96,16 @@ export default async function MenuPage() {
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm sm:text-base tracking-wider text-[var(--term-fg-bright)]">
                 {tile.label}
+                {!!tile.badge && tile.badge > 0 && (
+                  <span
+                    className="clearance-chip ml-2 text-[10px] align-middle"
+                    // The count is meaningless to a screen reader without the
+                    // noun, so the accessible name carries both.
+                    aria-label={`${tile.badge} ${tile.badgeLabel ?? "new"}`}
+                  >
+                    {tile.badge > 99 ? "99+" : tile.badge}
+                  </span>
+                )}
               </span>
               <span className="text-[10px] sm:text-xs text-[var(--term-fg-dim)]">
                 [{tile.code}]

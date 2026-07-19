@@ -46,6 +46,10 @@ model User {
   reviewedRequests  ClearanceRequest[] @relation("ClearanceRequestReviewer")
   notesAbout       MemberNote[]      @relation("MemberNoteSubject")
   notesAuthored    MemberNote[]      @relation("MemberNoteAuthor")
+  auditEntries     AuditLog[]        @relation("AuditActor")
+  revisions        Revision[]        @relation("RevisionEditor")
+  createdInvites   InviteCode[]      @relation("InviteCodeCreator")
+  inviteRedemptions InviteRedemption[] @relation("InviteRedemptionUser")
 }
 
 model MemberNote {
@@ -64,11 +68,44 @@ model InviteCode {
   id        String   @id @default(cuid())
   code      String   @unique
   active    Boolean  @default(true)
+  // Free-text label so staff can remember what a batch was minted for
+  // ("winter recruitment", "MTF Nu-7 transfers").
+  note      String   @default("")
+  // How many registrations this code may back. 1 preserves the original
+  // single-use behavior; higher values allow a shared batch code.
+  maxUses   Int      @default(1)
+  useCount  Int      @default(0)
+  // Recorded when staff revoke a code, so the log explains itself later.
+  revokedReason String @default("")
   createdAt DateTime @default(now())
   expiresAt DateTime?
 
+  createdById String?
+  createdBy   User?   @relation("InviteCodeCreator", fields: [createdById], references: [id])
+
+  // First redeemer. Kept for the pre-existing one-to-one relation and the
+  // "USED BY" display; the full list lives in `redemptions`.
   usedById String?  @unique
   usedBy   User?    @relation("InviteCodeUser", fields: [usedById], references: [id])
+
+  redemptions InviteRedemption[]
+
+  @@index([createdById])
+}
+
+// One row per registration backed by an invite code. Lets a multi-use code
+// report exactly who it let in.
+model InviteRedemption {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  inviteId String
+  invite   InviteCode @relation(fields: [inviteId], references: [id])
+  userId   String
+  user     User       @relation("InviteRedemptionUser", fields: [userId], references: [id])
+
+  @@index([inviteId])
+  @@index([userId])
 }
 
 model Message {
@@ -96,6 +133,10 @@ model ScpFile {
   clearanceRequired Int
   classification    String   @default("Safe")
   createdAt         DateTime @default(now())
+  // Null until the document is first edited. `revisionCount` counts stored
+  // prior versions, so the UI can show "REV 3" without a join.
+  updatedAt         DateTime?
+  revisionCount     Int      @default(0)
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
@@ -106,6 +147,8 @@ model Broadcast {
   title     String
   body      String
   createdAt DateTime @default(now())
+  updatedAt DateTime?
+  revisionCount Int  @default(0)
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
@@ -154,7 +197,75 @@ model IncidentReport {
   severity          String   @default("Minor")
   clearanceRequired Int      @default(1)
   createdAt         DateTime @default(now())
+  updatedAt         DateTime?
+  revisionCount     Int      @default(0)
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
+}
+
+// Immutable snapshot of a document taken immediately before an edit lands, so
+// the archive can show what a file used to say and who changed it.
+//
+// Deliberately generic across ScpFile / IncidentReport / Broadcast: the three
+// share title+body and differ only in a couple of metadata fields, which are
+// stashed as JSON in `meta` rather than adding three near-identical tables.
+model Revision {
+  id         String   @id @default(cuid())
+  // "scp" | "incident" | "broadcast" — see REVISION_ENTITIES in lib/revisions.ts
+  entityType String
+  entityId   String
+  title      String
+  body       String
+  // JSON blob of the type-specific fields at snapshot time (classification,
+  // severity, location, clearanceRequired).
+  meta       String   @default("{}")
+  // Optional note the editor left explaining the change.
+  reason     String   @default("")
+  createdAt  DateTime @default(now())
+
+  editorId   String?
+  editor     User?    @relation("RevisionEditor", fields: [editorId], references: [id])
+  // Denormalized so the history survives the editor's account being deleted.
+  editorName String   @default("")
+
+  @@index([entityType, entityId, createdAt])
+  @@index([editorId])
+}
+
+// Append-only record of privileged actions. Actor name and target name are
+// denormalized because the log has to stay readable after the accounts it
+// references are deleted.
+model AuditLog {
+  id         String   @id @default(cuid())
+  // Dot-namespaced verb, e.g. "user.clearance.set" — see AUDIT_ACTIONS.
+  action     String
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorName  String   @default("")
+  targetType String   @default("")
+  targetId   String   @default("")
+  targetName String   @default("")
+  // Human-readable one-line description rendered directly in the admin log.
+  summary    String   @default("")
+  ip         String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+  @@index([targetId])
+}
+
+// Throttling ledger for credential and invite-code guessing. One row per
+// attempt; `key` scopes the bucket (e.g. "login:agent@foundation.scp",
+// "invite:203.0.113.4"). Rows are pruned opportunistically once expired.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  ip        String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@index([createdAt])
 }

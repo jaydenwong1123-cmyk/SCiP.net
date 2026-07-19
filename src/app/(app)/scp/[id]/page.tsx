@@ -3,8 +3,9 @@ import Link from "next/link";
 import { requireUser, hasStaffPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
-import { classificationColor } from "@/lib/classification";
+import { canEditScpFile } from "@/lib/doc-permissions";
 import { renderRedacted, canBypassRedaction } from "@/lib/redact";
+import { ClassificationBadge } from "@/components/signal-badge";
 import { deleteScpFileAction } from "../actions";
 
 export default async function ScpDetailPage({
@@ -23,36 +24,55 @@ export default async function ScpDetailPage({
   if (!file || file.clearanceRequired > user.clearance) notFound();
 
   const canManage = hasStaffPowers(user);
+  const canEdit = canEditScpFile(user, file);
 
   return (
     <div className="term-panel space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg tracking-widest">:: {file.title.toUpperCase()} ::</h1>
-        <Link href="/scp" className="term-link text-sm">
-          [BACK TO ARCHIVE]
-        </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-lg tracking-widest break-words">
+          :: {file.title.toUpperCase()} ::
+        </h1>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          {canEdit && (
+            <Link href={`/scp/${file.id}/edit`} className="term-link">
+              [AMEND]
+            </Link>
+          )}
+          <Link href={`/scp/${file.id}/history`} className="term-link">
+            [HISTORY{file.revisionCount > 0 ? ` (${file.revisionCount})` : ""}]
+          </Link>
+          <Link href="/scp" className="term-link">
+            [BACK TO ARCHIVE]
+          </Link>
+        </div>
       </div>
-      <p className="text-sm text-[var(--term-fg-dim)]">
-        OBJECT CLASS:{" "}
-        <span
-          className="font-bold"
-          style={{ color: classificationColor(file.classification) }}
-        >
-          {file.classification.toUpperCase()}
-        </span>{" "}
-        — CLEARANCE REQUIRED: {clearanceLabel(file.clearanceRequired)} — AUTHOR:{" "}
-        {file.author.displayName}
-      </p>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--term-fg-dim)]">
+        <ClassificationBadge classification={file.classification} size="lg" />
+        <span>CLEARANCE REQUIRED: {clearanceLabel(file.clearanceRequired)}</span>
+        <span>— AUTHOR: {file.author.displayName}</span>
+        {file.updatedAt && (
+          <span>
+            — REV {file.revisionCount}, AMENDED{" "}
+            {file.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
+          </span>
+        )}
+      </div>
+
       <pre className="whitespace-pre-wrap break-words font-mono text-sm">
         {renderRedacted(file.body, user.clearance, canBypassRedaction(user))}
       </pre>
+
       {canManage && (
         <form
           action={deleteScpFileAction}
           className="pt-2 border-t border-[var(--term-border)]/30"
         >
           <input type="hidden" name="id" value={file.id} />
-          <button className="term-button text-xs" style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}>
+          <button
+            className="term-button text-xs"
+            style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+          >
             [DELETE FILE]
           </button>
         </form>

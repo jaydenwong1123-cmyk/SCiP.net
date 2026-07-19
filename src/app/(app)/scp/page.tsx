@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import { CLASSIFICATIONS, classificationColor } from "@/lib/classification";
+import { ClassificationBadge, SignalDot } from "@/components/signal-badge";
 
 export default async function ScpListPage({
   searchParams,
@@ -100,27 +101,43 @@ export default async function ScpListPage({
 
       <div className="term-panel space-y-2">
         {files.length === 0 && (
-          <p className="text-sm">NO FILES MATCH THE CURRENT FILTER.</p>
+          <div className="empty-state">
+            <span className="empty-state__glyph" aria-hidden>
+              ▤
+            </span>
+            <p className="empty-state__title">NO FILES MATCH</p>
+            <p className="text-sm">
+              {activeClass || activeLevel
+                ? "NO DOCUMENTS MATCH THE CURRENT FILTER."
+                : "NO DOCUMENTS ARE READABLE AT YOUR CLEARANCE."}
+            </p>
+            {(activeClass || activeLevel) && (
+              <Link href="/scp" className="term-button text-xs mt-1">
+                CLEAR FILTERS
+              </Link>
+            )}
+          </div>
         )}
         {files.map((f) => (
           <Link
             key={f.id}
             href={`/scp/${f.id}`}
-            className="flex flex-wrap justify-between gap-x-4 text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
+            className="flex flex-wrap justify-between gap-x-4 text-sm term-row border-b border-[var(--term-border)]/30 term-link"
           >
             <span className="flex items-center gap-2 min-w-0 break-words">
-              <span
-                className="inline-block w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: classificationColor(f.classification) }}
-                aria-hidden
-              />
+              <SignalDot color={classificationColor(f.classification)} />
               {f.title}
+              {f.revisionCount > 0 && (
+                <span className="text-[10px] text-[var(--term-fg-dim)]">
+                  REV {f.revisionCount}
+                </span>
+              )}
             </span>
-            <span className="text-[var(--term-fg-dim)] shrink-0">
-              <span style={{ color: classificationColor(f.classification) }}>
-                {f.classification.toUpperCase()}
-              </span>{" "}
-              · [{clearanceLabel(f.clearanceRequired)}] — {f.author.displayName}
+            <span className="text-[var(--term-fg-dim)] shrink-0 flex items-center gap-2">
+              <ClassificationBadge classification={f.classification} />
+              <span>
+                [{clearanceLabel(f.clearanceRequired)}] — {f.author.displayName}
+              </span>
             </span>
           </Link>
         ))}

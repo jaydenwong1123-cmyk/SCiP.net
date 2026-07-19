@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { severityColor } from "@/lib/incident";
+import { SeverityBadge, SignalDot } from "@/components/signal-badge";
 
 export default async function IncidentsPage() {
   const user = await requireUser();
@@ -24,27 +25,39 @@ export default async function IncidentsPage() {
 
       <div className="term-panel space-y-2">
         {reports.length === 0 && (
-          <p className="text-sm">NO REPORTS ACCESSIBLE AT YOUR CLEARANCE.</p>
+          <div className="empty-state">
+            <span className="empty-state__glyph" aria-hidden>
+              ⚠
+            </span>
+            <p className="empty-state__title">NO REPORTS ON FILE</p>
+            <p className="text-sm">
+              NOTHING HAS BEEN FILED AT OR BELOW YOUR CLEARANCE.
+            </p>
+            <Link href="/incidents/new" className="term-button text-xs mt-1">
+              FILE THE FIRST REPORT
+            </Link>
+          </div>
         )}
         {reports.map((r) => (
           <Link
             key={r.id}
             href={`/incidents/${r.id}`}
-            className="flex flex-wrap justify-between gap-x-4 text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
+            className="flex flex-wrap justify-between gap-x-4 text-sm term-row border-b border-[var(--term-border)]/30 term-link"
           >
             <span className="flex items-center gap-2 min-w-0 break-words">
-              <span
-                className="inline-block w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: severityColor(r.severity) }}
-                aria-hidden
-              />
+              <SignalDot color={severityColor(r.severity)} />
               {r.title}
+              {r.revisionCount > 0 && (
+                <span className="text-[10px] text-[var(--term-fg-dim)]">
+                  REV {r.revisionCount}
+                </span>
+              )}
             </span>
-            <span className="text-[var(--term-fg-dim)] shrink-0">
-              <span style={{ color: severityColor(r.severity) }}>
-                {r.severity.toUpperCase()}
-              </span>{" "}
-              · [{clearanceLabel(r.clearanceRequired)}] — {r.author.displayName}
+            <span className="text-[var(--term-fg-dim)] shrink-0 flex items-center gap-2">
+              <SeverityBadge severity={r.severity} />
+              <span>
+                [{clearanceLabel(r.clearanceRequired)}] — {r.author.displayName}
+              </span>
             </span>
           </Link>
         ))}

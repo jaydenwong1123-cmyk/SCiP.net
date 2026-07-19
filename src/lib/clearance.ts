@@ -45,6 +45,34 @@ export function clearanceDisplay(
   return clearanceLabel(clearance);
 }
 
+// Rank accent colors used to tint the terminal chrome, so an L-1 session is
+// visually distinguishable from an L-OMNI one at a glance.
+//
+// Ranks 1-3 track the active theme (they read as "ordinary personnel" in
+// whatever palette the member chose). Ranks 4+ are deliberately fixed colors:
+// a privileged session should look the same to everyone regardless of theme,
+// which is the point of the signal.
+const CLEARANCE_ACCENTS: Record<number, string> = {
+  1: "var(--term-fg-dim)",
+  2: "var(--term-fg)",
+  3: "var(--term-fg-bright)",
+  4: "#66ccff",
+  5: "var(--term-amber)",
+  6: "#c08cff",
+  7: "var(--term-red)",
+};
+
+export function clearanceAccent(
+  clearance: number,
+  designation?: string | null
+): string {
+  // E5 / R5 sit at rank 6 and inherit its accent.
+  if (designation === E5_DESIGNATION || designation === R5_DESIGNATION) {
+    return CLEARANCE_ACCENTS[6]!;
+  }
+  return CLEARANCE_ACCENTS[clearance] ?? "var(--term-fg-dim)";
+}
+
 // Selectable clearance options for admin assignment. E5 is a value distinct
 // from O5 even though both resolve to rank 6.
 export const CLEARANCE_ASSIGN_OPTIONS = [
