@@ -4,7 +4,7 @@ import { requireUser, hasStaffPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { canEditScpFile } from "@/lib/doc-permissions";
-import { renderRedacted, canBypassRedaction } from "@/lib/redact";
+import { renderBody } from "@/lib/render-body";
 import { ClassificationBadge } from "@/components/signal-badge";
 import { deleteScpFileAction } from "../actions";
 
@@ -60,7 +60,7 @@ export default async function ScpDetailPage({
       </div>
 
       <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-        {renderRedacted(file.body, user.clearance, canBypassRedaction(user))}
+        {await renderBody(file.body, user)}
       </pre>
 
       {canManage && (

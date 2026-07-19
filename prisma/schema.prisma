@@ -47,6 +47,7 @@ model User {
   notesAbout       MemberNote[]      @relation("MemberNoteSubject")
   notesAuthored    MemberNote[]      @relation("MemberNoteAuthor")
   auditEntries     AuditLog[]        @relation("AuditActor")
+  attachments      Attachment[]      @relation("AttachmentUploader")
   revisions        Revision[]        @relation("RevisionEditor")
   createdInvites   InviteCode[]      @relation("InviteCodeCreator")
   inviteRedemptions InviteRedemption[] @relation("InviteRedemptionUser")
@@ -149,9 +150,48 @@ model Broadcast {
   createdAt DateTime @default(now())
   updatedAt DateTime?
   revisionCount Int  @default(0)
+  // Scheduling window. `publishAt` null (or in the past) means the directive
+  // is live now; `expiresAt` null means it never stands down. Filtering is
+  // done at query time rather than by a job, so a directive becomes visible
+  // and disappears on its own without anything needing to run.
+  publishAt DateTime?
+  expiresAt DateTime?
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
+
+  @@index([publishAt])
+  @@index([expiresAt])
+}
+
+// Binary attachment stored directly in the database.
+//
+// Bytes live here rather than in object storage because the deployment has no
+// blob store configured, and every attachment is deleted 14 days after upload
+// — which caps how large the table can get. Reads filter on `expiresAt`, so an
+// expired file stops being served the moment it lapses, whether or not the
+// sweeper has physically removed the row yet.
+model Attachment {
+  id         String   @id @default(cuid())
+  // "secure" (a secure-channel transmission) | "personnel" (a member dossier).
+  // See ATTACHMENT_ENTITIES in lib/attachments.ts.
+  entityType String
+  entityId   String
+  filename   String
+  mimeType   String
+  size       Int
+  data       Bytes
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  uploaderId   String?
+  uploader     User?   @relation("AttachmentUploader", fields: [uploaderId], references: [id])
+  // Denormalized so the caption survives the uploader's account deletion.
+  uploaderName String  @default("")
+
+  @@index([entityType, entityId])
+  @@index([expiresAt])
+  @@index([uploaderId])
 }
 
 model ClearanceRequest {

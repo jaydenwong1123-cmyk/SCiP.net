@@ -3,8 +3,19 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, canAnnotateMembers, hasStaffPowers } from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
-import { renderRedacted, canBypassRedaction } from "@/lib/redact";
-import { addMemberNoteAction, deleteMemberNoteAction } from "../actions";
+import { renderBody } from "@/lib/render-body";
+import {
+  addMemberNoteAction,
+  deleteMemberNoteAction,
+  deletePersonnelAttachmentAction,
+} from "../actions";
+import { AttachmentList } from "@/components/attachment-list";
+import { PersonnelAttachmentForm } from "./attachment-form";
+import {
+  ATTACHMENT_ENTITIES,
+  PERSONNEL_ATTACH_CLEARANCE,
+  listAttachments,
+} from "@/lib/attachments";
 
 export default async function PersonnelFilePage({
   params,
@@ -41,6 +52,13 @@ export default async function PersonnelFilePage({
     : [];
   const canDeleteAny = hasStaffPowers(viewer);
 
+  // Dossier attachments are L-4+ material: the same bar gates uploading,
+  // listing, and the route that serves the bytes.
+  const canSeeAttachments = viewer.clearance >= PERSONNEL_ATTACH_CLEARANCE;
+  const attachments = canSeeAttachments
+    ? await listAttachments(ATTACHMENT_ENTITIES.personnel, [person.id])
+    : [];
+
   return (
     <div className="space-y-4">
       <div className="term-panel space-y-4">
@@ -58,10 +76,50 @@ export default async function PersonnelFilePage({
         </p>
         <pre className="whitespace-pre-wrap break-words font-mono text-sm term-panel min-h-[10rem]">
           {person.personalFile
-            ? renderRedacted(person.personalFile, viewer.clearance, canBypassRedaction(viewer))
+            ? await renderBody(person.personalFile, viewer)
             : "[NO FILE ON RECORD]"}
         </pre>
       </div>
+
+      {canSeeAttachments && (
+        <div className="term-panel space-y-3">
+          <h2 className="text-sm text-[var(--term-amber)]">
+            ⧉ ATTACHED EVIDENCE — L-4+ ONLY
+          </h2>
+          {attachments.length === 0 ? (
+            <p className="text-sm text-[var(--term-fg-dim)]">
+              NO IMAGES ATTACHED TO THIS FILE.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <AttachmentList attachments={attachments} />
+              <div className="flex flex-wrap gap-2 pt-1">
+                {attachments
+                  // Uploaders may remove their own; staff may remove any.
+                  // Mirrors the check the delete action re-applies server-side.
+                  .filter((a) => a.uploaderId === viewer.id || canDeleteAny)
+                  .map((a) => (
+                    <form key={a.id} action={deletePersonnelAttachmentAction}>
+                      <input type="hidden" name="attachmentId" value={a.id} />
+                      <button
+                        className="term-button text-[10px]"
+                        style={{
+                          borderColor: "var(--term-red)",
+                          color: "var(--term-red)",
+                        }}
+                      >
+                        REMOVE {a.filename}
+                      </button>
+                    </form>
+                  ))}
+              </div>
+            </div>
+          )}
+          <div className="pt-2 border-t border-[var(--term-border)]/40">
+            <PersonnelAttachmentForm subjectId={person.id} />
+          </div>
+        </div>
+      )}
 
       {showNotes && (
         <div className="term-panel space-y-3">

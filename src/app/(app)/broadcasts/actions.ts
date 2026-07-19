@@ -12,6 +12,7 @@ import {
   deleteRevisionsFor,
 } from "@/lib/revisions";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
+import { parseScheduleInput } from "@/lib/broadcast-schedule";
 
 export async function createBroadcastAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -28,16 +29,53 @@ export async function createBroadcastAction(
     return { ok: false, error: "TITLE AND BODY ARE REQUIRED." };
   }
 
+  const publishAt = parseScheduleInput(formData.get("publishAt"));
+  const expiresAt = parseScheduleInput(formData.get("expiresAt"));
+  if (publishAt === undefined || expiresAt === undefined) {
+    return { ok: false, error: "INVALID SCHEDULE DATE." };
+  }
+  if (publishAt && expiresAt && expiresAt <= publishAt) {
+    return { ok: false, error: "STAND-DOWN MUST BE AFTER THE PUBLISH TIME." };
+  }
+  if (expiresAt && expiresAt.getTime() <= Date.now()) {
+    return { ok: false, error: "STAND-DOWN TIME IS ALREADY IN THE PAST." };
+  }
+
   await db.broadcast.create({
     data: {
       title: title.slice(0, 200),
       body: body.slice(0, 10000),
       authorId: user.id,
+      publishAt,
+      expiresAt,
     },
   });
 
   revalidatePath("/broadcasts");
   redirect("/broadcasts");
+}
+
+// Adjust an existing directive's window without touching its text, so
+// extending or standing down a notice doesn't create a content revision.
+export async function setBroadcastScheduleAction(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const existing = await db.broadcast.findUnique({ where: { id } });
+  if (!existing || !canEditBroadcast(user, existing)) return;
+
+  const publishAt = parseScheduleInput(formData.get("publishAt"));
+  const expiresAt = parseScheduleInput(formData.get("expiresAt"));
+  if (publishAt === undefined || expiresAt === undefined) return;
+  if (publishAt && expiresAt && expiresAt <= publishAt) return;
+
+  await db.broadcast.update({
+    where: { id },
+    data: { publishAt, expiresAt },
+  });
+
+  revalidatePath("/broadcasts");
 }
 
 export async function updateBroadcastAction(

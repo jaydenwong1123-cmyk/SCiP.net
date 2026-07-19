@@ -4,7 +4,7 @@ import { requireUser, hasStaffPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { canEditIncident } from "@/lib/doc-permissions";
-import { renderRedacted, canBypassRedaction } from "@/lib/redact";
+import { renderBody } from "@/lib/render-body";
 import { SeverityBadge } from "@/components/signal-badge";
 import { deleteIncidentReportAction } from "../actions";
 
@@ -60,7 +60,7 @@ export default async function IncidentDetailPage({
         )}
       </div>
       <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-        {renderRedacted(report.body, user.clearance, canBypassRedaction(user))}
+        {await renderBody(report.body, user)}
       </pre>
       {canManage && (
         <form

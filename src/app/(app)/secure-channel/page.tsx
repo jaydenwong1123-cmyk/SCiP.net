@@ -6,6 +6,12 @@ import {
   canAccessSecureChannel,
 } from "@/lib/clearance";
 import { SecureForm } from "./secure-form";
+import { AttachmentList } from "@/components/attachment-list";
+import {
+  ATTACHMENT_ENTITIES,
+  listAttachments,
+  groupByEntity,
+} from "@/lib/attachments";
 
 export default async function SecureChannelPage() {
   const user = await requireUser();
@@ -18,6 +24,16 @@ export default async function SecureChannelPage() {
       author: { select: { displayName: true, clearance: true, designation: true } },
     },
   });
+
+  // Attachment metadata for the visible transmissions, fetched in one query
+  // and grouped by message. The bytes are not loaded here — only the serving
+  // route reads those.
+  const attachments = groupByEntity(
+    await listAttachments(
+      ATTACHMENT_ENTITIES.secure,
+      messages.map((m) => m.id)
+    )
+  );
 
   return (
     <div className="space-y-4">
@@ -58,9 +74,12 @@ export default async function SecureChannelPage() {
               </span>{" "}
               · {m.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
             </p>
-            <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-              {m.body}
-            </pre>
+            {m.body && (
+              <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+                {m.body}
+              </pre>
+            )}
+            <AttachmentList attachments={attachments.get(m.id) ?? []} />
           </div>
         ))}
       </div>
