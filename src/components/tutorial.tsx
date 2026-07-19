@@ -106,12 +106,6 @@ export function Tutorial() {
                   <span className="text-[var(--term-fg)]">CLEARANCE</span> —
                   request a clearance change; staff review it with a note.
                 </li>
-                <li>
-                  <span className="text-[var(--term-amber)]">
-                    ⚿ SECURE CHANNEL
-                  </span>{" "}
-                  — encrypted comms visible only to L-5+ personnel.
-                </li>
               </ul>
             </section>
 
