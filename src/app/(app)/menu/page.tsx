@@ -37,7 +37,7 @@ export default async function MenuPage() {
       href: "/admin",
       label: "ADMIN",
       code: "ADM",
-      desc: "Site administration & member control",
+      desc: "RAISA Control",
       accent: "red",
     });
   }
