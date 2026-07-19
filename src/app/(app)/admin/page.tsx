@@ -5,6 +5,7 @@ import {
   CLEARANCE_LEVELS,
   CLEARANCE_ASSIGN_OPTIONS,
   E5_DESIGNATION,
+  R5_DESIGNATION,
   clearanceLabel,
   clearanceDisplay,
   clearanceAssignValue,
@@ -38,6 +39,7 @@ export default async function AdminPage() {
     messageCount,
     activeInviteCount,
     e5Count,
+    r5Count,
   ] = await Promise.all([
     db.user.findMany({
       where: { isOwner: false },
@@ -62,6 +64,7 @@ export default async function AdminPage() {
     db.message.count(),
     db.inviteCode.count({ where: { active: true, usedById: null } }),
     db.user.count({ where: { designation: E5_DESIGNATION } }),
+    db.user.count({ where: { designation: R5_DESIGNATION } }),
   ]);
 
   // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
@@ -114,9 +117,14 @@ export default async function AdminPage() {
                 </span>
               </span>
               {l.rank === 5 && (
-                <span>
-                  L-E5=<span className="text-[var(--term-fg)]">{e5Count}</span>
-                </span>
+                <>
+                  <span>
+                    L-E5=<span className="text-[var(--term-fg)]">{e5Count}</span>
+                  </span>
+                  <span>
+                    L-R5=<span className="text-[var(--term-fg)]">{r5Count}</span>
+                  </span>
+                </>
               )}
             </Fragment>
           ))}
