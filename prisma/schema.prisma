@@ -4,7 +4,12 @@ generator client {
 
 datasource db {
   provider     = "sqlite"
-  url          = env("DATABASE_URL")
+  // Placeholder only. The real connection is provided by the libSQL driver
+  // adapter (see prisma.config.ts for the CLI/schema engine, and src/lib/db.ts
+  // for the runtime), which reads DATABASE_URL/TURSO_AUTH_TOKEN from the env.
+  // Prisma's schema validation rejects a libsql:// URL here, so we keep a
+  // static file: value that the adapter overrides.
+  url          = "file:./prisma/dev.db"
   relationMode = "prisma"
 }
 
