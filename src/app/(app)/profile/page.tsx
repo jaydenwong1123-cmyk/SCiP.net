@@ -1,12 +1,20 @@
 import { requireUser } from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
-import { OPEN_DEPARTMENTS, isRestrictedDepartment } from "@/lib/departments";
+import {
+  OPEN_DEPARTMENTS,
+  ALL_DEPARTMENTS,
+  isRestrictedDepartment,
+} from "@/lib/departments";
 import { ProfileForm } from "./profile-form";
 import { updateDepartmentAction } from "./actions";
 
 export default async function ProfilePage() {
   const user = await requireUser();
-  const restrictedLocked = !!user.department && isRestrictedDepartment(user.department);
+  // The owner may freely change to any department; members are locked out of a
+  // staff-assigned restricted department.
+  const restrictedLocked =
+    !user.isOwner && !!user.department && isRestrictedDepartment(user.department);
+  const departmentOptions = user.isOwner ? ALL_DEPARTMENTS : OPEN_DEPARTMENTS;
 
   return (
     <div className="term-panel space-y-4">
@@ -34,7 +42,7 @@ export default async function ProfilePage() {
               className="term-input py-1"
             >
               <option value="">— UNASSIGNED —</option>
-              {OPEN_DEPARTMENTS.map((d) => (
+              {departmentOptions.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>

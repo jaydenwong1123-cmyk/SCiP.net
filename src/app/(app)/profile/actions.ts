@@ -3,16 +3,26 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { isOpenDepartment, isRestrictedDepartment } from "@/lib/departments";
+import {
+  isOpenDepartment,
+  isRestrictedDepartment,
+  isValidDepartment,
+} from "@/lib/departments";
 
 export async function updateDepartmentAction(formData: FormData) {
   const user = await requireUser();
   const department = String(formData.get("department") ?? "");
 
-  // Members may only self-assign open departments (or clear to none). If they
-  // currently hold a staff-assigned restricted department, they can't change it.
-  if (user.department && isRestrictedDepartment(user.department)) return;
-  if (department !== "" && !isOpenDepartment(department)) return;
+  // The owner may self-assign any valid department (or clear to none),
+  // bypassing the member restrictions below.
+  if (user.isOwner) {
+    if (department !== "" && !isValidDepartment(department)) return;
+  } else {
+    // Members may only self-assign open departments (or clear to none). If they
+    // currently hold a staff-assigned restricted department, they can't change it.
+    if (user.department && isRestrictedDepartment(user.department)) return;
+    if (department !== "" && !isOpenDepartment(department)) return;
+  }
 
   await db.user.update({
     where: { id: user.id },
