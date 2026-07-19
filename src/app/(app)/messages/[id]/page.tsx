@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { markThreadReadAction } from "../actions";
 
 export default async function MessageDetailPage({
   params,
@@ -37,7 +36,17 @@ export default async function MessageDetailPage({
 
   if (thread.length === 0) notFound();
 
-  await markThreadReadAction(threadKey);
+  // Mark received messages in this conversation as read. Done inline rather than
+  // via the server action because that action calls revalidatePath(), which
+  // Next.js forbids during render and would crash the page.
+  await db.message.updateMany({
+    where: {
+      recipientId: user.id,
+      read: false,
+      OR: [{ threadId: threadKey }, { id: threadKey }],
+    },
+    data: { read: true },
+  });
 
   const latest = thread[thread.length - 1];
   const otherPartyId =
