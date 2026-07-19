@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
@@ -36,16 +37,18 @@ export default async function MessageDetailPage({
 
   if (thread.length === 0) notFound();
 
-  // Mark received messages in this conversation as read. Done inline rather than
-  // via the server action because that action calls revalidatePath(), which
-  // Next.js forbids during render and would crash the page.
-  await db.message.updateMany({
-    where: {
-      recipientId: user.id,
-      read: false,
-      OR: [{ threadId: threadKey }, { id: threadKey }],
-    },
-    data: { read: true },
+  // Mark received messages in this conversation as read. Scheduled with after()
+  // so the write (and its revalidatePath) runs once the response is sent —
+  // mutating during render is not allowed and crashes the page.
+  after(async () => {
+    await db.message.updateMany({
+      where: {
+        recipientId: user.id,
+        read: false,
+        OR: [{ threadId: threadKey }, { id: threadKey }],
+      },
+      data: { read: true },
+    });
   });
 
   const latest = thread[thread.length - 1];

@@ -58,17 +58,3 @@ export async function sendMessageAction(
   revalidatePath("/messages");
   redirect("/messages");
 }
-
-// Mark every message the viewer received in a conversation as read.
-export async function markThreadReadAction(threadKey: string) {
-  const user = await requireUser();
-  await db.message.updateMany({
-    where: {
-      recipientId: user.id,
-      read: false,
-      OR: [{ threadId: threadKey }, { id: threadKey }],
-    },
-    data: { read: true },
-  });
-  revalidatePath("/messages");
-}
