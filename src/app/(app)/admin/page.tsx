@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { requireStaff } from "@/lib/session";
 import { db } from "@/lib/db";
 import {
@@ -74,7 +75,6 @@ export default async function AdminPage() {
     { label: "SUSPENDED", value: suspendedCount },
     { label: "PENDING REQ", value: pendingRequests.length },
     { label: "ACTIVE INVITES", value: activeInviteCount },
-    { label: "L-E5", value: e5Count },
     { label: "SCP FILES", value: scpCount },
     { label: "INCIDENTS", value: incidentCount },
     { label: "MESSAGES", value: messageCount },
@@ -106,14 +106,20 @@ export default async function AdminPage() {
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--term-fg-dim)]">
           <span>CLEARANCE DISTRIBUTION:</span>
           {CLEARANCE_LEVELS.map((l) => (
-            <span key={l.rank}>
-              {l.label}=
-              <span className="text-[var(--term-fg)]">{tierMap.get(l.rank) ?? 0}</span>
-            </span>
+            <Fragment key={l.rank}>
+              <span>
+                {l.label}=
+                <span className="text-[var(--term-fg)]">
+                  {tierMap.get(l.rank) ?? 0}
+                </span>
+              </span>
+              {l.rank === 5 && (
+                <span>
+                  L-E5=<span className="text-[var(--term-fg)]">{e5Count}</span>
+                </span>
+              )}
+            </Fragment>
           ))}
-          <span>
-            L-E5=<span className="text-[var(--term-fg)]">{e5Count}</span>
-          </span>
         </div>
       </div>
 
