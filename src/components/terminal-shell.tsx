@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SecretLogo } from "@/components/secret-logo";
 import { LogoutButton } from "@/components/logout-button";
 import { clearanceDisplay } from "@/lib/clearance";
 import { Tutorial } from "@/components/tutorial";
@@ -22,9 +22,8 @@ export function TerminalShell({
     <div className="min-h-screen flex flex-col w-full max-w-5xl mx-auto p-2 sm:p-4 gap-3 sm:gap-4">
       <header className="term-panel flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
-          <Link href="/menu" className="text-base sm:text-lg tracking-widest term-link">
-            SCiP.NET
-          </Link>
+          <SecretLogo />
+          <span className="text-[var(--term-amber)] ml-2">FACILITY-220</span>
           <span className="hidden sm:inline text-[var(--term-fg-dim)] ml-2">
             {"// SECURE TERMINAL"}
           </span>

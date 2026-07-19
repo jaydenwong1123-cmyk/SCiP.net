@@ -30,12 +30,18 @@ export function clearanceLabel(rank: number): string {
 export const E5_DESIGNATION = "E5";
 export const E5_RANK = 6;
 
-// Display label for a member, honoring an alternate designation like E5.
+// R5 is a distinct designation that carries the same access as L-O5 / L-E5
+// (rank 6).
+export const R5_DESIGNATION = "R5";
+export const R5_RANK = 6;
+
+// Display label for a member, honoring an alternate designation like E5 / R5.
 export function clearanceDisplay(
   clearance: number,
   designation?: string | null
 ): string {
   if (designation === E5_DESIGNATION) return "L-E5";
+  if (designation === R5_DESIGNATION) return "L-R5";
   return clearanceLabel(clearance);
 }
 
@@ -49,15 +55,19 @@ export const CLEARANCE_ASSIGN_OPTIONS = [
   { value: "5", label: "L-5", rank: 5 },
   { value: "6", label: "L-O5", rank: 6 },
   { value: E5_DESIGNATION, label: "L-E5", rank: E5_RANK },
+  { value: R5_DESIGNATION, label: "L-R5", rank: R5_RANK },
   { value: "7", label: "L-OMNI", rank: 7 },
 ] as const;
 
-// The stored form value for a member's current clearance (E5 designation wins).
+// The stored form value for a member's current clearance (E5 / R5 designation
+// wins).
 export function clearanceAssignValue(
   clearance: number,
   designation?: string | null
 ): string {
-  return designation === E5_DESIGNATION ? E5_DESIGNATION : String(clearance);
+  if (designation === E5_DESIGNATION) return E5_DESIGNATION;
+  if (designation === R5_DESIGNATION) return R5_DESIGNATION;
+  return String(clearance);
 }
 
 // Resolve an admin-submitted assignment value to { clearance, designation }.
@@ -66,6 +76,9 @@ export function parseClearanceAssignment(
 ): { clearance: number; designation: string | null } | null {
   if (value === E5_DESIGNATION) {
     return { clearance: E5_RANK, designation: E5_DESIGNATION };
+  }
+  if (value === R5_DESIGNATION) {
+    return { clearance: R5_RANK, designation: R5_DESIGNATION };
   }
   if (/^\d+$/.test(value)) {
     const n = parseInt(value, 10);
@@ -96,8 +109,9 @@ export function parseClearanceToken(token: string): number | null {
 
   // Normalize label: uppercase, strip spaces / dashes / leading "L".
   const norm = raw.toUpperCase().replace(/[\s-]/g, "").replace(/^L/, "");
-  // E5 shares O5's rank-6 access.
+  // E5 / R5 share O5's rank-6 access.
   if (norm === E5_DESIGNATION) return E5_RANK;
+  if (norm === R5_DESIGNATION) return R5_RANK;
   const match = CLEARANCE_LEVELS.find(
     (l) => l.label.toUpperCase().replace(/[\s-]/g, "").replace(/^L/, "") === norm
   );
