@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Line = { kind: "in" | "out"; text: string };
 
@@ -9,18 +10,30 @@ const BANNER = [
   "║  SCiP.NET // FACILITY-220 MAINTENANCE SHELL    ║",
   "║  UNAUTHORIZED ACCESS IS A CLASS-3 VIOLATION    ║",
   "╚══════════════════════════════════════════════╝",
+  "★ You found the easter egg. Welcome, operative. ★",
   "Connection established. Type a command.",
 ];
 
 // Hidden command set. Intentionally NOT surfaced through any [? HELP] view —
 // there is no `help` command and no listing of these anywhere in the UI.
-function runCommand(raw: string): { out: string[]; clear?: boolean; close?: boolean } {
+function runCommand(raw: string): {
+  out: string[];
+  clear?: boolean;
+  close?: boolean;
+  navigate?: string;
+} {
   const input = raw.trim();
   if (!input) return { out: [] };
   const [cmd, ...rest] = input.split(/\s+/);
   const arg = rest.join(" ");
 
   switch (cmd.toLowerCase()) {
+    case "access":
+      if (!arg) return { out: ["usage: access <SCP>   e.g. access SCP-173"] };
+      return {
+        out: [`Locating ${arg.toUpperCase()} ... opening file.`],
+        navigate: `/scp/access?q=${encodeURIComponent(arg)}`,
+      };
     case "whoami":
       return {
         out: [
@@ -92,6 +105,7 @@ function runCommand(raw: string): { out: string[]; clear?: boolean; close?: bool
 }
 
 export function SecretTerminal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const [lines, setLines] = useState<Line[]>(BANNER.map((text) => ({ kind: "out", text })));
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +124,19 @@ export function SecretTerminal({ onClose }: { onClose: () => void }) {
     const entry = value;
     setValue("");
     const result = runCommand(entry);
+    if (result.navigate) {
+      setLines((prev) => [
+        ...prev,
+        { kind: "in", text: entry },
+        ...result.out.map((text) => ({ kind: "out" as const, text })),
+      ]);
+      const dest = result.navigate;
+      setTimeout(() => {
+        onClose();
+        router.push(dest);
+      }, 400);
+      return;
+    }
     if (result.close) {
       setLines((prev) => [
         ...prev,
