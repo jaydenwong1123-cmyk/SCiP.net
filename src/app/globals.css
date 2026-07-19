@@ -248,3 +248,65 @@ a {
 .term-link:hover {
   border-bottom-color: var(--term-fg-bright);
 }
+
+/* Selectable menu-screen tiles. */
+.menu-tile {
+  display: block;
+  text-decoration: none;
+  color: var(--term-fg);
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s, background 0.15s;
+}
+
+.menu-tile:hover,
+.menu-tile:focus-visible {
+  outline-color: rgba(var(--term-glow-rgb), 0.5);
+  transform: translateY(-2px);
+  background: linear-gradient(
+    rgba(var(--term-glow-rgb), 0.1),
+    rgba(var(--term-glow-rgb), 0.04)
+  );
+  box-shadow:
+    0 0 20px rgba(var(--term-glow-rgb), 0.22) inset,
+    0 0 16px rgba(var(--term-glow-rgb), 0.14);
+}
+
+.menu-tile__prompt {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.menu-tile:hover .menu-tile__prompt,
+.menu-tile:focus-visible .menu-tile__prompt {
+  opacity: 1;
+}
+
+.menu-tile__caret {
+  animation: term-blink 1s steps(1) infinite;
+}
+
+.menu-tile--amber {
+  border-color: var(--term-amber);
+}
+
+.menu-tile--amber:hover,
+.menu-tile--amber:focus-visible {
+  outline-color: rgba(255, 204, 85, 0.5);
+  background: linear-gradient(rgba(255, 204, 85, 0.1), rgba(255, 204, 85, 0.04));
+  box-shadow:
+    0 0 20px rgba(255, 204, 85, 0.2) inset,
+    0 0 16px rgba(255, 204, 85, 0.12);
+}
+
+.menu-tile--red {
+  border-color: var(--term-red);
+}
+
+.menu-tile--red:hover,
+.menu-tile--red:focus-visible {
+  outline-color: rgba(255, 85, 85, 0.5);
+  background: linear-gradient(rgba(255, 85, 85, 0.1), rgba(255, 85, 85, 0.04));
+  box-shadow:
+    0 0 20px rgba(255, 85, 85, 0.2) inset,
+    0 0 16px rgba(255, 85, 85, 0.12);
+}

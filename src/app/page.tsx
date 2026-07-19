@@ -8,5 +8,5 @@ export default async function HomePage() {
   if (!user) redirect("/login");
   if (user.suspended) redirect("/suspended");
   if (!user.displayName) redirect("/set-name");
-  redirect("/personnel");
+  redirect("/menu");
 }

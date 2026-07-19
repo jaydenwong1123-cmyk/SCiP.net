@@ -27,10 +27,12 @@ export function TerminalShell({
   };
 }) {
   return (
-    <div className="min-h-screen flex flex-col max-w-5xl mx-auto p-2 sm:p-4 gap-3 sm:gap-4">
+    <div className="min-h-screen flex flex-col w-full max-w-5xl mx-auto p-2 sm:p-4 gap-3 sm:gap-4">
       <header className="term-panel flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
-          <span className="text-base sm:text-lg tracking-widest">SCiP.NET</span>
+          <Link href="/menu" className="text-base sm:text-lg tracking-widest term-link">
+            SCiP.NET
+          </Link>
           <span className="hidden sm:inline text-[var(--term-fg-dim)] ml-2">
             {"// SECURE TERMINAL"}
           </span>
@@ -56,6 +58,9 @@ export function TerminalShell({
       </header>
 
       <nav className="term-panel flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm">
+        <Link href="/menu" className="term-link text-[var(--term-fg-bright)]">
+          [◄ MENU]
+        </Link>
         {NAV_ITEMS.map((item) => (
           <Link key={item.href} href={item.href} className="term-link">
             [{item.label}]
@@ -74,7 +79,7 @@ export function TerminalShell({
         </span>
       </nav>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 flex flex-col">{children}</main>
 
       <footer className="text-xs text-[var(--term-fg-dim)] text-center py-2">
         SCP FOUNDATION SECURE ACCESS TERMINAL — UNAUTHORIZED ACCESS WILL BE LOGGED
