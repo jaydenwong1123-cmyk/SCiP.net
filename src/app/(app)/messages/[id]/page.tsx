@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { markThreadReadAction } from "../actions";
 
 export default async function MessageDetailPage({
   params,
@@ -37,7 +37,19 @@ export default async function MessageDetailPage({
 
   if (thread.length === 0) notFound();
 
-  await markThreadReadAction(threadKey);
+  // Mark received messages in this conversation as read. Scheduled with after()
+  // so the write (and its revalidatePath) runs once the response is sent —
+  // mutating during render is not allowed and crashes the page.
+  after(async () => {
+    await db.message.updateMany({
+      where: {
+        recipientId: user.id,
+        read: false,
+        OR: [{ threadId: threadKey }, { id: threadKey }],
+      },
+      data: { read: true },
+    });
+  });
 
   const latest = thread[thread.length - 1];
   const otherPartyId =
