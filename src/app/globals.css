@@ -160,6 +160,35 @@ a {
   }
 }
 
+/* Official Foundation hazard-alert panel (suspension / maintenance notices). */
+.alert-panel {
+  position: relative;
+  border: 2px solid var(--term-red);
+  outline: 1px solid rgba(255, 85, 85, 0.25);
+  outline-offset: 3px;
+  background: linear-gradient(
+    rgba(255, 85, 85, 0.06),
+    rgba(255, 85, 85, 0.02)
+  );
+  padding: 1.25rem;
+  box-shadow:
+    0 0 18px rgba(255, 85, 85, 0.14) inset,
+    0 0 12px rgba(255, 85, 85, 0.08);
+}
+
+/* Yellow/black hazard tape divider. */
+.alert-stripe {
+  height: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--term-amber) 0px,
+    var(--term-amber) 12px,
+    #000 12px,
+    #000 24px
+  );
+  opacity: 0.85;
+}
+
 /* Secure L-5+ channel: a heavier, amber-accented "encrypted" panel. */
 .secure-panel {
   position: relative;

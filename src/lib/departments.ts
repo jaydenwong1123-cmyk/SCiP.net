@@ -11,6 +11,8 @@ export const RESTRICTED_DEPARTMENTS = [
   "Ethics Committee",
   "O5 Command",
   "The Administrator",
+  "Recordkeeping & Information Security Administration",
+  "Site Directorate",
   "Mobile Task Force",
   "Alpha-1",
   "Omega-1",

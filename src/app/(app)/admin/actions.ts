@@ -9,7 +9,12 @@ import {
   requireStaff,
 } from "@/lib/session";
 import { generateInviteCode } from "@/lib/codeword";
-import { MAX_CLEARANCE, MIN_CLEARANCE, OWNER_CLEARANCE } from "@/lib/clearance";
+import {
+  MAX_CLEARANCE,
+  MIN_CLEARANCE,
+  OWNER_CLEARANCE,
+  parseClearanceAssignment,
+} from "@/lib/clearance";
 import { isValidDepartment } from "@/lib/departments";
 import { updateSiteConfig, MAINT_COOKIE } from "@/lib/site-config";
 
@@ -46,10 +51,10 @@ export async function setMaintenanceAction(formData: FormData) {
 export async function setClearanceAction(formData: FormData) {
   const actor = await requireStaff();
   const userId = String(formData.get("userId") ?? "");
-  const clearance = Number(formData.get("clearance"));
+  const parsed = parseClearanceAssignment(String(formData.get("clearance") ?? ""));
 
-  if (!userId || !Number.isInteger(clearance)) return;
-  if (clearance < MIN_CLEARANCE || clearance > OWNER_CLEARANCE) return;
+  if (!userId || !parsed) return;
+  const { clearance, designation } = parsed;
 
   // Only owner/admin may grant the top clearance (L-OMNI). Staff cap below it.
   const canGrantTop = actor.isOwner || actor.isAdmin;
@@ -57,7 +62,7 @@ export async function setClearanceAction(formData: FormData) {
 
   await db.user.update({
     where: { id: userId, isOwner: false },
-    data: { clearance },
+    data: { clearance, designation },
   });
 
   revalidatePath("/admin");
@@ -102,7 +107,7 @@ export async function setOwnClearanceAction(formData: FormData) {
 
   await db.user.update({
     where: { id: owner.id },
-    data: { clearance },
+    data: { clearance, designation: null },
   });
 
   revalidatePath("/admin");
@@ -281,7 +286,7 @@ export async function reviewClearanceRequestAction(formData: FormData) {
     if (request.requestedLevel < OWNER_CLEARANCE || canGrantTop) {
       await db.user.update({
         where: { id: request.userId, isOwner: false },
-        data: { clearance: request.requestedLevel },
+        data: { clearance: request.requestedLevel, designation: null },
       });
     }
   }

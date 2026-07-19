@@ -10,20 +10,26 @@ export default async function SuspendedPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="term-panel w-full max-w-md space-y-4 text-center">
+      <div className="alert-panel w-full max-w-md space-y-4 text-center">
+        <div className="alert-stripe" aria-hidden />
         <h1 className="text-lg tracking-widest text-[var(--term-red)]">
-          :: ACCESS SUSPENDED ::
+          ⚠ ACCESS SUSPENDED ⚠
         </h1>
         <p className="text-sm">
           YOUR CREDENTIALS HAVE BEEN SUSPENDED BY FOUNDATION ADMINISTRATION.
-          CONTACT YOUR SITE DIRECTOR TO APPEAL.
+        </p>
+        <p className="text-sm text-[var(--term-amber)]">
+          TO APPEAL OR REINSTATE ACCESS, CONTACT A{" "}
+          <span className="text-[var(--term-fg-bright)]">RAISA AGENT</span>{" "}
+          (RECORDKEEPING &amp; INFORMATION SECURITY ADMINISTRATION).
         </p>
         {user.suspendedReason && (
           <p className="text-sm text-[var(--term-fg-dim)]">
             REASON: {user.suspendedReason}
           </p>
         )}
-        <div className="pt-2">
+        <div className="alert-stripe" aria-hidden />
+        <div className="pt-1">
           <LogoutButton />
         </div>
       </div>

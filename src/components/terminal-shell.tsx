@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
-import { clearanceLabel, canAccessSecureChannel } from "@/lib/clearance";
+import { clearanceDisplay, canAccessSecureChannel } from "@/lib/clearance";
 import { Tutorial } from "@/components/tutorial";
 
 const NAV_ITEMS = [
@@ -20,6 +20,7 @@ export function TerminalShell({
   user: {
     displayName: string | null;
     clearance: number;
+    designation: string | null;
     isOwner: boolean;
     isAdmin: boolean;
     isStaff: boolean;
@@ -37,7 +38,7 @@ export function TerminalShell({
         <div className="text-xs sm:text-sm flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4">
           <span>
             USER: <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
-            [{clearanceLabel(user.clearance)}]
+            [{clearanceDisplay(user.clearance, user.designation)}]
           </span>
           {(user.isOwner || user.isAdmin || user.isStaff) && (
             <Link href="/admin" className="term-link">

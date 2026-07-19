@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/session";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceDisplay } from "@/lib/clearance";
 import { OPEN_DEPARTMENTS, isRestrictedDepartment } from "@/lib/departments";
 import { ProfileForm } from "./profile-form";
 import { updateDepartmentAction } from "./actions";
@@ -12,7 +12,8 @@ export default async function ProfilePage() {
     <div className="term-panel space-y-4">
       <h1 className="text-lg tracking-widest">:: MY PROFILE ::</h1>
       <p className="text-sm text-[var(--term-fg-dim)]">
-        NAME: {user.displayName} — CLEARANCE: {clearanceLabel(user.clearance)} — LOGIN:{" "}
+        NAME: {user.displayName} — CLEARANCE:{" "}
+        {clearanceDisplay(user.clearance, user.designation)} — LOGIN:{" "}
         {user.email}
       </p>
 

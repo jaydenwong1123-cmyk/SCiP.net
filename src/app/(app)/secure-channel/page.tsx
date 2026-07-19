@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { clearanceLabel, canAccessSecureChannel } from "@/lib/clearance";
+import {
+  clearanceDisplay,
+  canAccessSecureChannel,
+} from "@/lib/clearance";
 import { SecureForm } from "./secure-form";
 
 export default async function SecureChannelPage() {
@@ -12,7 +15,7 @@ export default async function SecureChannelPage() {
     orderBy: { createdAt: "desc" },
     take: 200,
     include: {
-      author: { select: { displayName: true, clearance: true } },
+      author: { select: { displayName: true, clearance: true, designation: true } },
     },
   });
 
@@ -26,7 +29,8 @@ export default async function SecureChannelPage() {
           <span className="secure-badge text-xs">● AES-256 SECURE LINK</span>
         </div>
         <p className="text-xs text-[var(--term-fg-dim)]">
-          END-TO-END ENCRYPTED · ACCESS: {clearanceLabel(user.clearance)} ·
+          END-TO-END ENCRYPTED · ACCESS:{" "}
+          {clearanceDisplay(user.clearance, user.designation)} ·
           UNAUTHORIZED INTERCEPTION IS A CLASS-4 INFRACTION · ALL TRAFFIC LOGGED
         </p>
       </div>
@@ -49,7 +53,8 @@ export default async function SecureChannelPage() {
           >
             <p className="text-xs text-[var(--term-fg-dim)]">
               <span className="text-[var(--term-amber)]">
-                [{clearanceLabel(m.author.clearance)}] {m.author.displayName}
+                [{clearanceDisplay(m.author.clearance, m.author.designation)}]{" "}
+                {m.author.displayName}
               </span>{" "}
               · {m.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
             </p>

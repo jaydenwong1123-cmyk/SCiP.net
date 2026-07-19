@@ -24,6 +24,9 @@ model User {
   isAdmin      Boolean  @default(false)
   isStaff      Boolean  @default(false)
   department   String?
+  // Optional alternate clearance designation shown instead of the numeric label
+  // (e.g. "E5", which carries the same rank-6 / L-O5 access). Null = normal.
+  designation  String?
   personalFile String   @default("")
   suspended        Boolean  @default(false)
   suspendedReason  String?

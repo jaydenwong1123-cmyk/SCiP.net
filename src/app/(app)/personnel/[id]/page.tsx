@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, canAnnotateMembers } from "@/lib/session";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceDisplay } from "@/lib/clearance";
 import { renderRedacted, canBypassRedaction } from "@/lib/redact";
 import { addMemberNoteAction, deleteMemberNoteAction } from "../actions";
 
@@ -19,6 +19,7 @@ export default async function PersonnelFilePage({
       id: true,
       displayName: true,
       clearance: true,
+      designation: true,
       department: true,
       personalFile: true,
       isOwner: true,
@@ -60,7 +61,7 @@ export default async function PersonnelFilePage({
           </Link>
         </div>
         <p className="text-sm text-[var(--term-fg-dim)]">
-          CLEARANCE: {clearanceLabel(person.clearance)}
+          CLEARANCE: {clearanceDisplay(person.clearance, person.designation)}
           {role ? ` — ${role}` : ""}
           {person.department ? ` — ${person.department}` : ""}
         </p>

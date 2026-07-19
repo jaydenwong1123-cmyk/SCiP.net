@@ -12,11 +12,13 @@ import {
   deleteAccountAction,
 } from "./actions";
 import { ALL_DEPARTMENTS } from "@/lib/departments";
+import { CLEARANCE_ASSIGN_OPTIONS, clearanceAssignValue } from "@/lib/clearance";
 
 type Member = {
   id: string;
   displayName: string | null;
   clearance: number;
+  designation: string | null;
   canPostScp: boolean;
   isAdmin: boolean;
   isStaff: boolean;
@@ -24,17 +26,13 @@ type Member = {
   suspended: boolean;
 };
 
-type Level = { rank: number; label: string };
-
 export function MemberRow({
   member,
-  levels,
   canGrantTopClearance,
   canManageStaff,
   canManageAdmin,
 }: {
   member: Member;
-  levels: Level[];
   canGrantTopClearance: boolean;
   canManageStaff: boolean;
   canManageAdmin: boolean;
@@ -42,9 +40,10 @@ export function MemberRow({
   const [open, setOpen] = useState(false);
 
   const role = member.isAdmin ? "ADMIN" : member.isStaff ? "STAFF" : null;
-  const selectableLevels = canGrantTopClearance
-    ? levels
-    : levels.filter((l) => l.rank < 7);
+  // L-OMNI (value "7") may only be granted by owner/admin.
+  const selectableOptions = CLEARANCE_ASSIGN_OPTIONS.filter(
+    (o) => canGrantTopClearance || o.value !== "7"
+  );
 
   return (
     <div className="border-b border-[var(--term-border)]/30 py-2">
@@ -87,12 +86,12 @@ export function MemberRow({
             <input type="hidden" name="userId" value={member.id} />
             <select
               name="clearance"
-              defaultValue={member.clearance}
+              defaultValue={clearanceAssignValue(member.clearance, member.designation)}
               className="term-input py-1"
             >
-              {selectableLevels.map((l) => (
-                <option key={l.rank} value={l.rank}>
-                  {l.label}
+              {selectableOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>

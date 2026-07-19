@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, canAnnotateMembers } from "@/lib/session";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceDisplay } from "@/lib/clearance";
 
 export default async function PersonnelPage() {
   const viewer = await requireUser();
@@ -12,6 +12,7 @@ export default async function PersonnelPage() {
       id: true,
       displayName: true,
       clearance: true,
+      designation: true,
       department: true,
       isOwner: true,
       isAdmin: true,
@@ -64,7 +65,7 @@ export default async function PersonnelPage() {
                 )}
               </span>
               <span className="text-[var(--term-fg-dim)]">
-                [{clearanceLabel(p.clearance)}]
+                [{clearanceDisplay(p.clearance, p.designation)}]
               </span>
             </Link>
           );

@@ -1,6 +1,6 @@
 import { requireStaff } from "@/lib/session";
 import { db } from "@/lib/db";
-import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
+import { CLEARANCE_LEVELS, clearanceLabel, clearanceDisplay } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberRow } from "./member-row";
 import {
@@ -41,7 +41,9 @@ export default async function AdminPage() {
     db.clearanceRequest.findMany({
       where: { status: "pending" },
       orderBy: { createdAt: "asc" },
-      include: { user: { select: { displayName: true, clearance: true } } },
+      include: {
+        user: { select: { displayName: true, clearance: true, designation: true } },
+      },
     }),
     db.user.groupBy({ by: ["clearance"], _count: true }),
     db.user.count({ where: { suspended: true } }),
@@ -214,7 +216,8 @@ export default async function AdminPage() {
             className="border-b border-[var(--term-border)]/30 py-2 space-y-2"
           >
             <p className="text-sm">
-              {r.user.displayName} ({clearanceLabel(r.user.clearance)}) requests{" "}
+              {r.user.displayName} (
+              {clearanceDisplay(r.user.clearance, r.user.designation)}) requests{" "}
               {clearanceLabel(r.requestedLevel)}
             </p>
             <p className="text-sm text-[var(--term-fg-dim)]">{r.reason}</p>
@@ -260,13 +263,13 @@ export default async function AdminPage() {
                 id: m.id,
                 displayName: m.displayName,
                 clearance: m.clearance,
+                designation: m.designation,
                 canPostScp: m.canPostScp,
                 isAdmin: m.isAdmin,
                 isStaff: m.isStaff,
                 department: m.department,
                 suspended: m.suspended,
               }}
-              levels={editableLevels}
               canGrantTopClearance={canGrantTopClearance}
               canManageStaff={canManageStaff}
               canManageAdmin={canManageAdmin}
