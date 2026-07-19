@@ -1,16 +1,8 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
-import { clearanceDisplay, canAccessSecureChannel } from "@/lib/clearance";
+import { clearanceDisplay } from "@/lib/clearance";
 import { Tutorial } from "@/components/tutorial";
-
-const NAV_ITEMS = [
-  { href: "/personnel", label: "PERSONNEL" },
-  { href: "/messages", label: "MESSAGES" },
-  { href: "/scp", label: "SCP FILES" },
-  { href: "/incidents", label: "INCIDENTS" },
-  { href: "/broadcasts", label: "BROADCASTS" },
-  { href: "/clearance-request", label: "CLEARANCE" },
-];
+import { TabBar } from "@/components/tab-bar";
 
 export function TerminalShell({
   children,
@@ -42,42 +34,12 @@ export function TerminalShell({
             USER: <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
             [{clearanceDisplay(user.clearance, user.designation)}]
           </span>
-          {(user.isOwner || user.isAdmin || user.isStaff) && (
-            <Link href="/admin" className="term-link">
-              ADMIN
-            </Link>
-          )}
-          <Link href="/profile" className="term-link">
-            PROFILE
-          </Link>
-          <Link href="/settings" className="term-link">
-            SETTINGS
-          </Link>
           <LogoutButton />
+          <Tutorial />
         </div>
       </header>
 
-      <nav className="term-panel flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm">
-        <Link href="/menu" className="term-link text-[var(--term-fg-bright)]">
-          [◄ MENU]
-        </Link>
-        {NAV_ITEMS.map((item) => (
-          <Link key={item.href} href={item.href} className="term-link">
-            [{item.label}]
-          </Link>
-        ))}
-        {canAccessSecureChannel(user.clearance) && (
-          <Link
-            href="/secure-channel"
-            className="term-link text-[var(--term-amber)]"
-          >
-            [⚿ SECURE CHANNEL]
-          </Link>
-        )}
-        <span className="ml-auto">
-          <Tutorial />
-        </span>
-      </nav>
+      <TabBar />
 
       <main className="flex-1 flex flex-col">{children}</main>
 

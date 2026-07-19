@@ -249,6 +249,93 @@ a {
   border-bottom-color: var(--term-fg-bright);
 }
 
+/* Browser-style tab strip. */
+.tabbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 2px solid var(--term-border);
+  padding: 0 2px;
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  max-width: 15rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  color: var(--term-fg-dim);
+  border: 2px solid var(--term-border);
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(
+    rgba(var(--term-glow-rgb), 0.02),
+    rgba(var(--term-glow-rgb), 0.05)
+  );
+  margin-bottom: -2px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--term-fg);
+}
+
+.tab--active {
+  color: var(--term-fg-bright);
+  border-color: var(--term-fg);
+  background: linear-gradient(
+    rgba(var(--term-glow-rgb), 0.06),
+    rgba(var(--term-glow-rgb), 0.02)
+  );
+  box-shadow: 0 -6px 12px rgba(var(--term-glow-rgb), 0.12) inset;
+}
+
+.tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  line-height: 1;
+  font-size: 0.9rem;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.6;
+  flex: 0 0 auto;
+}
+
+.tab__close:hover {
+  opacity: 1;
+  background: var(--term-red);
+  color: var(--term-bg);
+}
+
+.tab--home,
+.tab--new {
+  color: var(--term-fg-bright);
+}
+
+.tab--new {
+  padding-inline: 0.7rem;
+  font-size: 1rem;
+}
+
 /* Selectable menu-screen tiles. */
 .menu-tile {
   display: block;
