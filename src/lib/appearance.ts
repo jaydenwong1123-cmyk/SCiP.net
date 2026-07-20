@@ -95,6 +95,42 @@ export const THEMES: { key: string; label: string; vars: ThemeVars }[] = [
       "--term-glow-rgb": "230,230,230",
     },
   },
+  {
+    key: "cyan",
+    label: "CYBERWAVE CYAN",
+    vars: {
+      "--term-bg": "#020a09",
+      "--term-fg": "#33fff0",
+      "--term-fg-dim": "#1e8f8a",
+      "--term-fg-bright": "#aaffed",
+      "--term-border": "#1e8f8a",
+      "--term-glow-rgb": "51,255,240",
+    },
+  },
+  {
+    key: "orange",
+    label: "SOLAR ORANGE",
+    vars: {
+      "--term-bg": "#0a0500",
+      "--term-fg": "#ff9933",
+      "--term-fg-dim": "#c26a20",
+      "--term-fg-bright": "#ffd2a3",
+      "--term-border": "#c26a20",
+      "--term-glow-rgb": "255,153,51",
+    },
+  },
+  {
+    key: "magenta",
+    label: "MAGENTA PULSE",
+    vars: {
+      "--term-bg": "#0a020a",
+      "--term-fg": "#ff66e0",
+      "--term-fg-dim": "#c04caa",
+      "--term-fg-bright": "#ffc2f0",
+      "--term-border": "#c04caa",
+      "--term-glow-rgb": "255,102,224",
+    },
+  },
 ];
 
 export const FONTS: { key: string; label: string; stack: string }[] = [
