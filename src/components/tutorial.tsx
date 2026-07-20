@@ -78,6 +78,25 @@ export function Tutorial() {
             </section>
 
             <section className="space-y-1">
+              <h3 className="text-[var(--term-fg-bright)]">◈ CROSS-LINKING</h3>
+              <p>
+                Mention another file or member and it auto-links, if you&apos;re
+                cleared to see it:
+              </p>
+              <ul className="list-none space-y-1 pl-2 text-[var(--term-fg-dim)]">
+                <li>
+                  <code className="text-[var(--term-fg)]">SCP-XXXX</code> —
+                  links to that file. Above your clearance shows as a locked
+                  reference instead.
+                </li>
+                <li>
+                  <code className="text-[var(--term-fg)]">@Display Name</code>{" "}
+                  — links to that member&apos;s personnel file and notifies them.
+                </li>
+              </ul>
+            </section>
+
+            <section className="space-y-1">
               <h3 className="text-[var(--term-fg-bright)]">◈ SECTIONS</h3>
               <ul className="list-none space-y-1 pl-2 text-[var(--term-fg-dim)]">
                 <li>
