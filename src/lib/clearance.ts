@@ -54,22 +54,21 @@ export function clearanceDisplay(
 // which is the point of the signal.
 const CLEARANCE_ACCENTS: Record<number, string> = {
   1: "var(--term-fg-dim)",
-  2: "var(--term-fg)",
-  3: "var(--term-fg-bright)",
-  4: "#66ccff",
-  5: "var(--term-amber)",
-  6: "#c08cff",
-  7: "var(--term-red)",
+  2: "var(--term-fg-dim)",
+  3: "#99e6ff",
+  4: "#ff9933",
+  5: "#8b2fc9",
+  6: "#8b0000",
+  7: "#ffffff",
 };
 
 export function clearanceAccent(
   clearance: number,
   designation?: string | null
 ): string {
-  // E5 / R5 sit at rank 6 and inherit its accent.
-  if (designation === E5_DESIGNATION || designation === R5_DESIGNATION) {
-    return CLEARANCE_ACCENTS[6]!;
-  }
+  // E5 / R5 sit at rank 6 but get their own distinct accents.
+  if (designation === E5_DESIGNATION) return "#33cc33";
+  if (designation === R5_DESIGNATION) return "#00e5ff";
   return CLEARANCE_ACCENTS[clearance] ?? "var(--term-fg-dim)";
 }
 
