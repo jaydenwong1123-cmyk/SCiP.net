@@ -4,13 +4,12 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 
-// Fired when the bell dropdown opens. Marks everything currently unread as
-// read — there is no per-item "mark read" affordance, so this is the only
-// write path.
-export async function markAllNotificationsReadAction() {
+// Fired when a single notification in the bell dropdown is clicked. Marking
+// just that one keeps the rest visible/unread until the user opens them too.
+export async function markNotificationReadAction(notificationId: string) {
   const user = await requireUser();
   await db.notification.updateMany({
-    where: { userId: user.id, read: false },
+    where: { id: notificationId, userId: user.id },
     data: { read: true },
   });
   // Layout scope: the unread badge is rendered in the shared shell, not a

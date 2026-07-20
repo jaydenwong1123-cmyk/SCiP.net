@@ -10,6 +10,7 @@ import {
   storeAttachment,
   pruneExpiredAttachments,
 } from "@/lib/attachments";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function postSecureMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -18,6 +19,9 @@ export async function postSecureMessageAction(
   const user = await requireUser();
   if (!canAccessSecureChannel(user.clearance)) {
     return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const body = String(formData.get("body") ?? "").trim();

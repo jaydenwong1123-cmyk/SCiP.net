@@ -13,12 +13,16 @@ import {
   deleteRevisionsFor,
 } from "@/lib/revisions";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function createIncidentReportAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
 
   const title = String(formData.get("title") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
@@ -74,6 +78,9 @@ export async function updateIncidentReportAction(
   }
   if (existing.clearanceRequired > user.clearance) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE FOR THIS REPORT." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const title = String(formData.get("title") ?? "").trim();

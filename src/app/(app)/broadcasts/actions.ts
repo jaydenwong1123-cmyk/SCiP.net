@@ -13,6 +13,7 @@ import {
 } from "@/lib/revisions";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { parseScheduleInput } from "@/lib/broadcast-schedule";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function createBroadcastAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -21,6 +22,9 @@ export async function createBroadcastAction(
   const user = await requireUser();
   if (!canPostBroadcast(user.clearance)) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE TO BROADCAST." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const title = String(formData.get("title") ?? "").trim();
@@ -93,6 +97,9 @@ export async function updateBroadcastAction(
       ok: false,
       error: "YOU DO NOT HAVE PERMISSION TO EDIT THIS BROADCAST.",
     };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const title = String(formData.get("title") ?? "").trim();

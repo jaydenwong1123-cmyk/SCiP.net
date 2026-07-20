@@ -13,10 +13,12 @@ import {
 import { isInfractionSeverity } from "@/lib/infractions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function addMemberNoteAction(formData: FormData) {
   const author = await requireUser();
   if (!canAnnotateMembers(author)) return;
+  if (findNonAsciiFormField(formData)) return;
 
   const subjectId = String(formData.get("subjectId") ?? "");
   const body = String(formData.get("body") ?? "").trim();
@@ -124,6 +126,9 @@ export async function addInfractionAction(
   const issuer = await requireUser();
   if (!canAnnotateMembers(issuer)) {
     return { ok: false, error: "NOT AUTHORIZED." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const subjectId = String(formData.get("subjectId") ?? "");

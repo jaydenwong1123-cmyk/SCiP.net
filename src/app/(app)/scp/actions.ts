@@ -13,6 +13,7 @@ import {
   deleteRevisionsFor,
 } from "@/lib/revisions";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function createScpFileAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -21,6 +22,9 @@ export async function createScpFileAction(
   const user = await requireUser();
   if (!user.canPostScp) {
     return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO POST SCP FILES." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const title = String(formData.get("title") ?? "").trim();
@@ -79,6 +83,9 @@ export async function updateScpFileAction(
   // rewrite it either.
   if (existing.clearanceRequired > user.clearance) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE FOR THIS FILE." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const title = String(formData.get("title") ?? "").trim();

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { ComposeForm } from "./compose-form";
@@ -20,7 +21,12 @@ export default async function ComposePage({
 
   return (
     <div className="term-panel space-y-4">
-      <h1 className="text-lg tracking-widest">:: COMPOSE MESSAGE ::</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-lg tracking-widest">:: COMPOSE MESSAGE ::</h1>
+        <Link href="/messages" className="term-link text-sm shrink-0">
+          [BACK]
+        </Link>
+      </div>
       <ComposeForm
         recipients={recipients}
         defaultRecipientId={defaultRecipientId}

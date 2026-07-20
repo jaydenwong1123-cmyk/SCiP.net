@@ -9,12 +9,16 @@ import {
   MIN_CLEARANCE,
   MAX_REQUESTABLE_CLEARANCE,
 } from "@/lib/clearance";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function createClearanceRequestAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
   const requestedLevel = Number(formData.get("requestedLevel"));
   const reason = String(formData.get("reason") ?? "").trim();
 

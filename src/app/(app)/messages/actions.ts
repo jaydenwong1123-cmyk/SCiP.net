@@ -6,12 +6,17 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { getMentionCandidates, resolveMentionedUsers } from "@/lib/mentions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function sendMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
+
   const recipientId = String(formData.get("recipientId") ?? "");
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();

@@ -14,6 +14,7 @@ import {
   INVITE_RULE,
 } from "@/lib/rate-limit";
 import { logAudit, clientIp, AUDIT_ACTIONS } from "@/lib/audit";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 const EMAIL_DOMAIN = "foundation.scp";
 const USERNAME_PATTERN = /^[a-z][a-z0-9._-]{1,30}$/i;
@@ -148,6 +149,9 @@ export async function setNameAction(
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "NOT AUTHENTICATED." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
   }
 
   const displayName = String(formData.get("displayName") ?? "").trim();

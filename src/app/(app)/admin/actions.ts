@@ -21,6 +21,7 @@ import { isValidDepartment } from "@/lib/departments";
 import { updateSiteConfig, MAINT_COOKIE } from "@/lib/site-config";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
+import { findNonAsciiFormField } from "@/lib/validation";
 
 // Audit entries name the person acted on, not just their id. Looked up once
 // per action rather than joined into every log read.
@@ -34,6 +35,7 @@ async function targetName(userId: string): Promise<string> {
 
 export async function setMaintenanceAction(formData: FormData) {
   const actor = await requireOwner();
+  if (findNonAsciiFormField(formData)) return;
   const wantsMaintenance = formData.get("maintenanceMode") === "on";
   const bypassCode = String(formData.get("bypassCode") ?? "").trim().slice(0, 64);
   const maintenanceMessage = String(formData.get("maintenanceMessage") ?? "")
@@ -113,6 +115,7 @@ export async function setClearanceAction(formData: FormData) {
 
 export async function setDisplayNameAction(formData: FormData) {
   const actor = await requireStaff();
+  if (findNonAsciiFormField(formData)) return;
   const userId = String(formData.get("userId") ?? "");
   const displayName = String(formData.get("displayName") ?? "").trim();
 
@@ -141,6 +144,7 @@ export async function setDisplayNameAction(formData: FormData) {
 
 export async function setOwnDisplayNameAction(formData: FormData) {
   const owner = await requireOwner();
+  if (findNonAsciiFormField(formData)) return;
   const displayName = String(formData.get("displayName") ?? "").trim();
   if (!displayName) return;
 
@@ -321,6 +325,7 @@ export async function toggleCoOwnerAction(formData: FormData) {
 
 export async function setSuspendedAction(formData: FormData) {
   const actor = await requireStaff();
+  if (findNonAsciiFormField(formData)) return;
   const userId = String(formData.get("userId") ?? "");
   const suspend = formData.get("suspend") === "true";
   const reason = String(formData.get("reason") ?? "").trim();
@@ -411,6 +416,7 @@ export async function deleteAccountAction(formData: FormData) {
 
 export async function generateInviteCodeAction(formData: FormData) {
   const actor = await requireStaff();
+  if (findNonAsciiFormField(formData)) return;
 
   const countRaw = Number(formData.get("count"));
   const count =
@@ -459,6 +465,7 @@ export async function generateInviteCodeAction(formData: FormData) {
 
 export async function revokeInviteCodeAction(formData: FormData) {
   const actor = await requireStaff();
+  if (findNonAsciiFormField(formData)) return;
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -486,6 +493,7 @@ export async function revokeInviteCodeAction(formData: FormData) {
 
 export async function reviewClearanceRequestAction(formData: FormData) {
   const reviewer = await requireStaff();
+  if (findNonAsciiFormField(formData)) return;
   const requestId = String(formData.get("requestId") ?? "");
   const decision = String(formData.get("decision") ?? "");
   const reviewNote = String(formData.get("reviewNote") ?? "").trim();

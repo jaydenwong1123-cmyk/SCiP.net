@@ -8,6 +8,7 @@ import {
   isRestrictedDepartment,
   isValidDepartment,
 } from "@/lib/departments";
+import { findNonAsciiFormField } from "@/lib/validation";
 
 export async function updateDepartmentAction(formData: FormData) {
   const user = await requireUser();
@@ -39,6 +40,7 @@ export async function updatePersonalFileAction(
   formData: FormData
 ): Promise<{ ok: boolean }> {
   const user = await requireUser();
+  if (findNonAsciiFormField(formData)) return { ok: false };
   const content = String(formData.get("personalFile") ?? "");
 
   await db.user.update({
