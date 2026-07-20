@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { MEMBER_NOTE_CLEARANCE } from "@/lib/clearance";
+import { getViewAsClearance } from "@/lib/view-as";
 
 // Personnel who may flag/annotate members: L-5 and above, plus staff/admin/owner.
 export function canAnnotateMembers(user: {
@@ -18,12 +19,46 @@ export function canAnnotateMembers(user: {
   );
 }
 
-// Memoized per request: the layout and the page both resolve the current user,
-// so without this cache each navigation issues the same DB lookup twice.
-export const getCurrentUser = cache(async () => {
+// The member as stored — never downgraded by "view as". Used by the Settings
+// page and the revert action, which must keep working while a simulation is
+// active.
+export const getRealUser = cache(async () => {
   const session = await auth();
   if (!session?.user?.id) return null;
   return db.user.findUnique({ where: { id: session.user.id } });
+});
+
+// Memoized per request: the layout and the page both resolve the current user,
+// so without this cache each navigation issues the same DB lookup twice.
+//
+// If the member is running a "view as" simulation, what comes back here is the
+// downgraded persona — lower clearance, no elevated roles — so every page,
+// nav gate and redaction check in the app sees the simulated viewer without
+// having to know the feature exists. `realClearance` carries the true rank for
+// the few places that need to show it (the banner, Settings).
+export const getCurrentUser = cache(async () => {
+  const user = await getRealUser();
+  if (!user) return null;
+
+  const viewAs = await getViewAsClearance(user);
+  if (viewAs === null) {
+    return { ...user, realClearance: user.clearance, viewAsClearance: null };
+  }
+
+  return {
+    ...user,
+    clearance: viewAs,
+    // An alternate designation (E5 / R5) is an identity at rank 6; carrying it
+    // into a rank-2 persona would be nonsense.
+    designation: null,
+    isOwner: false,
+    isCoOwner: false,
+    isAdmin: false,
+    isStaff: false,
+    isHelper: false,
+    realClearance: user.clearance,
+    viewAsClearance: viewAs,
+  };
 });
 
 export async function requireUser() {

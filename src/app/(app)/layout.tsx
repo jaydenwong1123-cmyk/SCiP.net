@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { clearanceLabel } from "@/lib/clearance";
 import { enforceMaintenance } from "@/lib/site-config";
 import { TerminalShell } from "@/components/terminal-shell";
 import { db } from "@/lib/db";
@@ -39,6 +41,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         isStaff: user.isStaff,
       }}
     >
+      {user.viewAsClearance !== null && (
+        <div className="term-panel mb-3 flex flex-wrap items-center justify-between gap-2 border-[var(--term-amber)] text-xs">
+          <span className="text-[var(--term-amber)]">
+            ⚠ SIMULATING {clearanceLabel(user.viewAsClearance)} — ELEVATED ACCESS
+            SUSPENDED (ACTUAL: {clearanceLabel(user.realClearance)})
+          </span>
+          <Link href="/settings" className="term-link">
+            [END SIMULATION]
+          </Link>
+        </div>
+      )}
       {children}
     </TerminalShell>
   );

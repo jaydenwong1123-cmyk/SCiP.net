@@ -5,6 +5,7 @@ import Link from "next/link";
 import { updateScpFileAction } from "../../actions";
 import { CLEARANCE_LEVELS } from "@/lib/clearance";
 import { CLASSIFICATIONS } from "@/lib/classification";
+import { BodyEditor } from "@/components/body-editor";
 
 export function EditScpForm({
   file,
@@ -73,23 +74,7 @@ export function EditScpForm({
           ))}
         </select>
       </div>
-      <div>
-        <label className="block text-sm mb-1" htmlFor="body">
-          BODY
-        </label>
-        <textarea
-          id="body"
-          name="body"
-          required
-          rows={16}
-          defaultValue={file.body}
-          className="term-input resize-y"
-        />
-        <p className="text-xs text-[var(--term-fg-dim)] mt-1">
-          REDACTION: <code>[*text*]</code> hides text from everyone. <code>[*text*][4]</code>{" "}
-          reveals it only to L-4 clearance or higher; lower levels see a redacted box.
-        </p>
-      </div>
+      <BodyEditor defaultValue={file.body} />
       <div>
         <label className="block text-sm mb-1" htmlFor="reason">
           REVISION NOTE <span className="text-[var(--term-fg-dim)]">(OPTIONAL)</span>
