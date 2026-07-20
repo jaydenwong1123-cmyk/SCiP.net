@@ -7,6 +7,7 @@ import {
   setMemberDepartmentAction,
   toggleCanPostScpAction,
   toggleCanFileIncidentAction,
+  toggleHelperAction,
   toggleStaffAction,
   toggleAdminAction,
   toggleCoOwnerAction,
@@ -26,6 +27,7 @@ type Member = {
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
+  isHelper: boolean;
   department: string | null;
   suspended: boolean;
 };
@@ -36,12 +38,14 @@ export function MemberRow({
   canManageStaff,
   canManageAdmin,
   canManageCoOwner,
+  canManageHelper,
 }: {
   member: Member;
   canGrantTopClearance: boolean;
   canManageStaff: boolean;
   canManageAdmin: boolean;
   canManageCoOwner: boolean;
+  canManageHelper: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -51,7 +55,9 @@ export function MemberRow({
       ? "ADMIN"
       : member.isStaff
         ? "STAFF"
-        : null;
+        : member.isHelper
+          ? "HELPER"
+          : null;
   // A co-owner is owner-equivalent: only the seeded owner may touch them, and
   // then only to revoke the role.
   const locked = member.isCoOwner && !canManageCoOwner;
@@ -176,6 +182,20 @@ export function MemberRow({
               {member.canFileIncident ? "REVOKE INCIDENT-FILE" : "GRANT INCIDENT-FILE"}
             </button>
           </form>
+
+          {canManageHelper && (
+            <form action={toggleHelperAction}>
+              <input type="hidden" name="userId" value={member.id} />
+              <input
+                type="hidden"
+                name="isHelper"
+                value={(!member.isHelper).toString()}
+              />
+              <button className="term-button text-xs">
+                {member.isHelper ? "REVOKE HELPER" : "GRANT HELPER"}
+              </button>
+            </form>
+          )}
 
           {canManageStaff && (
             <form action={toggleStaffAction}>

@@ -14,6 +14,7 @@ const SECTIONS: { base: string; label: string }[] = [
   { base: "/incidents", label: "INCIDENTS" },
   { base: "/broadcasts", label: "BROADCASTS" },
   { base: "/clearance-request", label: "CLEARANCE" },
+  { base: "/tickets", label: "IT SUPPORT" },
   { base: "/secure-channel", label: "SECURE CHANNEL" },
   { base: "/admin", label: "ADMIN" },
   { base: "/profile", label: "PROFILE" },

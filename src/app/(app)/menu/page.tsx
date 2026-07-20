@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser, hasStaffPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canAccessSecureChannel, clearanceDisplay } from "@/lib/clearance";
+import { TICKET_STATUSES, handleableTicketTypes } from "@/lib/tickets";
 
 type Tile = {
   href: string;
@@ -20,10 +21,23 @@ export default async function MenuPage() {
 
   // Counts backing the tile badges. Fetched together so the menu still costs
   // a single round trip.
-  const [unreadMessages, pendingRequests] = await Promise.all([
+  const ticketQueues = handleableTicketTypes(user);
+
+  const [unreadMessages, pendingRequests, openTickets] = await Promise.all([
     db.message.count({ where: { recipientId: user.id, read: false } }),
     staff
       ? db.clearanceRequest.count({ where: { status: "pending" } })
+      : Promise.resolve(0),
+    // Badge counts only what this member is expected to act on: tickets in a
+    // queue they handle, excluding their own.
+    ticketQueues.length > 0
+      ? db.ticket.count({
+          where: {
+            type: { in: ticketQueues },
+            status: TICKET_STATUSES.open,
+            authorId: { not: user.id },
+          },
+        })
       : Promise.resolve(0),
   ]);
 
@@ -41,6 +55,14 @@ export default async function MenuPage() {
     { href: "/incidents", label: "INCIDENTS", code: "SEC-04", desc: "Breach & incident reports" },
     { href: "/broadcasts", label: "BROADCASTS", code: "SEC-05", desc: "Site-wide directives & bulletins" },
     { href: "/clearance-request", label: "CLEARANCE", code: "SEC-06", desc: "Request clearance elevation" },
+    {
+      href: "/tickets",
+      label: "IT SUPPORT",
+      code: "SEC-07",
+      desc: "Assistance, bug reports & file access requests",
+      badge: openTickets,
+      badgeLabel: "open tickets in your queue",
+    },
   ];
 
   if (canAccessSecureChannel(user.clearance)) {

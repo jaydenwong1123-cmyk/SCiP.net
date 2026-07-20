@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPES = {
   message: "message",
   mention: "mention",
   infraction: "infraction",
+  ticket: "ticket",
 } as const;
 
 export type NotificationType =

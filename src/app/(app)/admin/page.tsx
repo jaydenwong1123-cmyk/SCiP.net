@@ -27,6 +27,8 @@ export default async function AdminPage() {
   const ownerPowers = hasOwnerPowers(viewer);
   const canManageStaff = ownerPowers || viewer.isAdmin;
   const canManageAdmin = ownerPowers;
+  // Helper ranks below Staff, but only Admin and above may appoint one.
+  const canManageHelper = ownerPowers || viewer.isAdmin;
   // Appointing the single Co-Owner is reserved for the seeded owner.
   const canManageCoOwner = viewer.isOwner;
   const canGrantTopClearance = ownerPowers || viewer.isAdmin;
@@ -312,6 +314,7 @@ export default async function AdminPage() {
                 isCoOwner: m.isCoOwner,
                 isAdmin: m.isAdmin,
                 isStaff: m.isStaff,
+                isHelper: m.isHelper,
                 department: m.department,
                 suspended: m.suspended,
               }}
@@ -319,6 +322,7 @@ export default async function AdminPage() {
               canManageStaff={canManageStaff}
               canManageAdmin={canManageAdmin}
               canManageCoOwner={canManageCoOwner}
+              canManageHelper={canManageHelper}
             />
           ))}
         </div>

@@ -27,6 +27,9 @@ model User {
   isCoOwner    Boolean  @default(false)
   isAdmin      Boolean  @default(false)
   isStaff      Boolean  @default(false)
+  // Helper: sits directly below Staff. Grants access to the General Assistance
+  // ticket queue and nothing else. Only an Admin (or above) may grant it.
+  isHelper     Boolean  @default(false)
   department   String?
   // Optional alternate clearance designation shown instead of the numeric label
   // (e.g. "E5", which carries the same rank-6 / L-O5 access). Null = normal.
@@ -57,6 +60,61 @@ model User {
   infractionsIssued  MemberInfraction[]  @relation("InfractionIssuer")
   scpAccessGrantsReceived ScpAccessGrant[] @relation("ScpAccessGrantUser")
   scpAccessGrantsIssued   ScpAccessGrant[] @relation("ScpAccessGrantGrantor")
+  ticketsOpened    Ticket[]       @relation("TicketAuthor")
+  ticketsClosed    Ticket[]       @relation("TicketCloser")
+  ticketReplies    TicketReply[]  @relation("TicketReplyAuthor")
+}
+
+// An IT support ticket. One table backs all three kinds because they share
+// subject+body+status+thread and differ only in who may read them and, for an
+// SCP access request, which file is being asked for.
+//
+// Visibility is NOT encoded here — it is derived from `type` by
+// lib/tickets.ts, so the routing rules live in one place rather than being
+// denormalized onto every row (and going stale when the rules change).
+model Ticket {
+  id        String   @id @default(cuid())
+  // "general" | "bug" | "scp_access" — see TICKET_TYPES in lib/tickets.ts
+  type      String
+  subject   String
+  body      String
+  // "open" | "resolved" | "denied" — see TICKET_STATUSES
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  updatedAt DateTime?
+  closedAt  DateTime?
+  // Closing note from the handler, shown to the requester.
+  resolution String  @default("")
+
+  authorId String
+  author   User   @relation("TicketAuthor", fields: [authorId], references: [id])
+  closedById String?
+  closedBy   User?  @relation("TicketCloser", fields: [closedById], references: [id])
+
+  // SCP access requests only: the file being requested and for how long.
+  scpFileId      String?
+  requestedDays  Int?
+
+  replies TicketReply[]
+
+  @@index([authorId])
+  @@index([type, status])
+  @@index([createdAt])
+}
+
+model TicketReply {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+  authorId String?
+  author   User?  @relation("TicketReplyAuthor", fields: [authorId], references: [id])
+  // Denormalized so the thread survives the author's account being deleted.
+  authorName String @default("")
+
+  @@index([ticketId, createdAt])
 }
 
 // In-app alert surfaced by the header bell. Deliberately generic across

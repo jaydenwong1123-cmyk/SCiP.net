@@ -259,6 +259,34 @@ export async function toggleCanFileIncidentAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function toggleHelperAction(formData: FormData) {
+  // Helper sits below Staff, but granting it is reserved for Admin and above —
+  // Staff cannot appoint their own juniors.
+  const actor = await requireAdminPowers();
+  const userId = String(formData.get("userId") ?? "");
+  const isHelper = formData.get("isHelper") === "true";
+
+  if (!userId) return;
+
+  const name = await targetName(userId);
+
+  await db.user.update({
+    where: { id: userId, isOwner: false, isCoOwner: false },
+    data: { isHelper },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.helperToggled,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: name,
+    summary: isHelper ? "Granted Helper role" : "Revoked Helper role",
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function toggleStaffAction(formData: FormData) {
   // Owner or admin may grant/revoke the Staff role.
   const actor = await requireAdminPowers();
@@ -416,6 +444,31 @@ export async function deleteAccountAction(formData: FormData) {
   await db.memberNote.deleteMany({
     where: { OR: [{ subjectId: userId }, { authorId: userId }] },
   });
+  // Tickets they opened go with them, replies and all. Replies they left on
+  // *other* people's tickets stay: the thread has to remain readable, and
+  // `authorName` is denormalized precisely so it survives this.
+  const ownTickets = await db.ticket.findMany({
+    where: { authorId: userId },
+    select: { id: true },
+  });
+  await db.ticketReply.deleteMany({
+    where: { ticketId: { in: ownTickets.map((t) => t.id) } },
+  });
+  await db.ticket.deleteMany({ where: { authorId: userId } });
+  await db.ticketReply.updateMany({
+    where: { authorId: userId },
+    data: { authorId: null },
+  });
+  await db.ticket.updateMany({
+    where: { closedById: userId },
+    data: { closedById: null },
+  });
+  await db.scpAccessGrant.deleteMany({ where: { userId } });
+  await db.scpAccessGrant.updateMany({
+    where: { grantedById: userId },
+    data: { grantedById: null },
+  });
+  await db.notification.deleteMany({ where: { userId } });
   // Audit rows and revisions deliberately survive: both denormalize the
   // actor's name so the history stays readable, and detaching the id keeps
   // the record without dangling at a deleted user.

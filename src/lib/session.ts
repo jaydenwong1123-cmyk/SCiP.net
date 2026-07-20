@@ -47,6 +47,10 @@ export async function requireUser() {
 //   Staff    (isStaff)   — elevated panel access: rename, set clearance (below
 //                          L-OMNI), toggle SCP-post, delete SCP files, invite
 //                          codes, review clearance requests.
+//   Helper   (isHelper)  — sits directly below Staff and carries no panel
+//                          access at all. Its single power is working the
+//                          General Assistance ticket queue. Granted only by
+//                          an Admin or above.
 
 // Owner-equivalent: the seeded owner or the appointed co-owner.
 export function hasOwnerPowers(user: { isOwner: boolean; isCoOwner: boolean }) {
@@ -68,6 +72,18 @@ export function hasStaffPowers(user: {
   isStaff: boolean;
 }) {
   return hasAdminPowers(user) || user.isStaff;
+}
+
+// Helper or anything above it. Note this is one-directional: Helper confers
+// nothing that Staff has, so no other `has*Powers` check consults isHelper.
+export function hasHelperPowers(user: {
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+  isHelper: boolean;
+}) {
+  return hasStaffPowers(user) || user.isHelper;
 }
 
 // Owner or co-owner.
