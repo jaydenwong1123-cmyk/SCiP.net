@@ -39,12 +39,20 @@ export function NotificationBell({
       <button
         type="button"
         onClick={toggle}
-        className="term-link text-[var(--term-fg-bright)]"
+        className="term-link text-[var(--term-fg-bright)] relative inline-block pr-1"
         aria-label={`${unreadCount} unread ${
           unreadCount === 1 ? "notification" : "notifications"
         }`}
       >
-        🔔 {unreadCount > 0 ? `${unreadCount} NEW` : "ALERTS"}
+        ALERTS
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-2 -right-2 rounded-full bg-[var(--term-amber)] text-[var(--term-bg)] text-[10px] leading-none min-w-[14px] h-[14px] px-[3px] flex items-center justify-center"
+            aria-hidden
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
       </button>
       {open && (
         <div
