@@ -3,6 +3,7 @@ import { after } from "next/server";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
+import { getMentionCandidates, linkifyMentions } from "@/lib/mentions";
 
 export default async function MessageDetailPage({
   params,
@@ -36,6 +37,8 @@ export default async function MessageDetailPage({
   });
 
   if (thread.length === 0) notFound();
+
+  const mentionCandidates = await getMentionCandidates();
 
   // Mark received messages in this conversation as read. Scheduled with after()
   // so the write (and its revalidatePath) runs once the response is sent —
@@ -91,7 +94,7 @@ export default async function MessageDetailPage({
                 {mine && " · SENT"}
               </p>
               <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-                {m.body}
+                {linkifyMentions(m.body, mentionCandidates)}
               </pre>
             </div>
           );

@@ -4,11 +4,14 @@ import { LogoutButton } from "@/components/logout-button";
 import { clearanceDisplay, clearanceAccent } from "@/lib/clearance";
 import { Tutorial } from "@/components/tutorial";
 import { TabBar } from "@/components/tab-bar";
+import { NotificationBell, type NotificationRow } from "@/components/notification-bell";
 
 export function TerminalShell({
   children,
   user,
   unreadMessages = 0,
+  notifications = [],
+  unreadNotifications = 0,
 }: {
   children: React.ReactNode;
   user: {
@@ -21,6 +24,8 @@ export function TerminalShell({
     isStaff: boolean;
   };
   unreadMessages?: number;
+  notifications?: NotificationRow[];
+  unreadNotifications?: number;
 }) {
   const accent = clearanceAccent(user.clearance, user.designation);
   const rank = clearanceDisplay(user.clearance, user.designation);
@@ -56,6 +61,7 @@ export function TerminalShell({
               ✉ {unreadMessages} NEW
             </Link>
           )}
+          <NotificationBell notifications={notifications} unreadCount={unreadNotifications} />
           <LogoutButton />
           <Tutorial />
         </div>

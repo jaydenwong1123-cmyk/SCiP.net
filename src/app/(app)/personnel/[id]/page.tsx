@@ -8,14 +8,17 @@ import {
   addMemberNoteAction,
   deleteMemberNoteAction,
   deletePersonnelAttachmentAction,
+  deleteInfractionAction,
 } from "../actions";
 import { AttachmentList } from "@/components/attachment-list";
 import { PersonnelAttachmentForm } from "./attachment-form";
+import { InfractionForm } from "./infraction-form";
 import {
   ATTACHMENT_ENTITIES,
   PERSONNEL_ATTACH_CLEARANCE,
   listAttachments,
 } from "@/lib/attachments";
+import { INFRACTION_SEVERITY_COLOR, type InfractionSeverity } from "@/lib/infractions";
 
 export default async function PersonnelFilePage({
   params,
@@ -51,6 +54,17 @@ export default async function PersonnelFilePage({
       })
     : [];
   const canDeleteAny = hasStaffPowers(viewer);
+
+  // Disciplinary record: visible to the subject themselves (it's a formal
+  // record, not a private staff note) and to anyone who can file one.
+  const canFileInfractions = canAnnotateMembers(viewer);
+  const canSeeInfractions = viewer.id === person.id || canFileInfractions;
+  const infractions = canSeeInfractions
+    ? await db.memberInfraction.findMany({
+        where: { subjectId: person.id },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   // Dossier attachments are L-4+ material: the same bar gates uploading,
   // listing, and the route that serves the bytes.
@@ -118,6 +132,69 @@ export default async function PersonnelFilePage({
           <div className="pt-2 border-t border-[var(--term-border)]/40">
             <PersonnelAttachmentForm subjectId={person.id} />
           </div>
+        </div>
+      )}
+
+      {canSeeInfractions && (
+        <div className="term-panel space-y-3">
+          <h2 className="text-sm text-[var(--term-amber)]">
+            ⚠ DISCIPLINARY RECORD
+          </h2>
+
+          <div className="space-y-2">
+            {infractions.length === 0 && (
+              <p className="text-sm text-[var(--term-fg-dim)]">
+                NO INFRACTIONS ON RECORD.
+              </p>
+            )}
+            {infractions.map((inf) => (
+              <div
+                key={inf.id}
+                className="border-b border-[var(--term-border)]/30 py-2 space-y-1"
+                style={{
+                  borderLeft: `3px solid ${
+                    INFRACTION_SEVERITY_COLOR[inf.severity as InfractionSeverity] ??
+                    "var(--term-fg-dim)"
+                  }`,
+                  paddingLeft: "0.5rem",
+                }}
+              >
+                <div className="flex items-center justify-between text-xs text-[var(--term-fg-dim)]">
+                  <span
+                    style={{
+                      color:
+                        INFRACTION_SEVERITY_COLOR[
+                          inf.severity as InfractionSeverity
+                        ] ?? undefined,
+                    }}
+                  >
+                    {inf.severity} — {inf.issuerName || "UNKNOWN"} —{" "}
+                    {inf.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                  </span>
+                  {(canDeleteAny || inf.issuerId === viewer.id) && (
+                    <form action={deleteInfractionAction}>
+                      <input type="hidden" name="infractionId" value={inf.id} />
+                      <button
+                        className="term-button text-xs"
+                        style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                      >
+                        DELETE
+                      </button>
+                    </form>
+                  )}
+                </div>
+                <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+                  {inf.reason}
+                </pre>
+              </div>
+            ))}
+          </div>
+
+          {canFileInfractions && viewer.id !== person.id && (
+            <div className="pt-2 border-t border-[var(--term-border)]/40">
+              <InfractionForm subjectId={person.id} />
+            </div>
+          )}
         </div>
       )}
 

@@ -32,6 +32,8 @@ export const AUDIT_ACTIONS = {
   broadcastEdited: "broadcast.edit",
   broadcastDeleted: "broadcast.delete",
   loginBlocked: "auth.login.blocked",
+  infractionFiled: "infraction.file",
+  infractionDeleted: "infraction.delete",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -59,6 +61,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.broadcastEdited]: "BROADCAST EDITED",
   [AUDIT_ACTIONS.broadcastDeleted]: "BROADCAST DELETED",
   [AUDIT_ACTIONS.loginBlocked]: "LOGIN THROTTLED",
+  [AUDIT_ACTIONS.infractionFiled]: "INFRACTION FILED",
+  [AUDIT_ACTIONS.infractionDeleted]: "INFRACTION DELETED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

@@ -10,6 +10,9 @@ import {
   storeAttachment,
   pruneExpiredAttachments,
 } from "@/lib/attachments";
+import { isInfractionSeverity } from "@/lib/infractions";
+import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
+import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 
 export async function addMemberNoteAction(formData: FormData) {
   const author = await requireUser();
@@ -109,4 +112,94 @@ export async function deleteMemberNoteAction(formData: FormData) {
 
   await db.memberNote.delete({ where: { id: noteId } });
   revalidatePath(`/personnel/${note.subjectId}`);
+}
+
+// File a disciplinary infraction against a member. Unlike MemberNote, this is
+// visible to the subject themselves — it's a formal record, not a private
+// staff note — so filing it also notifies them via the bell.
+export async function addInfractionAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const issuer = await requireUser();
+  if (!canAnnotateMembers(issuer)) {
+    return { ok: false, error: "NOT AUTHORIZED." };
+  }
+
+  const subjectId = String(formData.get("subjectId") ?? "");
+  const severity = String(formData.get("severity") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!subjectId || !reason) {
+    return { ok: false, error: "SUBJECT AND REASON ARE REQUIRED." };
+  }
+  if (subjectId === issuer.id) {
+    return { ok: false, error: "CANNOT FILE AN INFRACTION AGAINST YOURSELF." };
+  }
+  if (!isInfractionSeverity(severity)) {
+    return { ok: false, error: "INVALID SEVERITY." };
+  }
+
+  const subject = await db.user.findUnique({ where: { id: subjectId } });
+  if (!subject) return { ok: false, error: "SUBJECT NOT FOUND." };
+
+  const issuerName = issuer.displayName ?? issuer.email;
+
+  await db.memberInfraction.create({
+    data: {
+      subjectId,
+      issuerId: issuer.id,
+      issuerName,
+      severity,
+      reason: reason.slice(0, 2000),
+    },
+  });
+
+  await createNotification({
+    userId: subjectId,
+    type: NOTIFICATION_TYPES.infraction,
+    body: `${issuerName} filed a ${severity} infraction against you.`,
+    link: `/personnel/${subjectId}`,
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.infractionFiled,
+    actor: issuer,
+    targetType: "user",
+    targetId: subjectId,
+    targetName: subject.displayName ?? subject.email,
+    summary: `Filed ${severity} infraction: ${reason.slice(0, 100)}`,
+  });
+
+  revalidatePath(`/personnel/${subjectId}`);
+  return { ok: true };
+}
+
+export async function deleteInfractionAction(formData: FormData) {
+  const viewer = await requireUser();
+  if (!canAnnotateMembers(viewer)) return;
+
+  const infractionId = String(formData.get("infractionId") ?? "");
+  if (!infractionId) return;
+
+  const infraction = await db.memberInfraction.findUnique({
+    where: { id: infractionId },
+  });
+  if (!infraction) return;
+
+  // Issuers can retract their own; staff/admin/owner can remove any.
+  const canDeleteAny = hasStaffPowers(viewer);
+  if (infraction.issuerId !== viewer.id && !canDeleteAny) return;
+
+  await db.memberInfraction.delete({ where: { id: infractionId } });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.infractionDeleted,
+    actor: viewer,
+    targetType: "user",
+    targetId: infraction.subjectId,
+    summary: `Deleted ${infraction.severity} infraction`,
+  });
+
+  revalidatePath(`/personnel/${infraction.subjectId}`);
 }

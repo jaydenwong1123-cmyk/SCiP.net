@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { getMentionCandidates, resolveMentionedUsers } from "@/lib/mentions";
+import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 
 export async function sendMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -52,6 +54,29 @@ export async function sendMessageAction(
     await db.message.update({
       where: { id: created.id },
       data: { threadId: created.id },
+    });
+  }
+
+  const senderName = user.displayName ?? "A member";
+  await createNotification({
+    userId: recipientId,
+    type: NOTIFICATION_TYPES.message,
+    body: `${senderName} sent you a message: ${subject}`,
+    link: `/messages/${created.id}`,
+  });
+
+  // @mentions in the body notify anyone named besides the sender and the
+  // recipient (who's already notified above about the message itself).
+  const candidates = await getMentionCandidates();
+  const mentioned = resolveMentionedUsers(body, candidates).filter(
+    (m) => m.id !== user.id && m.id !== recipientId
+  );
+  for (const m of mentioned) {
+    await createNotification({
+      userId: m.id,
+      type: NOTIFICATION_TYPES.mention,
+      body: `${senderName} mentioned you in a message: ${subject}`,
+      link: `/messages/${created.id}`,
     });
   }
 
