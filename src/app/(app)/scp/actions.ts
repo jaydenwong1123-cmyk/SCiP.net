@@ -168,6 +168,88 @@ export async function updateScpFileAction(
   redirect(`/scp/${id}`);
 }
 
+// How long a temporary grant may run, in whole days.
+const MIN_GRANT_DAYS = 1;
+const MAX_GRANT_DAYS = 30;
+
+export async function grantScpAccessAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const actor = await requireStaff();
+  const scpFileId = String(formData.get("scpFileId") ?? "");
+  const userId = String(formData.get("userId") ?? "");
+  const days = Number(formData.get("days"));
+
+  if (!scpFileId || !userId) {
+    return { ok: false, error: "MISSING FILE OR MEMBER." };
+  }
+  if (!Number.isInteger(days) || days < MIN_GRANT_DAYS || days > MAX_GRANT_DAYS) {
+    return { ok: false, error: `DURATION MUST BE ${MIN_GRANT_DAYS}-${MAX_GRANT_DAYS} DAYS.` };
+  }
+
+  const [file, targetUser] = await Promise.all([
+    db.scpFile.findUnique({ where: { id: scpFileId } }),
+    db.user.findUnique({ where: { id: userId } }),
+  ]);
+  if (!file) return { ok: false, error: "FILE NOT FOUND." };
+  if (!targetUser) return { ok: false, error: "MEMBER NOT FOUND." };
+  if (targetUser.clearance >= file.clearanceRequired) {
+    return { ok: false, error: "MEMBER ALREADY MEETS THE CLEARANCE REQUIREMENT." };
+  }
+
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+  await db.scpAccessGrant.create({
+    data: {
+      scpFileId,
+      userId,
+      grantedById: actor.id,
+      expiresAt,
+    },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.scpAccessGranted,
+    actor,
+    targetType: "scp",
+    targetId: scpFileId,
+    targetName: file.title,
+    summary: `Granted ${targetUser.displayName ?? targetUser.email} temporary access to "${file.title}" for ${days} day(s)`,
+  });
+
+  revalidatePath(`/scp/${scpFileId}`);
+  return { ok: true };
+}
+
+export async function revokeScpAccessAction(formData: FormData) {
+  const actor = await requireStaff();
+  const grantId = String(formData.get("grantId") ?? "");
+  if (!grantId) return;
+
+  const grant = await db.scpAccessGrant.findUnique({
+    where: { id: grantId },
+    include: { scpFile: true, user: true },
+  });
+  if (!grant) return;
+
+  await db.scpAccessGrant.update({
+    where: { id: grantId },
+    data: { revokedAt: new Date() },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.scpAccessRevoked,
+    actor,
+    targetType: "scp",
+    targetId: grant.scpFileId,
+    targetName: grant.scpFile.title,
+    summary: `Revoked ${grant.user.displayName ?? grant.user.email}'s temporary access to "${grant.scpFile.title}"`,
+  });
+
+  revalidatePath(`/scp/${grant.scpFileId}`);
+}
+
 export async function deleteScpFileAction(formData: FormData) {
   const actor = await requireStaff();
   const id = String(formData.get("id") ?? "");

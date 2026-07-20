@@ -6,7 +6,8 @@ import { clearanceLabel } from "@/lib/clearance";
 import { canEditScpFile } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
 import { ClassificationBadge } from "@/components/signal-badge";
-import { deleteScpFileAction } from "../actions";
+import { deleteScpFileAction, revokeScpAccessAction } from "../actions";
+import { AccessForm } from "./access-form";
 
 export default async function ScpDetailPage({
   params,
@@ -21,10 +22,42 @@ export default async function ScpDetailPage({
     include: { author: { select: { displayName: true } } },
   });
 
-  if (!file || file.clearanceRequired > user.clearance) notFound();
+  if (!file) notFound();
+
+  const hasClearance = file.clearanceRequired <= user.clearance;
+  const activeGrant = hasClearance
+    ? null
+    : await db.scpAccessGrant.findFirst({
+        where: {
+          scpFileId: file.id,
+          userId: user.id,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+  if (!hasClearance && !activeGrant) notFound();
 
   const canManage = hasStaffPowers(user);
   const canEdit = canEditScpFile(user, file);
+
+  const [grants, members] = canManage
+    ? await Promise.all([
+        db.scpAccessGrant.findMany({
+          where: { scpFileId: file.id, revokedAt: null, expiresAt: { gt: new Date() } },
+          include: { user: { select: { displayName: true } } },
+          orderBy: { expiresAt: "asc" },
+        }),
+        db.user.findMany({
+          where: {
+            displayName: { not: null },
+            clearance: { lt: file.clearanceRequired },
+          },
+          orderBy: { displayName: "asc" },
+          select: { id: true, displayName: true, clearance: true },
+        }),
+      ])
+    : [[], []];
 
   return (
     <div className="term-panel space-y-4">
@@ -59,23 +92,67 @@ export default async function ScpDetailPage({
         )}
       </div>
 
+      {activeGrant && (
+        <p className="text-xs" style={{ color: "var(--term-amber)" }}>
+          TEMPORARY ACCESS — EXPIRES{" "}
+          {activeGrant.expiresAt.toISOString().slice(0, 16).replace("T", " ")}
+        </p>
+      )}
+
       <pre className="whitespace-pre-wrap break-words font-mono text-sm">
         {await renderBody(file.body, user)}
       </pre>
 
       {canManage && (
-        <form
-          action={deleteScpFileAction}
-          className="pt-2 border-t border-[var(--term-border)]/30"
-        >
-          <input type="hidden" name="id" value={file.id} />
-          <button
-            className="term-button text-xs"
-            style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
-          >
-            [DELETE FILE]
-          </button>
-        </form>
+        <div className="pt-2 border-t border-[var(--term-border)]/30 space-y-4">
+          <div className="space-y-2">
+            <h2 className="text-sm text-[var(--term-fg-dim)]">
+              GRANT TEMPORARY ACCESS
+            </h2>
+            {members.length > 0 ? (
+              <AccessForm scpFileId={file.id} members={members} />
+            ) : (
+              <p className="text-xs text-[var(--term-fg-dim)]">
+                NO MEMBERS BELOW THIS FILE&apos;S CLEARANCE REQUIREMENT.
+              </p>
+            )}
+          </div>
+
+          {grants.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm text-[var(--term-fg-dim)]">ACTIVE GRANTS</h2>
+              <ul className="space-y-1 text-xs">
+                {grants.map((g) => (
+                  <li key={g.id} className="flex items-center gap-2 flex-wrap">
+                    <span>
+                      {g.user.displayName} — EXPIRES{" "}
+                      {g.expiresAt.toISOString().slice(0, 16).replace("T", " ")}
+                    </span>
+                    <form action={revokeScpAccessAction}>
+                      <input type="hidden" name="grantId" value={g.id} />
+                      <button
+                        className="term-link"
+                        style={{ color: "var(--term-red)" }}
+                      >
+                        [REVOKE]
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <form action={deleteScpFileAction} className="pt-2">
+            <input type="hidden" name="id" value={file.id} />
+            <button
+              className="term-button text-xs"
+              style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+            >
+              [DELETE FILE]
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );

@@ -25,9 +25,18 @@ export default async function ScpListPage({
 
   const files = await db.scpFile.findMany({
     where: {
-      clearanceRequired: activeLevel
-        ? { equals: activeLevel }
-        : { lte: user.clearance },
+      OR: [
+        {
+          clearanceRequired: activeLevel
+            ? { equals: activeLevel }
+            : { lte: user.clearance },
+        },
+        {
+          accessGrants: {
+            some: { userId: user.id, revokedAt: null, expiresAt: { gt: new Date() } },
+          },
+        },
+      ],
       ...(activeClass ? { classification: activeClass } : {}),
     },
     orderBy: { createdAt: "desc" },

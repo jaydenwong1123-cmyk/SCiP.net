@@ -35,6 +35,8 @@ export const AUDIT_ACTIONS = {
   loginBlocked: "auth.login.blocked",
   infractionFiled: "infraction.file",
   infractionDeleted: "infraction.delete",
+  scpAccessGranted: "scp.access.grant",
+  scpAccessRevoked: "scp.access.revoke",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -65,6 +67,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.loginBlocked]: "LOGIN THROTTLED",
   [AUDIT_ACTIONS.infractionFiled]: "INFRACTION FILED",
   [AUDIT_ACTIONS.infractionDeleted]: "INFRACTION DELETED",
+  [AUDIT_ACTIONS.scpAccessGranted]: "SCP ACCESS GRANTED",
+  [AUDIT_ACTIONS.scpAccessRevoked]: "SCP ACCESS REVOKED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

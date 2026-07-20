@@ -55,6 +55,8 @@ model User {
   notifications      Notification[]      @relation("NotificationRecipient")
   infractionsAbout   MemberInfraction[]  @relation("InfractionSubject")
   infractionsIssued  MemberInfraction[]  @relation("InfractionIssuer")
+  scpAccessGrantsReceived ScpAccessGrant[] @relation("ScpAccessGrantUser")
+  scpAccessGrantsIssued   ScpAccessGrant[] @relation("ScpAccessGrantGrantor")
 }
 
 // In-app alert surfaced by the header bell. Deliberately generic across
@@ -184,6 +186,31 @@ model ScpFile {
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
+
+  accessGrants ScpAccessGrant[]
+}
+
+// A staff-granted, time-limited exception letting one member read a specific
+// SCP file below their normal clearance. Read access checks OR this in
+// alongside the usual `clearanceRequired <= user.clearance` gate; once
+// `expiresAt` passes the grant is simply ignored rather than deleted, so the
+// record stays around for the audit trail.
+model ScpAccessGrant {
+  id        String    @id @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  scpFileId String
+  scpFile   ScpFile @relation(fields: [scpFileId], references: [id])
+  userId    String
+  user      User    @relation("ScpAccessGrantUser", fields: [userId], references: [id])
+  grantedById String?
+  grantedBy   User?  @relation("ScpAccessGrantGrantor", fields: [grantedById], references: [id])
+
+  @@index([scpFileId, userId])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Broadcast {

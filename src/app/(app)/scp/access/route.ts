@@ -19,7 +19,16 @@ export async function GET(req: NextRequest) {
   }
 
   const files = await db.scpFile.findMany({
-    where: { clearanceRequired: { lte: user.clearance } },
+    where: {
+      OR: [
+        { clearanceRequired: { lte: user.clearance } },
+        {
+          accessGrants: {
+            some: { userId: user.id, revokedAt: null, expiresAt: { gt: new Date() } },
+          },
+        },
+      ],
+    },
     select: { id: true, title: true },
     orderBy: { createdAt: "desc" },
   });
