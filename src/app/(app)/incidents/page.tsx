@@ -18,9 +18,11 @@ export default async function IncidentsPage() {
     <div className="space-y-4">
       <div className="term-panel flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg tracking-widest">:: INCIDENT REPORTS ::</h1>
-        <Link href="/incidents/new" className="term-button text-sm">
-          [+ FILE REPORT]
-        </Link>
+        {user.canFileIncident && (
+          <Link href="/incidents/new" className="term-button text-sm">
+            [+ FILE REPORT]
+          </Link>
+        )}
       </div>
 
       <div className="term-panel space-y-2">
@@ -33,9 +35,11 @@ export default async function IncidentsPage() {
             <p className="text-sm">
               NOTHING HAS BEEN FILED AT OR BELOW YOUR CLEARANCE.
             </p>
-            <Link href="/incidents/new" className="term-button text-xs mt-1">
-              FILE THE FIRST REPORT
-            </Link>
+            {user.canFileIncident && (
+              <Link href="/incidents/new" className="term-button text-xs mt-1">
+                FILE THE FIRST REPORT
+              </Link>
+            )}
           </div>
         )}
         {reports.map((r) => (

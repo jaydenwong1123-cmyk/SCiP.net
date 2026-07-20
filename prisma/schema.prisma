@@ -20,6 +20,7 @@ model User {
   displayName  String?
   clearance    Int      @default(1)
   canPostScp   Boolean  @default(false)
+  canFileIncident Boolean @default(false)
   isOwner      Boolean  @default(false)
   // Co-Owner: owner-equivalent powers, held by at most one member at a time.
   // Only the seeded owner can grant or revoke it.

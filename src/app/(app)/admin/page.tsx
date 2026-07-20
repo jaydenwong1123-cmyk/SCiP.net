@@ -308,6 +308,7 @@ export default async function AdminPage() {
                 clearance: m.clearance,
                 designation: m.designation,
                 canPostScp: m.canPostScp,
+                canFileIncident: m.canFileIncident,
                 isCoOwner: m.isCoOwner,
                 isAdmin: m.isAdmin,
                 isStaff: m.isStaff,

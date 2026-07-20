@@ -20,6 +20,9 @@ export async function createIncidentReportAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  if (!user.canFileIncident) {
+    return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO FILE INCIDENT REPORTS." };
+  }
   if (findNonAsciiFormField(formData)) {
     return { ok: false, error: NON_ASCII_ERROR };
   }

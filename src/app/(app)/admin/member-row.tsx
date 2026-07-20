@@ -6,6 +6,7 @@ import {
   setDisplayNameAction,
   setMemberDepartmentAction,
   toggleCanPostScpAction,
+  toggleCanFileIncidentAction,
   toggleStaffAction,
   toggleAdminAction,
   toggleCoOwnerAction,
@@ -21,6 +22,7 @@ type Member = {
   clearance: number;
   designation: string | null;
   canPostScp: boolean;
+  canFileIncident: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
@@ -160,6 +162,18 @@ export function MemberRow({
             />
             <button className="term-button text-xs">
               {member.canPostScp ? "REVOKE SCP-POST" : "GRANT SCP-POST"}
+            </button>
+          </form>
+
+          <form action={toggleCanFileIncidentAction}>
+            <input type="hidden" name="userId" value={member.id} />
+            <input
+              type="hidden"
+              name="canFileIncident"
+              value={(!member.canFileIncident).toString()}
+            />
+            <button className="term-button text-xs">
+              {member.canFileIncident ? "REVOKE INCIDENT-FILE" : "GRANT INCIDENT-FILE"}
             </button>
           </form>
 

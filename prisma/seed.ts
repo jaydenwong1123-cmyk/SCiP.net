@@ -26,6 +26,7 @@ async function main() {
         clearance: 7,
         isOwner: true,
         canPostScp: true,
+        canFileIncident: true,
       },
     });
     console.log("=== OWNER ACCOUNT CREATED ===");

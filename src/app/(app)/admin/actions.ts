@@ -231,6 +231,34 @@ export async function toggleCanPostScpAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function toggleCanFileIncidentAction(formData: FormData) {
+  const actor = await requireStaff();
+  const userId = String(formData.get("userId") ?? "");
+  const canFileIncident = formData.get("canFileIncident") === "true";
+
+  if (!userId) return;
+
+  const name = await targetName(userId);
+
+  await db.user.update({
+    where: { id: userId },
+    data: { canFileIncident },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.incidentFileToggled,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: name,
+    summary: canFileIncident
+      ? "Granted incident filing permission"
+      : "Revoked incident filing permission",
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function toggleStaffAction(formData: FormData) {
   // Owner or admin may grant/revoke the Staff role.
   const actor = await requireAdminPowers();
