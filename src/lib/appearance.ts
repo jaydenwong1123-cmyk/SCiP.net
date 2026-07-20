@@ -131,6 +131,42 @@ export const THEMES: { key: string; label: string; vars: ThemeVars }[] = [
       "--term-glow-rgb": "255,102,224",
     },
   },
+  {
+    key: "yellow",
+    label: "WARNING YELLOW",
+    vars: {
+      "--term-bg": "#0a0a00",
+      "--term-fg": "#ffee33",
+      "--term-fg-dim": "#b3a020",
+      "--term-fg-bright": "#fff7aa",
+      "--term-border": "#b3a020",
+      "--term-glow-rgb": "255,238,51",
+    },
+  },
+  {
+    key: "blue",
+    label: "DEEP BLUE",
+    vars: {
+      "--term-bg": "#02030a",
+      "--term-fg": "#6699ff",
+      "--term-fg-dim": "#4d7fd9",
+      "--term-fg-bright": "#c2d6ff",
+      "--term-border": "#4d7fd9",
+      "--term-glow-rgb": "102,153,255",
+    },
+  },
+  {
+    key: "red",
+    label: "BLOOD RED",
+    vars: {
+      "--term-bg": "#0a0202",
+      "--term-fg": "#ff3333",
+      "--term-fg-dim": "#d24545",
+      "--term-fg-bright": "#ffaaaa",
+      "--term-border": "#d24545",
+      "--term-glow-rgb": "255,51,51",
+    },
+  },
 ];
 
 export const FONTS: { key: string; label: string; stack: string }[] = [
