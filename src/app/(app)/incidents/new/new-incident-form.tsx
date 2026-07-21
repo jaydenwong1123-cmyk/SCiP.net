@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { createIncidentReportAction } from "../actions";
+import { FormatToolbar } from "@/components/format-toolbar";
 import { CLEARANCE_LEVELS } from "@/lib/clearance";
 import { SEVERITIES } from "@/lib/incident";
 
@@ -10,6 +11,7 @@ export function NewIncidentForm({ maxClearance }: { maxClearance: number }) {
     createIncidentReportAction,
     null
   );
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const allowedLevels = CLEARANCE_LEVELS.filter((l) => l.rank <= maxClearance);
 
   return (
@@ -70,7 +72,9 @@ export function NewIncidentForm({ maxClearance }: { maxClearance: number }) {
         <label className="block text-sm mb-1" htmlFor="body">
           REPORT
         </label>
+        <FormatToolbar targetRef={bodyRef} />
         <textarea
+          ref={bodyRef}
           id="body"
           name="body"
           required

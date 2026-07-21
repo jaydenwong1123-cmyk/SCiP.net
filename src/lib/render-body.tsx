@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { renderRedacted, canBypassRedaction } from "@/lib/redact";
+import { formatNodes } from "@/lib/format";
 import {
   collectMentions,
   resolveScpLinks,
@@ -30,6 +31,10 @@ export async function renderBody(
     canBypassRedaction(viewer)
   );
   const links = await resolveScpLinks(collectMentions(text));
-  if (links.size === 0) return redacted;
-  return linkifyNodes(redacted, links, viewer.clearance);
+  const linked =
+    links.size === 0
+      ? redacted
+      : linkifyNodes(redacted, links, viewer.clearance);
+  // Formatting runs last, over visible text only.
+  return formatNodes(linked);
 }

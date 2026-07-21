@@ -1,14 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { updatePersonalFileAction } from "./actions";
+import { FormatToolbar } from "@/components/format-toolbar";
 
 export function ProfileForm({ initialContent }: { initialContent: string }) {
   const [state, formAction, pending] = useActionState(updatePersonalFileAction, null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   return (
     <form action={formAction} className="space-y-3">
+      <FormatToolbar targetRef={bodyRef} />
       <textarea
+        ref={bodyRef}
         name="personalFile"
         defaultValue={initialContent}
         rows={16}

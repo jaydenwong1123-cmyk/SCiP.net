@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { FormatToolbar } from "@/components/format-toolbar";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import { renderRedacted } from "@/lib/redact";
+import { formatNodes } from "@/lib/format";
 
 // The SCP body field plus a redaction preview. A writer marks text up for a
 // clearance they may not be able to un-see (staff and L-OMNI bypass redaction
@@ -18,13 +20,16 @@ export function BodyEditor({
 }) {
   const [body, setBody] = useState(defaultValue);
   const [previewRank, setPreviewRank] = useState<number | null>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);
 
   return (
     <div>
       <label className="block text-sm mb-1" htmlFor="body">
         BODY
       </label>
+      <FormatToolbar targetRef={ref} onChange={setBody} />
       <textarea
+        ref={ref}
         id="body"
         name="body"
         required
@@ -66,7 +71,7 @@ export function BodyEditor({
             {body.trim() === "" ? (
               <span className="text-[var(--term-fg-dim)]">[EMPTY RECORD]</span>
             ) : (
-              renderRedacted(body, previewRank)
+              formatNodes(renderRedacted(body, previewRank))
             )}
           </div>
         </div>
