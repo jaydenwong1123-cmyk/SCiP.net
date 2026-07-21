@@ -3,6 +3,10 @@ import { requireUser, hasStaffPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canAccessSecureChannel, clearanceDisplay } from "@/lib/clearance";
 import { TICKET_STATUSES, handleableTicketTypes } from "@/lib/tickets";
+import {
+  MESSAGE_LOG_RETENTION_DAYS,
+  canAccessMessageLogs,
+} from "@/lib/message-logs";
 
 type Tile = {
   href: string;
@@ -71,6 +75,16 @@ export default async function MenuPage() {
       label: "⚿ SECURE CHANNEL",
       code: "L-5+",
       desc: "Encrypted high-clearance channel",
+      accent: "amber",
+    });
+  }
+
+  if (canAccessMessageLogs(user)) {
+    tiles.push({
+      href: "/message-logs",
+      label: "MESSAGE LOGS",
+      code: "R5",
+      desc: `Member correspondence oversight (${MESSAGE_LOG_RETENTION_DAYS}d retention)`,
       accent: "amber",
     });
   }

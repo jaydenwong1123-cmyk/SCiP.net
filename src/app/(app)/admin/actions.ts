@@ -85,6 +85,8 @@ export async function setClearanceAction(formData: FormData) {
   // below it.
   const canGrantTop = hasOwnerPowers(actor) || actor.isAdmin;
   if (clearance >= OWNER_CLEARANCE && !canGrantTop) return;
+  // Plain Staff (no admin/owner powers) may only raise members up to L-3.
+  if (!canGrantTop && clearance > 3) return;
 
   const before = await db.user.findUnique({
     where: { id: userId },
@@ -596,7 +598,9 @@ export async function reviewClearanceRequestAction(formData: FormData) {
   if (decision === "approve" && request.requestedLevel <= MAX_CLEARANCE) {
     // Staff cannot push a member to the top clearance; owner-level/admin can.
     const canGrantTop = hasOwnerPowers(reviewer) || reviewer.isAdmin;
-    if (request.requestedLevel < OWNER_CLEARANCE || canGrantTop) {
+    // Plain Staff (no admin/owner powers) may only approve requests up to L-3.
+    const withinStaffCap = canGrantTop || request.requestedLevel <= 3;
+    if ((request.requestedLevel < OWNER_CLEARANCE || canGrantTop) && withinStaffCap) {
       await db.user.update({
         where: { id: request.userId, isOwner: false, isCoOwner: false },
         data: { clearance: request.requestedLevel, designation: null },
