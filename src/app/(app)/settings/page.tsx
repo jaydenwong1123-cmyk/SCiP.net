@@ -43,6 +43,12 @@ export default async function SettingsPage() {
             </select>
             <button className="term-button text-xs">APPLY</button>
           </form>
+          {viewAs !== null && (
+            <form action={setViewAsAction}>
+              <input type="hidden" name="clearance" value="" />
+              <button className="term-button text-xs">END SIMULATION</button>
+            </form>
+          )}
         </div>
       )}
     </div>

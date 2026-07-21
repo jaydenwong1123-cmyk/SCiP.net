@@ -39,7 +39,7 @@ const STORAGE_KEY = "scip-open-tabs";
 // section is open, which on a phone means a long scroll to reach anything.
 // Past the cap the least-recently-visited tab is evicted, the way a browser
 // with too many tabs would drop the oldest.
-const MAX_TABS = 6;
+const MAX_TABS = 8;
 
 // ---------------------------------------------------------------------------
 // Open-tab store
