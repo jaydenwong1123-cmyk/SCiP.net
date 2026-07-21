@@ -56,7 +56,7 @@ const CLEARANCE_ACCENTS: Record<number, string> = {
   1: "var(--term-fg-dim)",
   2: "var(--term-fg-dim)",
   3: "#99e6ff",
-  4: "#ff9933",
+  4: "#33cc33",
   5: "#8b2fc9",
   6: "#8b0000",
   7: "#ffffff",
@@ -67,7 +67,7 @@ export function clearanceAccent(
   designation?: string | null
 ): string {
   // E5 / R5 sit at rank 6 but get their own distinct accents.
-  if (designation === E5_DESIGNATION) return "#33cc33";
+  if (designation === E5_DESIGNATION) return "#1a6b1a";
   if (designation === R5_DESIGNATION) return "#00e5ff";
   return CLEARANCE_ACCENTS[clearance] ?? "var(--term-fg-dim)";
 }
