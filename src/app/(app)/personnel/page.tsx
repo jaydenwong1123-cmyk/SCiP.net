@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, canAnnotateMembers } from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
+import { renderRedactedName } from "@/lib/redact";
 
 export default async function PersonnelPage() {
   const viewer = await requireUser();
@@ -51,7 +52,9 @@ export default async function PersonnelPage() {
                 {flaggedIds.has(p.id) && (
                   <span className="text-[var(--term-red)]" title="FLAGGED">⚑ </span>
                 )}
-                {p.displayName}
+                {p.id === viewer.id
+                  ? p.displayName
+                  : renderRedactedName(p.displayName ?? "", viewer)}
                 {p.department && (
                   <span className="text-[var(--term-fg-dim)]"> — {p.department}</span>
                 )}

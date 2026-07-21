@@ -3,7 +3,15 @@ import { after } from "next/server";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { getMentionCandidates, linkifyMentions } from "@/lib/mentions";
+import {
+  getMentionCandidates,
+  linkifyMentionNodes,
+} from "@/lib/mentions";
+import {
+  renderRedacted,
+  renderRedactedName,
+  canBypassRedaction,
+} from "@/lib/redact";
 import { messageRetentionCutoff } from "@/lib/message-retention";
 
 export default async function MessageDetailPage({
@@ -91,12 +99,20 @@ export default async function MessageDetailPage({
               className="border border-[var(--term-border)]/40 p-3 space-y-2"
             >
               <p className="text-xs text-[var(--term-fg-dim)]">
-                FROM: {m.sender.displayName} → TO: {m.recipient.displayName} —{" "}
+                FROM: {renderRedactedName(m.sender.displayName ?? "", user)} → TO:{" "}
+                {renderRedactedName(m.recipient.displayName ?? "", user)} —{" "}
                 {m.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                 {mine && " · SENT"}
               </p>
               <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-                {linkifyMentions(m.body, mentionCandidates)}
+                {linkifyMentionNodes(
+                  renderRedacted(
+                    m.body,
+                    user.clearance,
+                    canBypassRedaction(user)
+                  ),
+                  mentionCandidates
+                )}
               </pre>
             </div>
           );

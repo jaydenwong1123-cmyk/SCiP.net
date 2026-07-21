@@ -13,7 +13,7 @@ import { formatNodes } from "@/lib/format";
 // holding the full source text in the textarea either way.
 export function BodyEditor({
   defaultValue = "",
-  rows = 16,
+  rows = 28,
 }: {
   defaultValue?: string;
   rows?: number;

@@ -6,6 +6,7 @@ import {
   messageRetentionCutoff,
   pruneExpiredMessages,
 } from "@/lib/message-retention";
+import { renderRedactedName } from "@/lib/redact";
 
 type ThreadRow = {
   threadKey: string;
@@ -94,7 +95,8 @@ export default async function MessagesPage() {
               )}
               {t.subject}
               <span className="text-[var(--term-fg-dim)]">
-                {" "}— {t.lastFromMe ? "to" : "from"} {t.otherName}
+                {" "}— {t.lastFromMe ? "to" : "from"}{" "}
+                {renderRedactedName(t.otherName ?? "", user)}
                 {t.count > 1 && ` · ${t.count} msgs`}
               </span>
             </span>

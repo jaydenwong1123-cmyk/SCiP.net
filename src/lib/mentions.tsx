@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, isValidElement, type ReactNode } from "react";
 import { db } from "@/lib/db";
 
 // Auto-linking and notification support for "@Display Name" mentions in
@@ -99,4 +99,30 @@ export function linkifyMentions(
     nodes.push(<Fragment key="tail">{text.slice(last)}</Fragment>);
   }
   return nodes;
+}
+
+// Walk the output of renderRedacted and linkify only the plain-text parts, the
+// same way lib/scp-links.tsx does for SCP references: a mention sitting inside
+// a redacted span must stay hidden rather than becoming a link that names the
+// person the block was hiding.
+export function linkifyMentionNodes(
+  nodes: ReactNode[],
+  candidates: MentionCandidate[]
+): ReactNode[] {
+  return nodes.map((node, i) => {
+    const text =
+      typeof node === "string"
+        ? node
+        : isValidElement(node) && node.type === Fragment
+          ? (node.props as { children?: unknown }).children
+          : undefined;
+
+    if (typeof text === "string") {
+      return (
+        <Fragment key={`t${i}`}>{linkifyMentions(text, candidates)}</Fragment>
+      );
+    }
+    // Redaction spans and anything else pass through untouched.
+    return <Fragment key={`o${i}`}>{node}</Fragment>;
+  });
 }

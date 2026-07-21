@@ -81,3 +81,43 @@ export function renderRedacted(
 
   return nodes;
 }
+
+type Viewer = {
+  clearance: number;
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+};
+
+// Redaction for display names, which may carry the same markup as document
+// bodies ("Agent [*Vance*][4]"). Resolved on the server like every other
+// redaction, so an uncleared viewer never receives the hidden name.
+export function renderRedactedName(
+  name: string,
+  viewer: Viewer
+): ReactNode[] {
+  return renderRedacted(name, viewer.clearance, canBypassRedaction(viewer));
+}
+
+// Plain-string form, for the places a name has to be a string rather than
+// nodes: <title>, title=, aria-label, <option> labels, notification text.
+// Hidden segments collapse to a block run of the same width, exactly as the
+// rendered form does.
+export function redactToText(
+  text: string,
+  viewerClearance: number,
+  canSeeAll = false
+): string {
+  REDACT_RE.lastIndex = 0;
+  return text.replace(REDACT_RE, (_full, content: string, tag?: string) => {
+    const level = tag ? parseClearanceToken(tag) : null;
+    const canSee = canSeeAll || (level !== null && viewerClearance >= level);
+    if (canSee) return content;
+    return "█".repeat(Math.min(Math.max(content.length, 3), 60));
+  });
+}
+
+export function redactNameToText(name: string, viewer: Viewer): string {
+  return redactToText(name, viewer.clearance, canBypassRedaction(viewer));
+}

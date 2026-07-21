@@ -42,7 +42,7 @@ export function NewScpForm({ maxClearance }: { maxClearance: number }) {
           ))}
         </select>
       </div>
-      <BodyEditor rows={14} />
+      <BodyEditor rows={28} />
       {state?.error && <p className="text-[var(--term-red)] text-sm">{state.error}</p>}
       <button type="submit" disabled={pending} className="term-button">
         {pending ? "FILING..." : "FILE RECORD"}

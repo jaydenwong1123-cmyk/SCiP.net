@@ -55,7 +55,7 @@ export async function createScpFileAction(
   await db.scpFile.create({
     data: {
       title: title.slice(0, 200),
-      body: body.slice(0, 20000),
+      body: body.slice(0, 60000),
       clearanceRequired,
       classification,
       authorId: user.id,
@@ -115,7 +115,7 @@ export async function updateScpFileAction(
   }
 
   const nextTitle = title.slice(0, 200);
-  const nextBody = body.slice(0, 20000);
+  const nextBody = body.slice(0, 60000);
 
   // Nothing changed — skip the write so the history isn't padded with
   // identical revisions.

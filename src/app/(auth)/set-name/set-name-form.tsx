@@ -19,7 +19,12 @@ export function SetNameForm() {
           className="term-input"
           placeholder="L. Cheung"
           autoComplete="off"
+          maxLength={80}
         />
+        <p className="text-xs text-[var(--term-fg-dim)] mt-1">
+          REDACTION: <code>[*text*]</code> hides part of your name;{" "}
+          <code>[*text*][4]</code> reveals it only to L-4 and above.
+        </p>
       </div>
       {state?.error && <p className="text-[var(--term-red)] text-sm">{state.error}</p>}
       <button type="submit" disabled={pending} className="term-button w-full">

@@ -155,8 +155,10 @@ export async function setNameAction(
   }
 
   const displayName = String(formData.get("displayName") ?? "").trim();
-  if (displayName.length < 2 || displayName.length > 40) {
-    return { ok: false, error: "NAME MUST BE 2-40 CHARACTERS." };
+  // Generous upper bound because a name may carry redaction markup
+  // ("Agent [*Vance*][4]"), which costs characters the reader never sees.
+  if (displayName.length < 2 || displayName.length > 80) {
+    return { ok: false, error: "NAME MUST BE 2-80 CHARACTERS." };
   }
 
   await db.user.update({

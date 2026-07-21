@@ -19,6 +19,7 @@ import {
   listAttachments,
 } from "@/lib/attachments";
 import { INFRACTION_SEVERITY_COLOR, type InfractionSeverity } from "@/lib/infractions";
+import { redactNameToText, renderRedactedName } from "@/lib/redact";
 
 export default async function PersonnelFilePage({
   params,
@@ -78,7 +79,12 @@ export default async function PersonnelFilePage({
       <div className="term-panel space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-lg tracking-widest">
-            :: PERSONNEL FILE — {person.displayName.toUpperCase()} ::
+            :: PERSONNEL FILE —{" "}
+            {(viewer.id === person.id
+              ? person.displayName
+              : redactNameToText(person.displayName, viewer)
+            ).toUpperCase()}{" "}
+            ::
           </h1>
           <Link href="/personnel" className="term-link text-sm">
             [BACK TO ROSTER]
@@ -224,7 +230,10 @@ export default async function PersonnelFilePage({
                     {n.flagged && (
                       <span className="text-[var(--term-red)]">⚑ FLAGGED — </span>
                     )}
-                    {n.author.displayName ?? "UNKNOWN"} —{" "}
+                    {n.author.displayName
+                      ? renderRedactedName(n.author.displayName, viewer)
+                      : "UNKNOWN"}{" "}
+                    —{" "}
                     {n.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                   </span>
                   {(canDeleteAny || n.authorId === viewer.id) && (
