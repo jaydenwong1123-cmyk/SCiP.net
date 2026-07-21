@@ -3,6 +3,7 @@ import { Fragment, isValidElement, type ReactNode } from "react";
 // Author-facing text formatting for document bodies:
 //
 //   **text**              -> bold
+//   ~~text~~              -> strikethrough
 //   [center]text[/center] -> centered block
 //
 // Applied as the *last* pass in the render pipeline (after redaction and SCP
@@ -12,16 +13,18 @@ import { Fragment, isValidElement, type ReactNode } from "react";
 // recurses through Fragments while leaving real elements untouched.
 
 const CENTER_RE = /\[center\]([\s\S]*?)\[\/center\]/gi;
-const BOLD_RE = /\*\*([\s\S]+?)\*\*/g;
+// One alternation rather than two passes, so ** and ~~ can't interleave into
+// each other's spans (**a~~b** ~~c would otherwise nest wrongly).
+const INLINE_RE = /\*\*([\s\S]+?)\*\*|~~([\s\S]+?)~~/g;
 
-function formatBold(text: string, keyPrefix: string): ReactNode[] {
+function formatInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   let last = 0;
   let key = 0;
   let match: RegExpExecArray | null;
 
-  BOLD_RE.lastIndex = 0;
-  while ((match = BOLD_RE.exec(text)) !== null) {
+  INLINE_RE.lastIndex = 0;
+  while ((match = INLINE_RE.exec(text)) !== null) {
     if (match.index > last) {
       nodes.push(
         <Fragment key={`${keyPrefix}-t${key++}`}>
@@ -29,11 +32,19 @@ function formatBold(text: string, keyPrefix: string): ReactNode[] {
         </Fragment>
       );
     }
-    nodes.push(
-      <strong key={`${keyPrefix}-b${key++}`} className="font-bold">
-        {match[1]}
-      </strong>
-    );
+    if (match[1] !== undefined) {
+      nodes.push(
+        <strong key={`${keyPrefix}-b${key++}`} className="font-bold">
+          {match[1]}
+        </strong>
+      );
+    } else {
+      nodes.push(
+        <s key={`${keyPrefix}-s${key++}`} className="line-through">
+          {match[2]}
+        </s>
+      );
+    }
     last = match.index + match[0].length;
   }
 
@@ -57,7 +68,7 @@ function formatString(text: string, keyPrefix: string): ReactNode[] {
     if (match.index > last) {
       nodes.push(
         <Fragment key={`${keyPrefix}-o${key++}`}>
-          {formatBold(text.slice(last, match.index), `${keyPrefix}-o${key}`)}
+          {formatInline(text.slice(last, match.index), `${keyPrefix}-o${key}`)}
         </Fragment>
       );
     }
@@ -65,7 +76,7 @@ function formatString(text: string, keyPrefix: string): ReactNode[] {
     // surrounding inline flow to have anywhere to center within.
     nodes.push(
       <span key={`${keyPrefix}-c${key++}`} className="block text-center">
-        {formatBold(match[1], `${keyPrefix}-c${key}`)}
+        {formatInline(match[1], `${keyPrefix}-c${key}`)}
       </span>
     );
     last = match.index + match[0].length;
@@ -74,7 +85,7 @@ function formatString(text: string, keyPrefix: string): ReactNode[] {
   if (last < text.length) {
     nodes.push(
       <Fragment key={`${keyPrefix}-o${key++}`}>
-        {formatBold(text.slice(last), `${keyPrefix}-o${key}`)}
+        {formatInline(text.slice(last), `${keyPrefix}-o${key}`)}
       </Fragment>
     );
   }

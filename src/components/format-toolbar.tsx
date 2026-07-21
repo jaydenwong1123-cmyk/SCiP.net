@@ -52,6 +52,14 @@ export function FormatToolbar({
       </button>
       <button
         type="button"
+        onClick={() => apply("~~", "~~")}
+        className="term-button px-2 py-0.5 text-xs line-through"
+        title="Strike through the selected text"
+      >
+        S
+      </button>
+      <button
+        type="button"
         onClick={() => apply("[center]", "[/center]")}
         className="term-button px-2 py-0.5 text-xs"
         title="Centre the selected text"
@@ -59,7 +67,8 @@ export function FormatToolbar({
         CENTRE
       </button>
       <span className="text-xs text-[var(--term-fg-dim)] ml-1">
-        <code>**bold**</code> · <code>[center]…[/center]</code>
+        <code>**bold**</code> · <code>~~struck~~</code> ·{" "}
+        <code>[center]…[/center]</code>
       </span>
     </div>
   );
