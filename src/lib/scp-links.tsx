@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Fragment, isValidElement, type ReactNode } from "react";
+import { cloneElement, Fragment, isValidElement, type ReactNode } from "react";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 
@@ -152,41 +152,69 @@ function linkifyString(
   return nodes;
 }
 
-// Walk the output of renderRedacted and linkify only the plain-text parts.
+// Walk the render tree and linkify only the plain-text parts.
 //
-// Redacted spans arrive as elements rather than strings, so they are passed
-// through untouched — a mention hidden behind a redaction stays hidden.
+// The tree at this point is redaction output that has since been run through
+// the formatter, so mentions may sit inside formatting elements (<strong>, <s>,
+// or the centered <span>). We recurse into those so **SCP-173** or a centered
+// mention still becomes a link, but we must never reach into a redaction span —
+// a mention hidden behind a redaction has to stay hidden.
+function isRedaction(node: ReactNode): boolean {
+  return (
+    isValidElement(node) &&
+    typeof (node.props as { className?: unknown }).className === "string" &&
+    ((node.props as { className: string }).className)
+      .split(/\s+/)
+      .includes("redacted")
+  );
+}
+
+function linkifyNode(
+  node: ReactNode,
+  links: ScpLinkMap,
+  viewerClearance: number,
+  keyPrefix: string
+): ReactNode {
+  if (typeof node === "string") {
+    return (
+      <Fragment key={keyPrefix}>
+        {linkifyString(node, links, viewerClearance, keyPrefix)}
+      </Fragment>
+    );
+  }
+
+  if (Array.isArray(node)) {
+    return (
+      <Fragment key={keyPrefix}>
+        {node.map((child, i) =>
+          linkifyNode(child, links, viewerClearance, `${keyPrefix}-${i}`)
+        )}
+      </Fragment>
+    );
+  }
+
+  // Redaction spans are opaque: pass through untouched so hidden text stays
+  // hidden and its styling and tooltip survive intact.
+  if (isValidElement(node) && !isRedaction(node)) {
+    const child = (node.props as { children?: ReactNode }).children;
+    if (child !== undefined) {
+      return cloneElement(
+        node,
+        { key: keyPrefix },
+        linkifyNode(child, links, viewerClearance, `${keyPrefix}-i`)
+      );
+    }
+  }
+
+  return <Fragment key={keyPrefix}>{node}</Fragment>;
+}
+
 export function linkifyNodes(
   nodes: ReactNode[],
   links: ScpLinkMap,
   viewerClearance: number
 ): ReactNode[] {
-  return nodes.map((node, i) => {
-    if (typeof node === "string") {
-      return (
-        <Fragment key={`s${i}`}>
-          {linkifyString(node, links, viewerClearance, `s${i}`)}
-        </Fragment>
-      );
-    }
-
-    // renderRedacted emits visible text as <Fragment>{string}</Fragment> and
-    // hidden text as a <span class="redacted">. Reach through the Fragment to
-    // linkify the text inside it, but *only* a Fragment — matching on "any
-    // element whose children is a string" would also swallow the redaction
-    // span, dropping its styling and tooltip along with it.
-    if (isValidElement(node) && node.type === Fragment) {
-      const child = (node.props as { children?: unknown }).children;
-      if (typeof child === "string") {
-        return (
-          <Fragment key={`f${i}`}>
-            {linkifyString(child, links, viewerClearance, `f${i}`)}
-          </Fragment>
-        );
-      }
-    }
-
-    // Redaction spans and anything else pass through untouched.
-    return <Fragment key={`o${i}`}>{node}</Fragment>;
-  });
+  return nodes.map((node, i) =>
+    linkifyNode(node, links, viewerClearance, `n${i}`)
+  );
 }

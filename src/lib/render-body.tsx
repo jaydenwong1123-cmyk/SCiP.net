@@ -15,12 +15,18 @@ type Viewer = {
   isStaff: boolean;
 };
 
-// Render a document body: redaction first, then SCP cross-linking over what
-// remains visible.
+// Render a document body: redaction first, then text formatting, then SCP
+// cross-linking over what remains visible.
 //
 // Order matters. Redaction resolves on the server and drops hidden text
-// entirely; linking then only ever sees text the viewer is allowed to read, so
-// a mention inside a redacted block can't be surfaced as a link.
+// entirely, so every later pass only ever sees text the viewer is allowed to
+// read — a mention inside a redacted block can't be surfaced as a link.
+//
+// Formatting runs *before* linking so that markers wrapping a mention
+// (**SCP-173**, [center]SCP-173[/center]) become the enclosing element, and
+// linking then recurses inside it to turn the mention into a link. Running the
+// other way round would strand the ** markers on either side of the link
+// element, where the formatter cannot pair them.
 export async function renderBody(
   text: string,
   viewer: Viewer
@@ -30,11 +36,9 @@ export async function renderBody(
     viewer.clearance,
     canBypassRedaction(viewer)
   );
+  const formatted = formatNodes(redacted);
   const links = await resolveScpLinks(collectMentions(text));
-  const linked =
-    links.size === 0
-      ? redacted
-      : linkifyNodes(redacted, links, viewer.clearance);
-  // Formatting runs last, over visible text only.
-  return formatNodes(linked);
+  return links.size === 0
+    ? formatted
+    : linkifyNodes(formatted, links, viewer.clearance);
 }
