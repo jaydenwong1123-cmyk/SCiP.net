@@ -29,8 +29,12 @@ export async function GET(
   const attachment = await db.attachment.findUnique({ where: { id } });
 
   // Expired attachments are treated as gone even if the sweeper hasn't
-  // physically deleted the row yet.
-  if (!attachment || attachment.expiresAt.getTime() <= Date.now()) {
+  // physically deleted the row yet. A null expiry never lapses.
+  if (
+    !attachment ||
+    (attachment.expiresAt !== null &&
+      attachment.expiresAt.getTime() <= Date.now())
+  ) {
     await pruneExpiredAttachments();
     return new NextResponse("Not found", { status: 404 });
   }

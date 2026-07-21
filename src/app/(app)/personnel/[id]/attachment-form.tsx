@@ -6,7 +6,6 @@ import {
   ACCEPTED_MIME,
   ACCEPTED_LABEL,
   MAX_ATTACHMENT_BYTES,
-  ATTACHMENT_TTL_DAYS,
 } from "@/lib/attachments";
 
 export function PersonnelAttachmentForm({ subjectId }: { subjectId: string }) {
@@ -40,9 +39,8 @@ export function PersonnelAttachmentForm({ subjectId }: { subjectId: string }) {
         className="term-input text-xs"
       />
       <p className="text-[10px] text-[var(--term-fg-dim)]">
-        {ACCEPTED_LABEL} · MAX {Math.floor(MAX_ATTACHMENT_BYTES / 1024)}KB ·
-        AUTOMATICALLY PURGED AFTER {ATTACHMENT_TTL_DAYS} DAYS · VISIBLE TO L-4+
-        ONLY
+        {ACCEPTED_LABEL} · MAX {Math.floor(MAX_ATTACHMENT_BYTES / 1024)}KB · ONE
+        FILE PER UPLOAD · RETAINED INDEFINITELY · VISIBLE TO L-5+ ONLY
       </p>
       {state?.error && (
         <p className="text-[var(--term-red)] text-sm" role="alert">

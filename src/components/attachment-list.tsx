@@ -9,7 +9,7 @@ type AttachmentMeta = {
   filename: string;
   mimeType: string;
   size: number;
-  expiresAt: Date;
+  expiresAt: Date | null;
   uploaderName: string;
 };
 
@@ -44,9 +44,13 @@ export function AttachmentList({
           <figcaption className="text-[10px] text-[var(--term-fg-dim)] mt-1 break-words">
             {a.filename} · {formatSize(a.size)}
             <br />
-            <span title={`Attachments are purged ${ATTACHMENT_TTL_DAYS} days after upload`}>
-              PURGES IN {formatRemaining(a.expiresAt)}
-            </span>
+            {a.expiresAt ? (
+              <span title={`Attachments are purged ${ATTACHMENT_TTL_DAYS} days after upload`}>
+                PURGES IN {formatRemaining(a.expiresAt)}
+              </span>
+            ) : (
+              <span title="Retained indefinitely">RETAINED INDEFINITELY</span>
+            )}
           </figcaption>
         </figure>
       ))}

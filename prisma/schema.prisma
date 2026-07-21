@@ -310,7 +310,9 @@ model Attachment {
   size       Int
   data       Bytes
   createdAt  DateTime @default(now())
-  expiresAt  DateTime
+  // Null means the attachment never expires. Personnel-dossier evidence is
+  // permanent; secure-channel attachments carry a real expiry.
+  expiresAt  DateTime?
 
   uploaderId   String?
   uploader     User?   @relation("AttachmentUploader", fields: [uploaderId], references: [id])

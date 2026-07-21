@@ -6,6 +6,8 @@ import { requireUser, canAnnotateMembers, hasStaffPowers } from "@/lib/session";
 import {
   ATTACHMENT_ENTITIES,
   PERSONNEL_ATTACH_CLEARANCE,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  countUploads,
   validateUpload,
   storeAttachment,
   pruneExpiredAttachments,
@@ -42,16 +44,21 @@ export async function addMemberNoteAction(formData: FormData) {
   revalidatePath(`/personnel/${subjectId}`);
 }
 
-// Attach an image to a member's dossier. Restricted to L-4 and above — the
+// Attach an image to a member's dossier. Restricted to L-5 and above — the
 // same bar the serving route enforces when handing the bytes back, so a file
-// can never be attached by someone whose peers cannot view it.
+// can never be attached by someone whose peers cannot view it. Unlike
+// secure-channel attachments, dossier evidence is retained indefinitely.
 export async function addPersonnelAttachmentAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
   if (user.clearance < PERSONNEL_ATTACH_CLEARANCE) {
-    return { ok: false, error: "CLEARANCE L-4 OR HIGHER REQUIRED." };
+    return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED." };
+  }
+
+  if (countUploads(formData) > MAX_ATTACHMENTS_PER_MESSAGE) {
+    return { ok: false, error: "ONE FILE PER UPLOAD." };
   }
 
   const subjectId = String(formData.get("subjectId") ?? "");

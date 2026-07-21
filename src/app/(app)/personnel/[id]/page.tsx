@@ -66,7 +66,7 @@ export default async function PersonnelFilePage({
       })
     : [];
 
-  // Dossier attachments are L-4+ material: the same bar gates uploading,
+  // Dossier attachments are L-5+ material: the same bar gates uploading,
   // listing, and the route that serves the bytes.
   const canSeeAttachments = viewer.clearance >= PERSONNEL_ATTACH_CLEARANCE;
   const attachments = canSeeAttachments
@@ -98,7 +98,7 @@ export default async function PersonnelFilePage({
       {canSeeAttachments && (
         <div className="term-panel space-y-3">
           <h2 className="text-sm text-[var(--term-amber)]">
-            ⧉ ATTACHED EVIDENCE — L-4+ ONLY
+            ⧉ ATTACHED EVIDENCE — L-5+ ONLY
           </h2>
           {attachments.length === 0 ? (
             <p className="text-sm text-[var(--term-fg-dim)]">

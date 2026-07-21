@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 
-// Attachments are stored as rows in the database and expire 14 days after
-// upload. Two mechanisms enforce that, deliberately:
+// Attachments are stored as rows in the database. Secure-channel attachments
+// expire 14 days after upload; personnel-dossier evidence is permanent (a null
+// `expiresAt`) because it backs disciplinary records that outlive the window.
+// Two mechanisms enforce expiry, deliberately:
 //
 //   1. Every read filters on `expiresAt`, so a lapsed file stops being served
 //      the instant it expires.
@@ -28,7 +30,19 @@ const TTL_MS = ATTACHMENT_TTL_DAYS * 24 * 60 * 60 * 1000;
 export const MAX_ATTACHMENT_BYTES = 512 * 1024;
 
 // Minimum clearance to attach to (or view attachments on) a personnel file.
-export const PERSONNEL_ATTACH_CLEARANCE = 4;
+export const PERSONNEL_ATTACH_CLEARANCE = 5;
+
+// At most one file may ride along with a single message/transmission. The
+// forms omit `multiple`, but the cap is enforced server-side too since a
+// crafted request can post the field more than once.
+export const MAX_ATTACHMENTS_PER_MESSAGE = 1;
+
+// How many non-empty files a form actually carried under `field`.
+export function countUploads(formData: FormData, field = "attachment"): number {
+  return formData
+    .getAll(field)
+    .filter((v) => v instanceof File && v.size > 0).length;
+}
 
 // Only raster images are accepted. Anything script-bearing — notably SVG,
 // which can carry inline JavaScript — is deliberately excluded.
@@ -143,7 +157,10 @@ export async function storeAttachment(args: {
       mimeType: args.file.mimeType,
       size: args.file.size,
       data: Buffer.from(args.file.bytes),
-      expiresAt: new Date(Date.now() + TTL_MS),
+      expiresAt:
+        args.entityType === ATTACHMENT_ENTITIES.personnel
+          ? null
+          : new Date(Date.now() + TTL_MS),
       uploaderId: args.uploader.id,
       uploaderName: args.uploader.displayName ?? args.uploader.email,
     },
@@ -162,7 +179,8 @@ export async function listAttachments(
     where: {
       entityType,
       entityId: { in: entityIds },
-      expiresAt: { gt: new Date() },
+      // Null = never expires.
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
     select: {
       id: true,
@@ -213,7 +231,8 @@ export async function pruneExpiredAttachments(probability = 0.05): Promise<void>
 }
 
 // "3 DAYS" / "5 HOURS" / "12 MIN" until an attachment lapses.
-export function formatRemaining(expiresAt: Date): string {
+export function formatRemaining(expiresAt: Date | null): string {
+  if (!expiresAt) return "NEVER";
   const ms = expiresAt.getTime() - Date.now();
   if (ms <= 0) return "EXPIRED";
   const minutes = Math.floor(ms / 60000);

@@ -38,7 +38,7 @@ export function SecureForm() {
           className="block text-xs text-[var(--term-fg-dim)] mb-1"
           htmlFor="attachment"
         >
-          &gt; ATTACH IMAGE (OPTIONAL)
+          &gt; ATTACH IMAGE (OPTIONAL, ONE FILE)
         </label>
         <input
           id="attachment"
@@ -48,8 +48,9 @@ export function SecureForm() {
           className="term-input text-xs"
         />
         <p className="text-[10px] text-[var(--term-fg-dim)] mt-1">
-          {ACCEPTED_LABEL} · MAX {Math.floor(MAX_ATTACHMENT_BYTES / 1024)}KB ·
-          AUTOMATICALLY PURGED AFTER {ATTACHMENT_TTL_DAYS} DAYS
+          {ACCEPTED_LABEL} · MAX {Math.floor(MAX_ATTACHMENT_BYTES / 1024)}KB · ONE
+          FILE PER TRANSMISSION · AUTOMATICALLY PURGED AFTER{" "}
+          {ATTACHMENT_TTL_DAYS} DAYS
         </p>
       </div>
       {state?.error && (

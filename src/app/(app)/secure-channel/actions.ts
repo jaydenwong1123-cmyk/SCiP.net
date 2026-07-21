@@ -7,6 +7,8 @@ import { canAccessSecureChannel } from "@/lib/clearance";
 import {
   ATTACHMENT_ENTITIES,
   validateUpload,
+  countUploads,
+  MAX_ATTACHMENTS_PER_MESSAGE,
   storeAttachment,
   pruneExpiredAttachments,
 } from "@/lib/attachments";
@@ -31,6 +33,10 @@ export async function postSecureMessageAction(
   // A transmission needs to carry something — text, an image, or both.
   if (!body && !hasUpload) {
     return { ok: false, error: "TRANSMISSION BODY OR ATTACHMENT REQUIRED." };
+  }
+
+  if (countUploads(formData) > MAX_ATTACHMENTS_PER_MESSAGE) {
+    return { ok: false, error: "ONE ATTACHMENT PER TRANSMISSION." };
   }
 
   // Validate the upload before writing the message, so a rejected file doesn't
