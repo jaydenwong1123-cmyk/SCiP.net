@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
+import { canCreateIncident } from "@/lib/doc-permissions";
 import { NewIncidentForm } from "./new-incident-form";
 
 export default async function NewIncidentPage() {
   const user = await requireUser();
-  if (!user.canFileIncident) redirect("/incidents");
+  if (!canCreateIncident(user)) redirect("/incidents");
 
   return (
     <div className="term-panel space-y-4">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { canCreateIncident } from "@/lib/doc-permissions";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { severityColor } from "@/lib/incident";
@@ -18,7 +19,7 @@ export default async function IncidentsPage() {
     <div className="space-y-4">
       <div className="term-panel flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg tracking-widest">:: INCIDENT REPORTS ::</h1>
-        {user.canFileIncident && (
+        {canCreateIncident(user) && (
           <Link href="/incidents/new" className="term-button text-sm">
             [+ FILE REPORT]
           </Link>
@@ -35,7 +36,7 @@ export default async function IncidentsPage() {
             <p className="text-sm">
               NOTHING HAS BEEN FILED AT OR BELOW YOUR CLEARANCE.
             </p>
-            {user.canFileIncident && (
+            {canCreateIncident(user) && (
               <Link href="/incidents/new" className="term-button text-xs mt-1">
                 FILE THE FIRST REPORT
               </Link>

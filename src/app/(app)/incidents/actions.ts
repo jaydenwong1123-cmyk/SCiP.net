@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { requireUser, requireStaff } from "@/lib/session";
 import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
 import { DEFAULT_SEVERITY, isValidSeverity } from "@/lib/incident";
-import { canEditIncident } from "@/lib/doc-permissions";
+import { canCreateIncident, canEditIncident } from "@/lib/doc-permissions";
 import {
   REVISION_ENTITIES,
   snapshotRevision,
@@ -20,7 +20,7 @@ export async function createIncidentReportAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  if (!user.canFileIncident) {
+  if (!canCreateIncident(user)) {
     return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO FILE INCIDENT REPORTS." };
   }
   if (findNonAsciiFormField(formData)) {

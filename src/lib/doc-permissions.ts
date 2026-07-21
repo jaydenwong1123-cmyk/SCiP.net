@@ -14,6 +14,20 @@ type Actor = {
   isStaff: boolean;
 };
 
+// Creation rights. The per-member grant is the normal route, but admin-level
+// roles carry it implicitly — an admin never needs to grant it to themselves.
+export function canCreateScpFile(
+  actor: Actor & { canPostScp: boolean }
+): boolean {
+  return actor.canPostScp || hasAdminPowers(actor);
+}
+
+export function canCreateIncident(
+  actor: Actor & { canFileIncident: boolean }
+): boolean {
+  return actor.canFileIncident || hasAdminPowers(actor);
+}
+
 // Authors may revise their own documents; staff may revise any.
 export function canEditScpFile(actor: Actor, file: { authorId: string }): boolean {
   return file.authorId === actor.id || hasStaffPowers(actor);

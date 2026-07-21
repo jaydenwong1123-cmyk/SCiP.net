@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { canCreateScpFile } from "@/lib/doc-permissions";
 import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import { CLASSIFICATIONS, classificationColor } from "@/lib/classification";
@@ -67,7 +68,7 @@ export default async function ScpListPage({
     <div className="space-y-4">
       <div className="term-panel flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg tracking-widest">:: SCP FILE ARCHIVE ::</h1>
-        {user.canPostScp && (
+        {canCreateScpFile(user) && (
           <Link href="/scp/new" className="term-button text-sm">
             [+ NEW FILE]
           </Link>

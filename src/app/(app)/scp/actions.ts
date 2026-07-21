@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, requireStaff } from "@/lib/session";
-import { canEditScpFile } from "@/lib/doc-permissions";
+import { canCreateScpFile, canEditScpFile } from "@/lib/doc-permissions";
 import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
 import { DEFAULT_CLASSIFICATION, isValidClassification } from "@/lib/classification";
 import {
@@ -20,7 +20,7 @@ export async function createScpFileAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  if (!user.canPostScp) {
+  if (!canCreateScpFile(user)) {
     return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO POST SCP FILES." };
   }
   if (findNonAsciiFormField(formData)) {

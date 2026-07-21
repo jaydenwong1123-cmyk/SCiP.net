@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
+import { canCreateScpFile } from "@/lib/doc-permissions";
 import { NewScpForm } from "./new-scp-form";
 
 export default async function NewScpPage() {
   const user = await requireUser();
-  if (!user.canPostScp) redirect("/scp");
+  if (!canCreateScpFile(user)) redirect("/scp");
 
   return (
     <div className="term-panel space-y-4">
