@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
+import {
+  MESSAGE_RETENTION_DAYS,
+  messageRetentionCutoff,
+  pruneExpiredMessages,
+} from "@/lib/message-retention";
 
 type ThreadRow = {
   threadKey: string;
@@ -16,8 +21,15 @@ type ThreadRow = {
 export default async function MessagesPage() {
   const user = await requireUser();
 
+  await pruneExpiredMessages();
+
+  // Filtered as well as swept, so a lapsed message disappears on schedule even
+  // when the probabilistic sweep hasn't fired yet.
   const messages = await db.message.findMany({
-    where: { OR: [{ recipientId: user.id }, { senderId: user.id }] },
+    where: {
+      createdAt: { gte: messageRetentionCutoff() },
+      OR: [{ recipientId: user.id }, { senderId: user.id }],
+    },
     orderBy: { createdAt: "desc" },
     include: {
       sender: { select: { displayName: true } },
@@ -63,7 +75,12 @@ export default async function MessagesPage() {
       </div>
 
       <div className="term-panel space-y-2">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">CONVERSATIONS</h2>
+        <h2 className="text-sm text-[var(--term-fg-dim)]">
+          CONVERSATIONS
+          <span className="ml-2 text-xs">
+            ({MESSAGE_RETENTION_DAYS}d retention)
+          </span>
+        </h2>
         {rows.length === 0 && <p className="text-sm">NO MESSAGES.</p>}
         {rows.map((t) => (
           <Link

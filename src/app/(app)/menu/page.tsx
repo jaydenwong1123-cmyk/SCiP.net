@@ -7,6 +7,7 @@ import {
   MESSAGE_LOG_RETENTION_DAYS,
   canAccessMessageLogs,
 } from "@/lib/message-logs";
+import { messageRetentionCutoff } from "@/lib/message-retention";
 
 type Tile = {
   href: string;
@@ -28,7 +29,13 @@ export default async function MenuPage() {
   const ticketQueues = handleableTicketTypes(user);
 
   const [unreadMessages, pendingRequests, openTickets] = await Promise.all([
-    db.message.count({ where: { recipientId: user.id, read: false } }),
+    db.message.count({
+      where: {
+        recipientId: user.id,
+        read: false,
+        createdAt: { gte: messageRetentionCutoff() },
+      },
+    }),
     staff
       ? db.clearanceRequest.count({ where: { status: "pending" } })
       : Promise.resolve(0),

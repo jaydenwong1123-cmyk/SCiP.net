@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { getMentionCandidates, linkifyMentions } from "@/lib/mentions";
+import { messageRetentionCutoff } from "@/lib/message-retention";
 
 export default async function MessageDetailPage({
   params,
@@ -26,6 +27,7 @@ export default async function MessageDetailPage({
   // All messages in the conversation the viewer is a party to.
   const thread = await db.message.findMany({
     where: {
+      createdAt: { gte: messageRetentionCutoff() },
       OR: [{ threadId: threadKey }, { id: threadKey }],
       AND: { OR: [{ senderId: user.id }, { recipientId: user.id }] },
     },

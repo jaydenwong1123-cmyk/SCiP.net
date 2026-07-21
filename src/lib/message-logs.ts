@@ -8,7 +8,7 @@ import { hasStaffPowers } from "@/lib/session";
 // has no cron, so anything job-based would silently never fire. Messages older
 // than the window fall out of the log on their own while the members who sent
 // and received them keep their own copies.
-export const MESSAGE_LOG_RETENTION_DAYS = 14;
+export const MESSAGE_LOG_RETENTION_DAYS = 21;
 
 export function logRetentionCutoff(now = new Date()): Date {
   return new Date(

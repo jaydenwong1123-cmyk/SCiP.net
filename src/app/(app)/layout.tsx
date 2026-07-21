@@ -5,6 +5,7 @@ import { enforceMaintenance } from "@/lib/site-config";
 import { TerminalShell } from "@/components/terminal-shell";
 import { db } from "@/lib/db";
 import { getRecentNotifications, getUnreadNotificationCount } from "@/lib/notifications";
+import { messageRetentionCutoff } from "@/lib/message-retention";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Independent gates — run concurrently instead of one after the other so the
@@ -13,7 +14,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Drives the header's unread indicator. A count, not a fetch of the rows.
   const [unreadMessages, notificationRows, unreadNotifications] = await Promise.all([
-    db.message.count({ where: { recipientId: user.id, read: false } }),
+    db.message.count({
+      where: {
+        recipientId: user.id,
+        read: false,
+        createdAt: { gte: messageRetentionCutoff() },
+      },
+    }),
     getRecentNotifications(user.id),
     getUnreadNotificationCount(user.id),
   ]);
