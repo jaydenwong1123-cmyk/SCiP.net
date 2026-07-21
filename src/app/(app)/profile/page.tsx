@@ -17,6 +17,20 @@ export default async function ProfilePage() {
     !ownerPowers && !!user.department && isRestrictedDepartment(user.department);
   const departmentOptions = ownerPowers ? ALL_DEPARTMENTS : OPEN_DEPARTMENTS;
 
+  // Roles are otherwise invisible to the member holding them, which makes
+  // "why can't I do X?" impossible to answer from the account itself.
+  const roleLabel = user.isOwner
+    ? "OWNER"
+    : user.isCoOwner
+      ? "CO-OWNER"
+      : user.isAdmin
+        ? "ADMIN"
+        : user.isStaff
+          ? "STAFF"
+          : user.isHelper
+            ? "HELPER"
+            : "PERSONNEL";
+
   return (
     <div className="term-panel space-y-4">
       <h1 className="text-lg tracking-widest">:: MY PROFILE ::</h1>
@@ -24,6 +38,9 @@ export default async function ProfilePage() {
         NAME: {user.displayName} — CLEARANCE:{" "}
         {clearanceDisplay(user.clearance, user.designation)} — LOGIN:{" "}
         {user.email}
+      </p>
+      <p className="text-sm text-[var(--term-fg-dim)]">
+        ROLE: <span className="text-[var(--term-fg)]">{roleLabel}</span>
       </p>
 
       <div className="space-y-2">
