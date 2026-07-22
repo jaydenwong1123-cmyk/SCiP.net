@@ -41,7 +41,6 @@ export default async function ScpListPage({
       ...(activeClass ? { classification: activeClass } : {}),
     },
     orderBy: { createdAt: "desc" },
-    include: { author: { select: { displayName: true } } },
   });
 
   // Levels the viewer can actually read files at.
@@ -145,9 +144,7 @@ export default async function ScpListPage({
             </span>
             <span className="text-[var(--term-fg-dim)] shrink-0 flex items-center gap-2">
               <ClassificationBadge classification={f.classification} />
-              <span>
-                [{clearanceLabel(f.clearanceRequired)}] — {f.author.displayName}
-              </span>
+              <span>[{clearanceLabel(f.clearanceRequired)}]</span>
             </span>
           </Link>
         ))}
