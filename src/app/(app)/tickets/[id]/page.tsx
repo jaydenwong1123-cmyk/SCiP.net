@@ -12,6 +12,7 @@ import {
   canViewTicket,
   statusColor,
 } from "@/lib/tickets";
+import { renderRedactedName } from "@/lib/redact";
 import { closeTicketAction } from "../actions";
 import { ReplyForm } from "./reply-form";
 
@@ -129,7 +130,12 @@ export default async function TicketDetailPage({
           <h2 className="text-sm text-[var(--term-fg-dim)]">RESOLUTION</h2>
           <p style={{ color: statusColor(ticket.status) }}>
             {ticket.status.toUpperCase()}
-            {ticket.closedBy && ` BY ${ticket.closedBy.displayName}`}
+            {ticket.closedBy && (
+              <>
+                {" BY "}
+                {renderRedactedName(ticket.closedBy.displayName ?? "", user)}
+              </>
+            )}
             {ticket.closedAt &&
               ` — ${ticket.closedAt.toISOString().slice(0, 16).replace("T", " ")}`}
           </p>

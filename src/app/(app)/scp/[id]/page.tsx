@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { canEditScpFile } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
+import { renderRedactedName } from "@/lib/redact";
 import { ClassificationBadge } from "@/components/signal-badge";
 import { deleteScpFileAction, revokeScpAccessAction } from "../actions";
 import { AccessForm } from "./access-form";
@@ -83,7 +84,7 @@ export default async function ScpDetailPage({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--term-fg-dim)]">
         <ClassificationBadge classification={file.classification} size="lg" />
         <span>CLEARANCE REQUIRED: {clearanceLabel(file.clearanceRequired)}</span>
-        <span>— AUTHOR: {file.author.displayName}</span>
+        <span>— AUTHOR: {renderRedactedName(file.author.displayName ?? "", user)}</span>
         {file.updatedAt && (
           <span>
             — REV {file.revisionCount}, AMENDED{" "}
