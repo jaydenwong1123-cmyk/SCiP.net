@@ -14,6 +14,10 @@ import {
 } from "@/lib/revisions";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 export async function createIncidentReportAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -48,6 +52,16 @@ export async function createIncidentReportAction(
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
+    };
+  }
+  const redactCheck = checkRedactionAuthorization(
+    `${title}\n${location}\n${body}`,
+    user
+  );
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
     };
   }
 
@@ -108,6 +122,16 @@ export async function updateIncidentReportAction(
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
+    };
+  }
+  const redactCheck = checkRedactionAuthorization(
+    `${title}\n${location}\n${body}`,
+    user
+  );
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
     };
   }
 

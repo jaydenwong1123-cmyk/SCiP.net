@@ -14,6 +14,10 @@ import {
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { parseScheduleInput } from "@/lib/broadcast-schedule";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 export async function createBroadcastAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -31,6 +35,13 @@ export async function createBroadcastAction(
   const body = String(formData.get("body") ?? "").trim();
   if (!title || !body) {
     return { ok: false, error: "TITLE AND BODY ARE REQUIRED." };
+  }
+  const redactCheck = checkRedactionAuthorization(`${title}\n${body}`, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+    };
   }
 
   const publishAt = parseScheduleInput(formData.get("publishAt"));
@@ -107,6 +118,14 @@ export async function updateBroadcastAction(
   const reason = String(formData.get("reason") ?? "").trim();
   if (!title || !body) {
     return { ok: false, error: "TITLE AND BODY ARE REQUIRED." };
+  }
+
+  const redactCheck = checkRedactionAuthorization(`${title}\n${body}`, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+    };
   }
 
   const nextTitle = title.slice(0, 200);

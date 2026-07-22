@@ -8,7 +8,11 @@ import {
   isRestrictedDepartment,
   isValidDepartment,
 } from "@/lib/departments";
-import { findNonAsciiFormField } from "@/lib/validation";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 export async function updateDepartmentAction(formData: FormData) {
   const user = await requireUser();
@@ -36,12 +40,20 @@ export async function updateDepartmentAction(formData: FormData) {
 }
 
 export async function updatePersonalFileAction(
-  _prevState: { ok: boolean } | null,
+  _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  if (findNonAsciiFormField(formData)) return { ok: false };
+  if (findNonAsciiFormField(formData)) return { ok: false, error: NON_ASCII_ERROR };
   const content = String(formData.get("personalFile") ?? "");
+
+  const redactCheck = checkRedactionAuthorization(content, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+    };
+  }
 
   await db.user.update({
     where: { id: user.id },

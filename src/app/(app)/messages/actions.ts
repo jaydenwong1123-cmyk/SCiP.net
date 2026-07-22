@@ -7,6 +7,10 @@ import { requireUser } from "@/lib/session";
 import { getMentionCandidates, resolveMentionedUsers } from "@/lib/mentions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 export async function sendMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -24,6 +28,14 @@ export async function sendMessageAction(
 
   if (!recipientId || !subject || !body) {
     return { ok: false, error: "RECIPIENT, SUBJECT, AND BODY ARE ALL REQUIRED." };
+  }
+
+  const redactCheck = checkRedactionAuthorization(`${subject}\n${body}`, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+    };
   }
 
   const recipient = await db.user.findUnique({ where: { id: recipientId } });

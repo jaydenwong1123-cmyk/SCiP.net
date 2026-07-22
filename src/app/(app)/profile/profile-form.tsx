@@ -23,6 +23,9 @@ export function ProfileForm({ initialContent }: { initialContent: string }) {
         {pending ? "SAVING..." : "SAVE FILE"}
       </button>
       {state?.ok && <span className="text-[var(--term-fg-bright)] ml-3 text-sm">SAVED.</span>}
+      {state && !state.ok && state.error && (
+        <span className="text-[var(--term-red)] ml-3 text-sm">{state.error}</span>
+      )}
     </form>
   );
 }

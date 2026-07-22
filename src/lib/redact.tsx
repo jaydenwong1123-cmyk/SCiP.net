@@ -3,6 +3,8 @@ import {
   parseClearanceToken,
   clearanceLabel,
   OWNER_CLEARANCE,
+  MAX_CLEARANCE,
+  R5_DESIGNATION,
 } from "@/lib/clearance";
 
 // Viewers who may read every redaction, including full (level-less) ones:
@@ -120,4 +122,99 @@ export function redactToText(
 
 export function redactNameToText(name: string, viewer: Viewer): string {
   return redactToText(name, viewer.clearance, canBypassRedaction(viewer));
+}
+
+// ---------------------------------------------------------------------------
+// Who may apply a given redaction level
+// ---------------------------------------------------------------------------
+//
+// A member may redact text up to ONE level above their own clearance on their
+// own authority — an L-3 can hide something behind an L-4 requirement, keeping
+// it from their own peers. Anything two or more levels higher (or a level-less
+// full redaction, which hides the text from everyone) has to be signed off by
+// a RAISA recordkeeper, since it walls the content off from the author's own
+// chain of command.
+
+// The highest offset above a member's clearance they may redact unaided.
+export const SELF_REDACT_OFFSET = 1;
+
+// A level-less full redaction ([*SECRET*] with no tag) is readable only by
+// bypass roles, so it sits above every numbered level. We model it as one rank
+// past the maximum for authorization purposes. An unrecognized tag is treated
+// the same way — fail closed rather than wave it through.
+const FULL_REDACTION_RANK = MAX_CLEARANCE + 1;
+
+// RAISA recordkeepers (the L-R5 designation) and staff/admin/owner may approve —
+// and so may themselves apply — a redaction at any level. Role booleans are
+// checked inline (rather than via hasStaffPowers) so this module stays free of
+// the server-only session import, exactly as canBypassRedaction does above.
+export function canApproveRedactions(user: {
+  designation?: string | null;
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+}): boolean {
+  return (
+    user.designation === R5_DESIGNATION ||
+    user.isOwner ||
+    user.isCoOwner ||
+    user.isAdmin ||
+    user.isStaff
+  );
+}
+
+// Every required rank present in the markup. A level-less (or unrecognized)
+// redaction contributes FULL_REDACTION_RANK.
+export function redactionRanks(text: string): number[] {
+  const ranks: number[] = [];
+  REDACT_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = REDACT_RE.exec(text)) !== null) {
+    const level = match[2] ? parseClearanceToken(match[2]) : null;
+    ranks.push(level ?? FULL_REDACTION_RANK);
+  }
+  return ranks;
+}
+
+// Verify a member may apply every redaction present in `text`. Returns the
+// highest offending required rank, or null when all are within reach. RAISA /
+// staff approvers are unrestricted.
+export function checkRedactionAuthorization(
+  text: string,
+  author: {
+    clearance: number;
+    designation?: string | null;
+    isOwner: boolean;
+    isCoOwner: boolean;
+    isAdmin: boolean;
+    isStaff: boolean;
+  }
+): { ok: true } | { ok: false; requiredRank: number } {
+  if (canApproveRedactions(author)) return { ok: true };
+  const cap = author.clearance + SELF_REDACT_OFFSET;
+  let offending: number | null = null;
+  for (const rank of redactionRanks(text)) {
+    if (rank > cap && (offending === null || rank > offending)) offending = rank;
+  }
+  return offending === null ? { ok: true } : { ok: false, requiredRank: offending };
+}
+
+// The error string shown when a member tries to apply a redaction above their
+// self-service ceiling.
+export function redactionAuthorizationError(
+  requiredRank: number,
+  authorClearance: number
+): string {
+  const required =
+    requiredRank > MAX_CLEARANCE
+      ? "a full redaction"
+      : clearanceLabel(requiredRank);
+  const ceiling = clearanceLabel(
+    Math.min(authorClearance + SELF_REDACT_OFFSET, MAX_CLEARANCE)
+  );
+  return (
+    `REDACTION AT ${required.toUpperCase()} REQUIRES RAISA APPROVAL. ` +
+    `YOU MAY REDACT UP TO ${ceiling} ON YOUR OWN AUTHORITY.`
+  );
 }

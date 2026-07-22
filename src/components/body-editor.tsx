@@ -41,6 +41,9 @@ export function BodyEditor({
       <p className="text-xs text-[var(--term-fg-dim)] mt-1">
         REDACTION: <code>[*text*]</code> hides text from everyone. <code>[*text*][4]</code>{" "}
         reveals it only to L-4 clearance or higher; lower levels see a redacted box.
+        You may redact up to one level above your own clearance; two or more
+        levels higher (or a full <code>[*text*]</code> redaction) must be applied
+        by a RAISA recordkeeper.
       </p>
 
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

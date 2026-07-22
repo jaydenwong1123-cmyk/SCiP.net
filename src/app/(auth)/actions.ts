@@ -15,6 +15,10 @@ import {
 } from "@/lib/rate-limit";
 import { logAudit, clientIp, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 const EMAIL_DOMAIN = "foundation.scp";
 const USERNAME_PATTERN = /^[a-z][a-z0-9._-]{1,30}$/i;
@@ -159,6 +163,18 @@ export async function setNameAction(
   // ("Agent [*Vance*][4]"), which costs characters the reader never sees.
   if (displayName.length < 2 || displayName.length > 80) {
     return { ok: false, error: "NAME MUST BE 2-80 CHARACTERS." };
+  }
+
+  const author = await db.user.findUnique({ where: { id: session.user.id } });
+  if (!author) {
+    return { ok: false, error: "NOT AUTHENTICATED." };
+  }
+  const redactCheck = checkRedactionAuthorization(displayName, author);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, author.clearance),
+    };
   }
 
   await db.user.update({

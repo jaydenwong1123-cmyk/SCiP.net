@@ -14,6 +14,10 @@ import {
 } from "@/lib/revisions";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 export async function createScpFileAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -49,6 +53,13 @@ export async function createScpFileAction(
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
+    };
+  }
+  const redactCheck = checkRedactionAuthorization(`${title}\n${body}`, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
     };
   }
 
@@ -111,6 +122,13 @@ export async function updateScpFileAction(
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
+    };
+  }
+  const redactCheck = checkRedactionAuthorization(`${title}\n${body}`, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
     };
   }
 
