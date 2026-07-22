@@ -4,12 +4,21 @@ import { useActionState, useRef } from "react";
 import { updatePersonalFileAction } from "./actions";
 import { FormatToolbar } from "@/components/format-toolbar";
 
-export function ProfileForm({ initialContent }: { initialContent: string }) {
+export function ProfileForm({
+  initialContent,
+  subjectId,
+}: {
+  initialContent: string;
+  // Set when editing another member's file (RAISA/staff only); omitted for the
+  // member's own profile.
+  subjectId?: string;
+}) {
   const [state, formAction, pending] = useActionState(updatePersonalFileAction, null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   return (
     <form action={formAction} className="space-y-3">
+      {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
       <FormatToolbar targetRef={bodyRef} />
       <textarea
         ref={bodyRef}

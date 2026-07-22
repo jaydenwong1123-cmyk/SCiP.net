@@ -2,7 +2,7 @@ import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { MEMBER_NOTE_CLEARANCE } from "@/lib/clearance";
+import { MEMBER_NOTE_CLEARANCE, R5_DESIGNATION } from "@/lib/clearance";
 import { getViewAsClearance } from "@/lib/view-as";
 
 // Personnel who may flag/annotate members: L-5 and above, plus staff/admin/owner.
@@ -17,6 +17,20 @@ export function canAnnotateMembers(user: {
     user.clearance >= MEMBER_NOTE_CLEARANCE ||
     hasStaffPowers(user)
   );
+}
+
+// RAISA recordkeepers (the L-R5 designation) plus staff/admin/owner. RAISA are
+// the custodians of personnel records, so they may rewrite any member's
+// personal file, not only their own. Mirrors the RAISA definition used for the
+// message logs — clearance rank alone never confers this.
+export function canEditAnyPersonalFile(user: {
+  designation?: string | null;
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+}): boolean {
+  return user.designation === R5_DESIGNATION || hasStaffPowers(user);
 }
 
 // The member as stored — never downgraded by "view as". Used by the Settings

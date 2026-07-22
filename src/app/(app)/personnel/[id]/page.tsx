@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireUser, canAnnotateMembers, hasStaffPowers } from "@/lib/session";
+import {
+  requireUser,
+  canAnnotateMembers,
+  hasStaffPowers,
+  canEditAnyPersonalFile,
+} from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
 import { renderBody } from "@/lib/render-body";
 import {
@@ -20,6 +25,7 @@ import {
 } from "@/lib/attachments";
 import { INFRACTION_SEVERITY_COLOR, type InfractionSeverity } from "@/lib/infractions";
 import { redactNameToText, renderRedactedName } from "@/lib/redact";
+import { ProfileForm } from "@/app/(app)/profile/profile-form";
 
 export default async function PersonnelFilePage({
   params,
@@ -99,6 +105,17 @@ export default async function PersonnelFilePage({
             ? await renderBody(person.personalFile, viewer)
             : "[NO FILE ON RECORD]"}
         </pre>
+        {canEditAnyPersonalFile(viewer) && viewer.id !== person.id && (
+          <div className="space-y-2 pt-2 border-t border-[var(--term-fg-dim)]/30">
+            <p className="text-sm text-[var(--term-amber)]">
+              ⧉ RAISA RECORDKEEPING — EDIT THIS FILE
+            </p>
+            <ProfileForm
+              initialContent={person.personalFile ?? ""}
+              subjectId={person.id}
+            />
+          </div>
+        )}
       </div>
 
       {canSeeAttachments && (

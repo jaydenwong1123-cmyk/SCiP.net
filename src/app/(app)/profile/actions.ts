@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireUser, hasOwnerPowers } from "@/lib/session";
+import {
+  requireUser,
+  hasOwnerPowers,
+  canEditAnyPersonalFile,
+} from "@/lib/session";
 import {
   isOpenDepartment,
   isRestrictedDepartment,
@@ -47,6 +51,21 @@ export async function updatePersonalFileAction(
   if (findNonAsciiFormField(formData)) return { ok: false, error: NON_ASCII_ERROR };
   const content = String(formData.get("personalFile") ?? "");
 
+  // A member always edits their own file. RAISA (and staff) may also edit
+  // another member's file by passing that member's id.
+  const subjectId = String(formData.get("subjectId") ?? "").trim();
+  const targetId = subjectId || user.id;
+  if (targetId !== user.id && !canEditAnyPersonalFile(user)) {
+    return { ok: false, error: "NOT AUTHORIZED TO EDIT THIS FILE." };
+  }
+  if (targetId !== user.id) {
+    const subject = await db.user.findUnique({
+      where: { id: targetId },
+      select: { id: true },
+    });
+    if (!subject) return { ok: false, error: "MEMBER NOT FOUND." };
+  }
+
   const redactCheck = checkRedactionAuthorization(content, user);
   if (!redactCheck.ok) {
     return {
@@ -56,11 +75,11 @@ export async function updatePersonalFileAction(
   }
 
   await db.user.update({
-    where: { id: user.id },
+    where: { id: targetId },
     data: { personalFile: content.slice(0, 20000) },
   });
 
   revalidatePath("/profile");
-  revalidatePath(`/personnel/${user.id}`);
+  revalidatePath(`/personnel/${targetId}`);
   return { ok: true };
 }
