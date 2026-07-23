@@ -27,6 +27,7 @@ async function main() {
         isOwner: true,
         canPostScp: true,
         canFileIncident: true,
+        canLogTest: true,
       },
     });
     console.log("=== OWNER ACCOUNT CREATED ===");

@@ -263,6 +263,34 @@ export async function toggleCanFileIncidentAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function toggleCanLogTestAction(formData: FormData) {
+  const actor = await requireStaff();
+  const userId = String(formData.get("userId") ?? "");
+  const canLogTest = formData.get("canLogTest") === "true";
+
+  if (!userId) return;
+
+  const name = await targetName(userId);
+
+  await db.user.update({
+    where: { id: userId },
+    data: { canLogTest },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.testLogToggled,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: name,
+    summary: canLogTest
+      ? "Granted experiment-log permission"
+      : "Revoked experiment-log permission",
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function toggleHelperAction(formData: FormData) {
   // Helper sits below Staff, but granting it is reserved for Admin and above —
   // Staff cannot appoint their own juniors.
@@ -628,6 +656,26 @@ export async function bulkMemberAction(
           summary: canFileIncident
             ? "Granted incident filing permission (bulk)"
             : "Revoked incident filing permission (bulk)",
+        });
+        break;
+      }
+
+      case "grantTestLog":
+      case "revokeTestLog": {
+        const canLogTest = op === "grantTestLog";
+        await db.user.update({
+          where: { id: target.id },
+          data: { canLogTest },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.testLogToggled,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: canLogTest
+            ? "Granted experiment-log permission (bulk)"
+            : "Revoked experiment-log permission (bulk)",
         });
         break;
       }

@@ -21,6 +21,10 @@ model User {
   clearance    Int      @default(1)
   canPostScp   Boolean  @default(false)
   canFileIncident Boolean @default(false)
+  // Filing experiment logs against an anomaly. Deliberately separate from
+  // canPostScp: authoring containment documentation and running tests on a
+  // contained anomaly are different jobs, held by different personnel.
+  canLogTest   Boolean  @default(false)
   isOwner      Boolean  @default(false)
   // Co-Owner: owner-equivalent powers, held by at most one member at a time.
   // Only the seeded owner can grant or revoke it.

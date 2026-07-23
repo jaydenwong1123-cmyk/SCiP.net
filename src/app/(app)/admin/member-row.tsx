@@ -7,6 +7,7 @@ import {
   setMemberDepartmentAction,
   toggleCanPostScpAction,
   toggleCanFileIncidentAction,
+  toggleCanLogTestAction,
   toggleHelperAction,
   toggleStaffAction,
   toggleAdminAction,
@@ -24,6 +25,7 @@ type Member = {
   designation: string | null;
   canPostScp: boolean;
   canFileIncident: boolean;
+  canLogTest: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
@@ -181,6 +183,18 @@ export function MemberRow({
             />
             <button className="term-button text-xs">
               {member.canFileIncident ? "REVOKE INCIDENT-FILE" : "GRANT INCIDENT-FILE"}
+            </button>
+          </form>
+
+          <form action={toggleCanLogTestAction}>
+            <input type="hidden" name="userId" value={member.id} />
+            <input
+              type="hidden"
+              name="canLogTest"
+              value={(!member.canLogTest).toString()}
+            />
+            <button className="term-button text-xs">
+              {member.canLogTest ? "REVOKE TEST-LOG" : "GRANT TEST-LOG"}
             </button>
           </form>
 

@@ -20,6 +20,7 @@ type Member = {
   designation: string | null;
   canPostScp: boolean;
   canFileIncident: boolean;
+  canLogTest: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
