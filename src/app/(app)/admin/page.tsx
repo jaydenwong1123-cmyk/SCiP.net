@@ -12,7 +12,7 @@ import {
   clearanceAssignValue,
 } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
-import { MemberRow } from "./member-row";
+import { MemberList } from "./member-list";
 import {
   generateInviteCodeAction,
   revokeInviteCodeAction,
@@ -298,34 +298,30 @@ export default async function AdminPage() {
       <div className="term-panel space-y-2">
         <h2 className="text-sm text-[var(--term-fg-dim)]">MEMBER MANAGEMENT</h2>
         <p className="text-xs text-[var(--term-fg-dim)]">
-          CLICK A MEMBER TO OPEN ACTIONS.
+          CLICK A MEMBER TO OPEN ACTIONS, OR TICK SEVERAL TO ACT ON THEM AT ONCE.
         </p>
-        <div>
-          {members.map((m) => (
-            <MemberRow
-              key={m.id}
-              member={{
-                id: m.id,
-                displayName: m.displayName,
-                clearance: m.clearance,
-                designation: m.designation,
-                canPostScp: m.canPostScp,
-                canFileIncident: m.canFileIncident,
-                isCoOwner: m.isCoOwner,
-                isAdmin: m.isAdmin,
-                isStaff: m.isStaff,
-                isHelper: m.isHelper,
-                department: m.department,
-                suspended: m.suspended,
-              }}
-              canGrantTopClearance={canGrantTopClearance}
-              canManageStaff={canManageStaff}
-              canManageAdmin={canManageAdmin}
-              canManageCoOwner={canManageCoOwner}
-              canManageHelper={canManageHelper}
-            />
-          ))}
-        </div>
+        <MemberList
+          members={members.map((m) => ({
+            id: m.id,
+            displayName: m.displayName,
+            clearance: m.clearance,
+            designation: m.designation,
+            canPostScp: m.canPostScp,
+            canFileIncident: m.canFileIncident,
+            isCoOwner: m.isCoOwner,
+            isAdmin: m.isAdmin,
+            isStaff: m.isStaff,
+            isHelper: m.isHelper,
+            department: m.department,
+            suspended: m.suspended,
+          }))}
+          canGrantTopClearance={canGrantTopClearance}
+          canManageStaff={canManageStaff}
+          canManageAdmin={canManageAdmin}
+          canManageCoOwner={canManageCoOwner}
+          canManageHelper={canManageHelper}
+          hasAdminPowers={ownerPowers || viewer.isAdmin}
+        />
       </div>
 
       <div className="term-panel space-y-3">

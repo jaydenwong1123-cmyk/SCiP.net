@@ -60,6 +60,7 @@ model User {
   infractionsIssued  MemberInfraction[]  @relation("InfractionIssuer")
   scpAccessGrantsReceived ScpAccessGrant[] @relation("ScpAccessGrantUser")
   scpAccessGrantsIssued   ScpAccessGrant[] @relation("ScpAccessGrantGrantor")
+  scpTestLogs      ScpTestLog[]   @relation("ScpTestLogAuthor")
   ticketsOpened    Ticket[]       @relation("TicketAuthor")
   ticketsClosed    Ticket[]       @relation("TicketCloser")
   ticketReplies    TicketReply[]  @relation("TicketReplyAuthor")
@@ -246,6 +247,35 @@ model ScpFile {
   author   User   @relation(fields: [authorId], references: [id])
 
   accessGrants ScpAccessGrant[]
+  testLogs     ScpTestLog[]
+}
+
+// An experiment or test performed on an anomaly, appended to its file.
+//
+// Visibility is deliberately NOT stored here: a test log is readable by
+// exactly whoever can read the parent ScpFile, so the existing clearance gate
+// (and any temporary ScpAccessGrant) governs it with no second rule to keep
+// in sync.
+model ScpTestLog {
+  id        String   @id @default(cuid())
+  // Sequential per file, assigned at insert. Displayed as "TEST LOG 4" so the
+  // archive reads like a lab notebook rather than a pile of cuids.
+  sequence  Int      @default(1)
+  procedure String
+  result    String
+  // Optional researcher commentary; the classic "Note:" line.
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  scpFileId String
+  scpFile   ScpFile @relation(fields: [scpFileId], references: [id])
+  authorId   String?
+  author     User?  @relation("ScpTestLogAuthor", fields: [authorId], references: [id])
+  // Denormalized so the log survives the researcher's account being deleted.
+  authorName String @default("")
+
+  @@index([scpFileId, sequence])
+  @@index([authorId])
 }
 
 // A staff-granted, time-limited exception letting one member read a specific

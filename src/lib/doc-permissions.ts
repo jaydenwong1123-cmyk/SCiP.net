@@ -28,6 +28,23 @@ export function canCreateIncident(
   return actor.canFileIncident || hasAdminPowers(actor);
 }
 
+// Logging an experiment is a research act, not an editorial one: anyone
+// trusted to author SCP documentation may append a test log to a file they can
+// already read, without needing edit rights over the document itself.
+export function canLogScpTest(
+  actor: Actor & { canPostScp: boolean }
+): boolean {
+  return canCreateScpFile(actor) || hasStaffPowers(actor);
+}
+
+// Researchers may retract their own logs; staff may remove any.
+export function canDeleteScpTest(
+  actor: Actor,
+  log: { authorId: string | null }
+): boolean {
+  return (log.authorId !== null && log.authorId === actor.id) || hasStaffPowers(actor);
+}
+
 // Authors may revise their own documents; staff may revise any.
 export function canEditScpFile(actor: Actor, file: { authorId: string }): boolean {
   return file.authorId === actor.id || hasStaffPowers(actor);

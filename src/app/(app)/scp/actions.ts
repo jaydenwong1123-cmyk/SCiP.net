@@ -4,8 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, requireStaff } from "@/lib/session";
-import { canCreateScpFile, canEditScpFile } from "@/lib/doc-permissions";
+import {
+  canCreateScpFile,
+  canEditScpFile,
+  canLogScpTest,
+  canDeleteScpTest,
+} from "@/lib/doc-permissions";
 import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
+import { canReadScpFile } from "@/lib/scp-access";
 import { DEFAULT_CLASSIFICATION, isValidClassification } from "@/lib/classification";
 import {
   REVISION_ENTITIES,
@@ -268,6 +274,109 @@ export async function revokeScpAccessAction(formData: FormData) {
   revalidatePath(`/scp/${grant.scpFileId}`);
 }
 
+const MAX_TEST_FIELD = 8000;
+
+export async function addScpTestLogAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  const scpFileId = String(formData.get("scpFileId") ?? "");
+  if (!scpFileId) return { ok: false, error: "MISSING FILE ID." };
+
+  if (!canLogScpTest(user)) {
+    return { ok: false, error: "YOU ARE NOT AUTHORIZED TO FILE TEST LOGS." };
+  }
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
+
+  const file = await db.scpFile.findUnique({ where: { id: scpFileId } });
+  if (!file) return { ok: false, error: "FILE NOT FOUND." };
+  // Same gate as reading the document — no appending to a file you can't open.
+  if (!(await canReadScpFile(user, file))) {
+    return { ok: false, error: "INSUFFICIENT CLEARANCE FOR THIS FILE." };
+  }
+
+  const procedure = String(formData.get("procedure") ?? "").trim();
+  const result = String(formData.get("result") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!procedure || !result) {
+    return { ok: false, error: "PROCEDURE AND RESULT ARE REQUIRED." };
+  }
+
+  const redactCheck = checkRedactionAuthorization(
+    `${procedure}\n${result}\n${notes}`,
+    user
+  );
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+    };
+  }
+
+  // Sequence is per file and derived from the highest existing entry, so
+  // retracting log 3 doesn't renumber 4 and 5 underneath the reader.
+  const last = await db.scpTestLog.findFirst({
+    where: { scpFileId },
+    orderBy: { sequence: "desc" },
+    select: { sequence: true },
+  });
+
+  await db.scpTestLog.create({
+    data: {
+      scpFileId,
+      sequence: (last?.sequence ?? 0) + 1,
+      procedure: procedure.slice(0, MAX_TEST_FIELD),
+      result: result.slice(0, MAX_TEST_FIELD),
+      notes: notes.slice(0, MAX_TEST_FIELD),
+      authorId: user.id,
+      authorName: user.displayName ?? user.email,
+    },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.scpTestLogged,
+    actor: user,
+    targetType: "scp",
+    targetId: scpFileId,
+    targetName: file.title,
+    summary: `Filed test log ${(last?.sequence ?? 0) + 1} on "${file.title}"`,
+  });
+
+  revalidatePath(`/scp/${scpFileId}`);
+  return { ok: true };
+}
+
+export async function deleteScpTestLogAction(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("logId") ?? "");
+  if (!id) return;
+
+  const log = await db.scpTestLog.findUnique({
+    where: { id },
+    include: { scpFile: { select: { id: true, title: true, clearanceRequired: true } } },
+  });
+  if (!log) return;
+  if (!canDeleteScpTest(user, log)) return;
+  if (!(await canReadScpFile(user, log.scpFile))) return;
+
+  await db.scpTestLog.deleteMany({ where: { id } });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.scpTestDeleted,
+    actor: user,
+    targetType: "scp",
+    targetId: log.scpFileId,
+    targetName: log.scpFile.title,
+    summary: `Retracted test log ${log.sequence} on "${log.scpFile.title}"`,
+  });
+
+  revalidatePath(`/scp/${log.scpFileId}`);
+}
+
 export async function deleteScpFileAction(formData: FormData) {
   const actor = await requireStaff();
   const id = String(formData.get("id") ?? "");
@@ -276,6 +385,10 @@ export async function deleteScpFileAction(formData: FormData) {
   const existing = await db.scpFile.findUnique({ where: { id } });
   if (!existing) return;
 
+  // No FK cascade under relationMode="prisma": the file's test logs and access
+  // grants have to go with it explicitly.
+  await db.scpTestLog.deleteMany({ where: { scpFileId: id } });
+  await db.scpAccessGrant.deleteMany({ where: { scpFileId: id } });
   await db.scpFile.deleteMany({ where: { id } });
   await deleteRevisionsFor(REVISION_ENTITIES.scp, id);
 

@@ -22,6 +22,8 @@ import { updateSiteConfig, MAINT_COOKIE } from "@/lib/site-config";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
 import { findNonAsciiFormField } from "@/lib/validation";
+import { purgeUser } from "@/lib/purge-user";
+import { isBulkOp, ADMIN_ONLY_BULK_OPS } from "@/lib/bulk-ops";
 
 // Audit entries name the person acted on, not just their id. Looked up once
 // per action rather than joined into every log read.
@@ -425,64 +427,7 @@ export async function deleteAccountAction(formData: FormData) {
   // Never delete the owner or the co-owner.
   if (!target || hasOwnerPowers(target)) return;
 
-  // No FK cascade under relationMode="prisma": clean up related rows manually.
-  await db.message.deleteMany({
-    where: { OR: [{ senderId: userId }, { recipientId: userId }] },
-  });
-  await db.scpFile.deleteMany({ where: { authorId: userId } });
-  await db.broadcast.deleteMany({ where: { authorId: userId } });
-  await db.incidentReport.deleteMany({ where: { authorId: userId } });
-  await db.secureMessage.deleteMany({ where: { authorId: userId } });
-  await db.clearanceRequest.deleteMany({ where: { userId } });
-  await db.clearanceRequest.updateMany({
-    where: { reviewedById: userId },
-    data: { reviewedById: null },
-  });
-  await db.inviteCode.updateMany({
-    where: { usedById: userId },
-    data: { usedById: null },
-  });
-  await db.inviteRedemption.deleteMany({ where: { userId } });
-  await db.memberNote.deleteMany({
-    where: { OR: [{ subjectId: userId }, { authorId: userId }] },
-  });
-  // Tickets they opened go with them, replies and all. Replies they left on
-  // *other* people's tickets stay: the thread has to remain readable, and
-  // `authorName` is denormalized precisely so it survives this.
-  const ownTickets = await db.ticket.findMany({
-    where: { authorId: userId },
-    select: { id: true },
-  });
-  await db.ticketReply.deleteMany({
-    where: { ticketId: { in: ownTickets.map((t) => t.id) } },
-  });
-  await db.ticket.deleteMany({ where: { authorId: userId } });
-  await db.ticketReply.updateMany({
-    where: { authorId: userId },
-    data: { authorId: null },
-  });
-  await db.ticket.updateMany({
-    where: { closedById: userId },
-    data: { closedById: null },
-  });
-  await db.scpAccessGrant.deleteMany({ where: { userId } });
-  await db.scpAccessGrant.updateMany({
-    where: { grantedById: userId },
-    data: { grantedById: null },
-  });
-  await db.notification.deleteMany({ where: { userId } });
-  // Audit rows and revisions deliberately survive: both denormalize the
-  // actor's name so the history stays readable, and detaching the id keeps
-  // the record without dangling at a deleted user.
-  await db.auditLog.updateMany({
-    where: { actorId: userId },
-    data: { actorId: null },
-  });
-  await db.revision.updateMany({
-    where: { editorId: userId },
-    data: { editorId: null },
-  });
-  await db.user.delete({ where: { id: userId } });
+  await purgeUser(userId);
 
   await logAudit({
     action: AUDIT_ACTIONS.accountDeleted,
@@ -495,6 +440,298 @@ export async function deleteAccountAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/personnel");
+}
+
+// ---------------------------------------------------------------------------
+// Bulk member management
+//
+// Every operation here is the multi-target form of a single-member action
+// above, and deliberately reuses the *same* authorization rules rather than
+// restating them loosely. Targets that fail a rule are skipped individually
+// instead of failing the whole batch, and the audit trail records one entry
+// per member acted on plus a batch summary — so a bulk change is no less
+// traceable than doing it one row at a time.
+// ---------------------------------------------------------------------------
+
+// Cap on how many members one submission may touch. Keeps a runaway or forged
+// request from walking the whole roster in a single call.
+const MAX_BULK_TARGETS = 100;
+
+export async function bulkMemberAction(
+  _prevState: { ok: boolean; error?: string; message?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const actor = await requireStaff();
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: "NON-ASCII CHARACTERS ARE NOT ALLOWED." };
+  }
+
+  const op = String(formData.get("op") ?? "");
+  if (!isBulkOp(op)) return { ok: false, error: "UNKNOWN OPERATION." };
+
+  const userIds = [
+    ...new Set(
+      formData
+        .getAll("userIds")
+        .map((v) => String(v))
+        .filter(Boolean)
+    ),
+  ];
+  if (userIds.length === 0) return { ok: false, error: "NO MEMBERS SELECTED." };
+  if (userIds.length > MAX_BULK_TARGETS) {
+    return {
+      ok: false,
+      error: `TOO MANY MEMBERS SELECTED (MAX ${MAX_BULK_TARGETS}).`,
+    };
+  }
+
+  // Role gates, mirroring the single-member actions exactly.
+  const ownerPowers = hasOwnerPowers(actor);
+  const adminPowers = ownerPowers || actor.isAdmin;
+  // Role/Staff grants and account deletion are Admin-and-above, matching
+  // toggleHelperAction / toggleStaffAction / deleteAccountAction.
+  if (ADMIN_ONLY_BULK_OPS.includes(op) && !adminPowers) {
+    return { ok: false, error: "INSUFFICIENT AUTHORITY FOR THIS OPERATION." };
+  }
+
+  // Operation-specific payload validation, done once before touching anything.
+  let clearance = 0;
+  let designation: string | null = null;
+  let department = "";
+  let reason = "";
+
+  if (op === "clearance") {
+    const parsed = parseClearanceAssignment(String(formData.get("clearance") ?? ""));
+    if (!parsed) return { ok: false, error: "INVALID CLEARANCE LEVEL." };
+    ({ clearance, designation } = parsed);
+    // Same caps as setClearanceAction: only admin+ may grant L-OMNI, and plain
+    // Staff top out at L-3.
+    if (clearance >= OWNER_CLEARANCE && !adminPowers) {
+      return { ok: false, error: "ONLY ADMIN AND ABOVE MAY GRANT L-OMNI." };
+    }
+    if (!adminPowers && clearance > 3) {
+      return { ok: false, error: "STAFF MAY ONLY ASSIGN UP TO L-3." };
+    }
+  }
+
+  if (op === "department") {
+    department = String(formData.get("department") ?? "");
+    if (department !== "" && !isValidDepartment(department)) {
+      return { ok: false, error: "INVALID DEPARTMENT." };
+    }
+  }
+
+  if (op === "suspend") {
+    reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
+  }
+
+  const targets = await db.user.findMany({
+    where: { id: { in: userIds } },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      clearance: true,
+      designation: true,
+      isOwner: true,
+      isCoOwner: true,
+    },
+  });
+
+  let applied = 0;
+  let skipped = 0;
+
+  for (const target of targets) {
+    // The owner and the co-owner are never bulk-targetable. Appointing or
+    // removing a co-owner stays a deliberate, single, confirmed act.
+    if (target.isOwner || target.isCoOwner) {
+      skipped++;
+      continue;
+    }
+    // Never let an operator suspend or delete themselves out of the panel.
+    if ((op === "suspend" || op === "delete") && target.id === actor.id) {
+      skipped++;
+      continue;
+    }
+
+    const name = target.displayName ?? target.email;
+
+    switch (op) {
+      case "clearance":
+        await db.user.update({
+          where: { id: target.id, isOwner: false, isCoOwner: false },
+          data: { clearance, designation },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.clearanceSet,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: `Clearance ${clearanceDisplay(
+            target.clearance,
+            target.designation
+          )} → ${clearanceDisplay(clearance, designation)} (bulk)`,
+        });
+        break;
+
+      case "department":
+        await db.user.update({
+          where: { id: target.id },
+          data: { department: department === "" ? null : department },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.departmentSet,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: department
+            ? `Assigned to ${department} (bulk)`
+            : "Removed department assignment (bulk)",
+        });
+        break;
+
+      case "grantScpPost":
+      case "revokeScpPost": {
+        const canPostScp = op === "grantScpPost";
+        await db.user.update({
+          where: { id: target.id },
+          data: { canPostScp },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.scpPostToggled,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: canPostScp
+            ? "Granted SCP filing permission (bulk)"
+            : "Revoked SCP filing permission (bulk)",
+        });
+        break;
+      }
+
+      case "grantIncidentFile":
+      case "revokeIncidentFile": {
+        const canFileIncident = op === "grantIncidentFile";
+        await db.user.update({
+          where: { id: target.id },
+          data: { canFileIncident },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.incidentFileToggled,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: canFileIncident
+            ? "Granted incident filing permission (bulk)"
+            : "Revoked incident filing permission (bulk)",
+        });
+        break;
+      }
+
+      case "grantHelper":
+      case "revokeHelper": {
+        const isHelper = op === "grantHelper";
+        await db.user.update({
+          where: { id: target.id, isOwner: false, isCoOwner: false },
+          data: { isHelper },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.helperToggled,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: isHelper
+            ? "Granted Helper role (bulk)"
+            : "Revoked Helper role (bulk)",
+        });
+        break;
+      }
+
+      case "grantStaff":
+      case "revokeStaff": {
+        const isStaff = op === "grantStaff";
+        await db.user.update({
+          where: { id: target.id, isOwner: false, isCoOwner: false },
+          data: { isStaff },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.staffToggled,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: isStaff
+            ? "Granted Staff role (bulk)"
+            : "Revoked Staff role (bulk)",
+        });
+        break;
+      }
+
+      case "suspend":
+      case "reinstate": {
+        const suspend = op === "suspend";
+        await db.user.update({
+          where: { id: target.id, isOwner: false, isCoOwner: false },
+          data: {
+            suspended: suspend,
+            suspendedReason: suspend ? (reason ? reason : null) : null,
+          },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.suspensionSet,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: suspend
+            ? `Suspended (bulk)${reason ? `: ${reason}` : ""}`
+            : "Lifted suspension (bulk)",
+        });
+        break;
+      }
+
+      case "delete":
+        await purgeUser(target.id);
+        await logAudit({
+          action: AUDIT_ACTIONS.accountDeleted,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: `Deleted account ${target.email} (bulk)`,
+        });
+        break;
+    }
+
+    applied++;
+  }
+
+  // Members whose ids were submitted but no longer exist.
+  skipped += userIds.length - targets.length;
+
+  await logAudit({
+    action: AUDIT_ACTIONS.bulkMemberAction,
+    actor,
+    targetType: "user",
+    summary: `Bulk "${op}" applied to ${applied} member(s)${
+      skipped > 0 ? `, ${skipped} skipped` : ""
+    }`,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/personnel");
+
+  return {
+    ok: true,
+    message: `APPLIED TO ${applied} MEMBER(S)${
+      skipped > 0 ? ` — ${skipped} SKIPPED (PROTECTED OR NOT FOUND)` : ""
+    }.`,
+  };
 }
 
 export async function generateInviteCodeAction(formData: FormData) {

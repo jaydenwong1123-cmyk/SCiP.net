@@ -40,6 +40,9 @@ export const AUDIT_ACTIONS = {
   helperToggled: "user.helper.toggle",
   ticketClosed: "ticket.close",
   messageLogViewed: "message_log.view",
+  scpTestLogged: "scp.test.log",
+  scpTestDeleted: "scp.test.delete",
+  bulkMemberAction: "user.bulk",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -75,6 +78,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.helperToggled]: "HELPER TOGGLED",
   [AUDIT_ACTIONS.ticketClosed]: "TICKET CLOSED",
   [AUDIT_ACTIONS.messageLogViewed]: "MESSAGE LOG READ",
+  [AUDIT_ACTIONS.scpTestLogged]: "TEST LOG FILED",
+  [AUDIT_ACTIONS.scpTestDeleted]: "TEST LOG RETRACTED",
+  [AUDIT_ACTIONS.bulkMemberAction]: "BULK MEMBER ACTION",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };
