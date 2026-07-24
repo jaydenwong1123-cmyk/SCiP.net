@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { getSiteConfig, hasBypass } from "@/lib/site-config";
+import { getSiteConfig, hasBypass, isLockedNow } from "@/lib/site-config";
 import { BypassForm } from "./bypass-form";
+import { Countdown } from "./countdown";
 
 // Depends on live config + cookies; must never be statically prerendered.
 export const dynamic = "force-dynamic";
@@ -8,8 +9,9 @@ export const dynamic = "force-dynamic";
 export default async function MaintenancePage() {
   const cfg = await getSiteConfig();
 
-  // Not in maintenance, or the visitor already has access — no gate to show.
-  if (!cfg.maintenanceMode) redirect("/");
+  // Not locked (or the schedule already lapsed), or the visitor already has
+  // access — no gate to show.
+  if (!isLockedNow(cfg)) redirect("/");
   if (await hasBypass(cfg)) redirect("/");
 
   const message =
@@ -23,6 +25,9 @@ export default async function MaintenancePage() {
           :: SYSTEM MAINTENANCE ::
         </h1>
         <p className="text-sm">{message}</p>
+        {cfg.lockdownUntil && (
+          <Countdown targetMs={cfg.lockdownUntil.getTime()} />
+        )}
         <p className="text-xs text-[var(--term-fg-dim)]">
           NETWORK ACCESS IS RESTRICTED TO AUTHORIZED PERSONNEL DURING THIS
           WINDOW.

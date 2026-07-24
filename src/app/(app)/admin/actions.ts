@@ -44,11 +44,31 @@ export async function setMaintenanceAction(formData: FormData) {
     .trim()
     .slice(0, 300);
 
+  // Optional scheduled unlock. The datetime-local input has no timezone, so it
+  // arrives as the owner's wall-clock time; we treat it as such. A blank value,
+  // an unparseable one, or one already in the past means "no schedule" — an
+  // indefinite lockdown that stays up until turned off by hand.
+  const lockdownUntilRaw = String(formData.get("lockdownUntil") ?? "").trim();
+  let lockdownUntil: Date | null = null;
+  if (lockdownUntilRaw) {
+    const parsed = new Date(lockdownUntilRaw);
+    if (!Number.isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+      lockdownUntil = parsed;
+    }
+  }
+
   // Never enable the lockdown without a code — that would lock everyone out,
   // including the owner.
   const maintenanceMode = wantsMaintenance && bypassCode.length > 0;
 
-  await updateSiteConfig({ maintenanceMode, bypassCode, maintenanceMessage });
+  await updateSiteConfig({
+    maintenanceMode,
+    bypassCode,
+    maintenanceMessage,
+    // Only carry a schedule while the lockdown is actually on, so a stale end
+    // time can't linger on a disabled config.
+    lockdownUntil: maintenanceMode ? lockdownUntil : null,
+  });
 
   // Grant the owner the bypass cookie immediately so enabling the lockdown
   // doesn't kick them out of their own admin session.
@@ -67,7 +87,9 @@ export async function setMaintenanceAction(formData: FormData) {
     actor,
     targetType: "site",
     summary: maintenanceMode
-      ? "Enabled maintenance lockdown"
+      ? lockdownUntil
+        ? `Enabled maintenance lockdown until ${lockdownUntil.toISOString()}`
+        : "Enabled maintenance lockdown"
       : "Disabled maintenance lockdown",
   });
 

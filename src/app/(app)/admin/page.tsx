@@ -13,6 +13,7 @@ import {
 } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberList } from "./member-list";
+import { LockdownScheduleField } from "./lockdown-schedule-field";
 import {
   generateInviteCodeAction,
   revokeInviteCodeAction,
@@ -196,10 +197,16 @@ export default async function AdminPage() {
           </h2>
           <p className="text-xs text-[var(--term-fg-dim)]">
             When enabled, the site shows a maintenance notice and only visitors
-            with the access code can enter. A code is required to enable it.
+            with the access code can enter. A code is required to enable it. Set
+            an auto-unlock time to show the public a live countdown that lifts
+            the lockdown on its own when it expires.
             {siteConfig.maintenanceMode && (
               <span className="text-[var(--term-amber)]">
-                {" "}CURRENTLY: LOCKED DOWN.
+                {" "}CURRENTLY: LOCKED DOWN
+                {siteConfig.lockdownUntil
+                  ? ` UNTIL ${siteConfig.lockdownUntil.toISOString()}`
+                  : ""}
+                .
               </span>
             )}
           </p>
@@ -239,6 +246,9 @@ export default async function AdminPage() {
                 className="term-input py-1 w-full"
               />
             </div>
+            <LockdownScheduleField
+              defaultIso={siteConfig.lockdownUntil?.toISOString() ?? null}
+            />
             <button
               className="term-button text-xs"
               style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}

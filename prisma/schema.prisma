@@ -391,6 +391,11 @@ model SiteConfig {
   maintenanceMode    Boolean @default(false)
   bypassCode         String  @default("")
   maintenanceMessage String  @default("")
+  // Optional scheduled end for the lockdown. When set, the maintenance notice
+  // shows a public countdown and the site unlocks itself the moment this passes
+  // — no job required, the gate simply re-reads the clock on each request. Null
+  // means the lockdown stays up until an owner turns it off by hand.
+  lockdownUntil      DateTime?
 }
 
 model IncidentReport {

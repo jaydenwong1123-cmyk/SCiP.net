@@ -11,6 +11,9 @@ export type SiteConfig = {
   maintenanceMode: boolean;
   bypassCode: string;
   maintenanceMessage: string;
+  // When set, the lockdown lifts on its own once this instant passes. Null =
+  // stays locked until an owner disables it manually.
+  lockdownUntil: Date | null;
 };
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -18,6 +21,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   maintenanceMode: false,
   bypassCode: "",
   maintenanceMessage: "",
+  lockdownUntil: null,
 };
 
 // Read-only fetch of the singleton config. Returns an in-memory default if the
@@ -39,6 +43,17 @@ export async function updateSiteConfig(
   });
 }
 
+// Is the site locked down at this instant? True when maintenance is enabled and
+// either has no scheduled end or that end is still in the future. A lapsed
+// schedule reads as unlocked without anything having to flip the flag.
+export function isLockedNow(cfg: SiteConfig): boolean {
+  if (!cfg.maintenanceMode) return false;
+  if (cfg.lockdownUntil && cfg.lockdownUntil.getTime() <= Date.now()) {
+    return false;
+  }
+  return true;
+}
+
 // Does this visitor hold a valid maintenance bypass cookie right now?
 export async function hasBypass(cfg: SiteConfig): Promise<boolean> {
   if (!cfg.bypassCode) return false;
@@ -50,7 +65,7 @@ export async function hasBypass(cfg: SiteConfig): Promise<boolean> {
 // bypass code is sent to the maintenance notice.
 export async function enforceMaintenance(): Promise<void> {
   const cfg = await getSiteConfig();
-  if (!cfg.maintenanceMode) return;
+  if (!isLockedNow(cfg)) return;
   if (await hasBypass(cfg)) return;
   redirect("/maintenance");
 }

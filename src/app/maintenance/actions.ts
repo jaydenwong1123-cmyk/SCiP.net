@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getSiteConfig, MAINT_COOKIE } from "@/lib/site-config";
+import { getSiteConfig, isLockedNow, MAINT_COOKIE } from "@/lib/site-config";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
 export async function submitBypassCodeAction(
@@ -12,8 +12,9 @@ export async function submitBypassCodeAction(
   const code = String(formData.get("code") ?? "").trim();
   const cfg = await getSiteConfig();
 
-  // Already back online — let them through.
-  if (!cfg.maintenanceMode) redirect("/");
+  // Already back online (disabled, or the scheduled window lapsed) — let them
+  // through.
+  if (!isLockedNow(cfg)) redirect("/");
 
   if (findNonAsciiFormField(formData)) {
     return { ok: false, error: NON_ASCII_ERROR };
