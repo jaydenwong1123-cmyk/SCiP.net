@@ -44,17 +44,25 @@ export async function setMaintenanceAction(formData: FormData) {
     .trim()
     .slice(0, 300);
 
-  // Optional scheduled unlock. The datetime-local input has no timezone, so it
-  // arrives as the owner's wall-clock time; we treat it as such. A blank value,
-  // an unparseable one, or one already in the past means "no schedule" — an
-  // indefinite lockdown that stays up until turned off by hand.
-  const lockdownUntilRaw = String(formData.get("lockdownUntil") ?? "").trim();
+  // Optional scheduled unlock, entered as a duration from now (e.g. "2 hours").
+  // A blank/zero amount means "no schedule" — an indefinite lockdown that stays
+  // up until turned off by hand. Computed relative to the moment of saving.
+  const durationAmount = Number(formData.get("durationAmount"));
+  const durationUnit = String(formData.get("durationUnit") ?? "hours");
+  const UNIT_MS: Record<string, number> = {
+    minutes: 60_000,
+    hours: 3_600_000,
+    days: 86_400_000,
+  };
   let lockdownUntil: Date | null = null;
-  if (lockdownUntilRaw) {
-    const parsed = new Date(lockdownUntilRaw);
-    if (!Number.isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
-      lockdownUntil = parsed;
-    }
+  if (
+    Number.isFinite(durationAmount) &&
+    durationAmount > 0 &&
+    UNIT_MS[durationUnit]
+  ) {
+    // Cap at one year so a typo can't lock the site down effectively forever.
+    const ms = Math.min(durationAmount * UNIT_MS[durationUnit], 365 * UNIT_MS.days);
+    lockdownUntil = new Date(Date.now() + ms);
   }
 
   // Never enable the lockdown without a code — that would lock everyone out,

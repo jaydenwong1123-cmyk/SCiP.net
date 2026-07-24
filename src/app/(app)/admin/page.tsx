@@ -13,7 +13,6 @@ import {
 } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberList } from "./member-list";
-import { LockdownScheduleField } from "./lockdown-schedule-field";
 import {
   generateInviteCodeAction,
   revokeInviteCodeAction,
@@ -246,9 +245,37 @@ export default async function AdminPage() {
                 className="term-input py-1 w-full"
               />
             </div>
-            <LockdownScheduleField
-              defaultIso={siteConfig.lockdownUntil?.toISOString() ?? null}
-            />
+            <div>
+              <label className="block text-xs text-[var(--term-fg-dim)] mb-1" htmlFor="durationAmount">
+                AUTO-UNLOCK AFTER (OPTIONAL — BLANK = UNTIL TURNED OFF)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="durationAmount"
+                  name="durationAmount"
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 2"
+                  className="term-input py-1 w-24"
+                />
+                <select name="durationUnit" defaultValue="hours" className="term-input py-1">
+                  <option value="minutes">MINUTES</option>
+                  <option value="hours">HOURS</option>
+                  <option value="days">DAYS</option>
+                </select>
+              </div>
+              <p className="text-[10px] text-[var(--term-fg-dim)] mt-1">
+                Counts from when you save. A public countdown is shown to
+                visitors and the site unlocks itself when it reaches zero. Blank
+                means no timer — the lockdown holds until you turn it off, and
+                re-saving without a duration clears any existing countdown.
+                {siteConfig.lockdownUntil && (
+                  <span className="text-[var(--term-amber)]">
+                    {" "}CURRENTLY UNLOCKING AT {siteConfig.lockdownUntil.toISOString()}.
+                  </span>
+                )}
+              </p>
+            </div>
             <button
               className="term-button text-xs"
               style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
