@@ -1,8 +1,20 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, canAnnotateMembers } from "@/lib/session";
-import { clearanceDisplay } from "@/lib/clearance";
+import {
+  clearanceDisplay,
+  E5_DESIGNATION,
+  R5_DESIGNATION,
+} from "@/lib/clearance";
 import { renderRedactedName } from "@/lib/redact";
+
+// Within a single clearance rank, plain designations sort ahead of the
+// alternate ones so rank 6 reads L-O5, L-E5, L-R5.
+function designationWeight(designation?: string | null): number {
+  if (designation === E5_DESIGNATION) return 1;
+  if (designation === R5_DESIGNATION) return 2;
+  return 0;
+}
 
 export default async function PersonnelPage() {
   const viewer = await requireUser();
@@ -32,6 +44,15 @@ export default async function PersonnelPage() {
     });
     for (const f of flagged) flaggedIds.add(f.subjectId);
   }
+
+  // The DB sort already orders by clearance (desc) then name; refine so that
+  // within a rank the alternate designations fall into L-O5, L-E5, L-R5 order.
+  personnel.sort((a, b) => {
+    if (a.clearance !== b.clearance) return b.clearance - a.clearance;
+    const dw = designationWeight(a.designation) - designationWeight(b.designation);
+    if (dw !== 0) return dw;
+    return (a.displayName ?? "").localeCompare(b.displayName ?? "");
+  });
 
   return (
     <div className="space-y-4">
