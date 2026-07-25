@@ -43,6 +43,7 @@ export function MemberRow({
   canManageAdmin,
   canManageCoOwner,
   canManageHelper,
+  canGrantPermissions,
 }: {
   member: Member;
   canGrantTopClearance: boolean;
@@ -50,6 +51,9 @@ export function MemberRow({
   canManageAdmin: boolean;
   canManageCoOwner: boolean;
   canManageHelper: boolean;
+  // Admin and above only. Staff manage accounts but never the per-member
+  // permission grants; the server enforces this independently.
+  canGrantPermissions: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -164,55 +168,61 @@ export function MemberRow({
             <button className="term-button text-xs">SET DEPT</button>
           </form>
 
-          <form action={toggleCanPostScpAction}>
-            <input type="hidden" name="userId" value={member.id} />
-            <input
-              type="hidden"
-              name="canPostScp"
-              value={(!member.canPostScp).toString()}
-            />
-            <button className="term-button text-xs">
-              {member.canPostScp ? "REVOKE SCP-POST" : "GRANT SCP-POST"}
-            </button>
-          </form>
+          {canGrantPermissions && (
+            <>
+              <form action={toggleCanPostScpAction}>
+                <input type="hidden" name="userId" value={member.id} />
+                <input
+                  type="hidden"
+                  name="canPostScp"
+                  value={(!member.canPostScp).toString()}
+                />
+                <button className="term-button text-xs">
+                  {member.canPostScp ? "REVOKE SCP-POST" : "GRANT SCP-POST"}
+                </button>
+              </form>
 
-          <form action={toggleCanFileIncidentAction}>
-            <input type="hidden" name="userId" value={member.id} />
-            <input
-              type="hidden"
-              name="canFileIncident"
-              value={(!member.canFileIncident).toString()}
-            />
-            <button className="term-button text-xs">
-              {member.canFileIncident ? "REVOKE INCIDENT-FILE" : "GRANT INCIDENT-FILE"}
-            </button>
-          </form>
+              <form action={toggleCanFileIncidentAction}>
+                <input type="hidden" name="userId" value={member.id} />
+                <input
+                  type="hidden"
+                  name="canFileIncident"
+                  value={(!member.canFileIncident).toString()}
+                />
+                <button className="term-button text-xs">
+                  {member.canFileIncident
+                    ? "REVOKE INCIDENT-FILE"
+                    : "GRANT INCIDENT-FILE"}
+                </button>
+              </form>
 
-          <form action={toggleCanLogTestAction}>
-            <input type="hidden" name="userId" value={member.id} />
-            <input
-              type="hidden"
-              name="canLogTest"
-              value={(!member.canLogTest).toString()}
-            />
-            <button className="term-button text-xs">
-              {member.canLogTest ? "REVOKE TEST-LOG" : "GRANT TEST-LOG"}
-            </button>
-          </form>
+              <form action={toggleCanLogTestAction}>
+                <input type="hidden" name="userId" value={member.id} />
+                <input
+                  type="hidden"
+                  name="canLogTest"
+                  value={(!member.canLogTest).toString()}
+                />
+                <button className="term-button text-xs">
+                  {member.canLogTest ? "REVOKE TEST-LOG" : "GRANT TEST-LOG"}
+                </button>
+              </form>
 
-          <form action={toggleCanEditPersonnelAction}>
-            <input type="hidden" name="userId" value={member.id} />
-            <input
-              type="hidden"
-              name="canEditPersonnel"
-              value={(!member.canEditPersonnel).toString()}
-            />
-            <button className="term-button text-xs">
-              {member.canEditPersonnel
-                ? "REVOKE PERSONNEL-EDIT"
-                : "GRANT PERSONNEL-EDIT"}
-            </button>
-          </form>
+              <form action={toggleCanEditPersonnelAction}>
+                <input type="hidden" name="userId" value={member.id} />
+                <input
+                  type="hidden"
+                  name="canEditPersonnel"
+                  value={(!member.canEditPersonnel).toString()}
+                />
+                <button className="term-button text-xs">
+                  {member.canEditPersonnel
+                    ? "REVOKE PERSONNEL-EDIT"
+                    : "GRANT PERSONNEL-EDIT"}
+                </button>
+              </form>
+            </>
+          )}
 
           {canManageHelper && (
             <form action={toggleHelperAction}>

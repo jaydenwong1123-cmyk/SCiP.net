@@ -237,8 +237,11 @@ export async function setMemberDepartmentAction(formData: FormData) {
   revalidatePath("/personnel");
 }
 
+// Every per-member permission grant below is reserved for Admin and above.
+// Staff run the day-to-day panel (clearance, departments, suspensions, the
+// ticket queues) but may not widen what another member is allowed to do.
 export async function toggleCanPostScpAction(formData: FormData) {
-  const actor = await requireStaff();
+  const actor = await requireAdminPowers();
   const userId = String(formData.get("userId") ?? "");
   const canPostScp = formData.get("canPostScp") === "true";
 
@@ -266,7 +269,7 @@ export async function toggleCanPostScpAction(formData: FormData) {
 }
 
 export async function toggleCanFileIncidentAction(formData: FormData) {
-  const actor = await requireStaff();
+  const actor = await requireAdminPowers();
   const userId = String(formData.get("userId") ?? "");
   const canFileIncident = formData.get("canFileIncident") === "true";
 
@@ -294,7 +297,7 @@ export async function toggleCanFileIncidentAction(formData: FormData) {
 }
 
 export async function toggleCanLogTestAction(formData: FormData) {
-  const actor = await requireStaff();
+  const actor = await requireAdminPowers();
   const userId = String(formData.get("userId") ?? "");
   const canLogTest = formData.get("canLogTest") === "true";
 
@@ -321,10 +324,8 @@ export async function toggleCanLogTestAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
-// Rewriting other members' personnel files. Staff may grant it: it is a
-// recordkeeping duty, not an elevation — the grant confers nothing else.
 export async function toggleCanEditPersonnelAction(formData: FormData) {
-  const actor = await requireStaff();
+  const actor = await requireAdminPowers();
   const userId = String(formData.get("userId") ?? "");
   const canEditPersonnel = formData.get("canEditPersonnel") === "true";
 

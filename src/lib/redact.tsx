@@ -8,20 +8,23 @@ import {
 } from "@/lib/clearance";
 
 // Viewers who may read every redaction, including full (level-less) ones:
-// L-OMNI clearance, staff, admins, the owner and the co-owner.
+// L-OMNI clearance, admins, the owner and the co-owner.
+//
+// Staff are deliberately NOT on this list. A full redaction is meant to wall
+// content off from everyone outside the top of the chain of command, and Staff
+// are numerous enough that including them made "[*…*]" mean very little. A
+// staff member still reads any numbered redaction their own clearance covers.
 export function canBypassRedaction(user: {
   clearance: number;
   isOwner: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
-  isStaff: boolean;
 }): boolean {
   return (
     user.clearance >= OWNER_CLEARANCE ||
     user.isOwner ||
     user.isCoOwner ||
-    user.isAdmin ||
-    user.isStaff
+    user.isAdmin
   );
 }
 
@@ -144,23 +147,23 @@ export const SELF_REDACT_OFFSET = 1;
 // the same way — fail closed rather than wave it through.
 const FULL_REDACTION_RANK = MAX_CLEARANCE + 1;
 
-// RAISA recordkeepers (the L-R5 designation) and staff/admin/owner may approve —
-// and so may themselves apply — a redaction at any level. Role booleans are
-// checked inline (rather than via hasStaffPowers) so this module stays free of
-// the server-only session import, exactly as canBypassRedaction does above.
+// RAISA recordkeepers (the L-R5 designation) and admin/owner may approve — and
+// so may themselves apply — a redaction at any level. Staff are not included:
+// they hold no more redaction authority than their clearance gives them, and
+// must go through RAISA like anyone else. Role booleans are checked inline
+// (rather than via hasStaffPowers) so this module stays free of the server-only
+// session import, exactly as canBypassRedaction does above.
 export function canApproveRedactions(user: {
   designation?: string | null;
   isOwner: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
-  isStaff: boolean;
 }): boolean {
   return (
     user.designation === R5_DESIGNATION ||
     user.isOwner ||
     user.isCoOwner ||
-    user.isAdmin ||
-    user.isStaff
+    user.isAdmin
   );
 }
 
@@ -179,7 +182,7 @@ export function redactionRanks(text: string): number[] {
 
 // Verify a member may apply every redaction present in `text`. Returns the
 // highest offending required rank, or null when all are within reach. RAISA /
-// staff approvers are unrestricted.
+// admin approvers are unrestricted.
 export function checkRedactionAuthorization(
   text: string,
   author: {
@@ -188,7 +191,6 @@ export function checkRedactionAuthorization(
     isOwner: boolean;
     isCoOwner: boolean;
     isAdmin: boolean;
-    isStaff: boolean;
   }
 ): { ok: true } | { ok: false; requiredRank: number } {
   if (canApproveRedactions(author)) return { ok: true };

@@ -55,7 +55,18 @@ export const BULK_OP_LABELS: Record<BulkOp, string> = {
 // Operations reserved for Admin and above, mirroring the single-member
 // actions' own `requireAdminPowers` gate. The server re-checks these; the UI
 // consults the same list only so it doesn't offer a button that will bounce.
+//
+// Every permission grant is on this list: Staff may set clearance, departments
+// and suspensions, but may not change what a member is allowed to do.
 export const ADMIN_ONLY_BULK_OPS: readonly BulkOp[] = [
+  "grantScpPost",
+  "revokeScpPost",
+  "grantIncidentFile",
+  "revokeIncidentFile",
+  "grantTestLog",
+  "revokeTestLog",
+  "grantPersonnelEdit",
+  "revokePersonnelEdit",
   "grantHelper",
   "revokeHelper",
   "grantStaff",

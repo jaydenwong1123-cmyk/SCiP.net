@@ -257,6 +257,7 @@ export function MemberList({
                 canManageAdmin={canManageAdmin}
                 canManageCoOwner={canManageCoOwner}
                 canManageHelper={canManageHelper}
+                canGrantPermissions={hasAdminPowers}
               />
             </div>
           </div>
