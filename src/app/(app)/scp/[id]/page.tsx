@@ -52,6 +52,8 @@ export default async function ScpDetailPage({
   // Issuing a temporary grant is Admin and above; Staff still see the active
   // grants and may revoke them.
   const canGrantAccess = hasAdminPowers(user);
+  // Prior versions of a file are Admin and above; the history page re-checks.
+  const canViewHistory = hasAdminPowers(user);
   const canEdit = canEditScpFile(user, file);
   const canAddTest = canLogScpTest(user);
 
@@ -103,9 +105,11 @@ export default async function ScpDetailPage({
               [AMEND]
             </Link>
           )}
-          <Link href={`/scp/${file.id}/history`} className="term-link">
-            [HISTORY{file.revisionCount > 0 ? ` (${file.revisionCount})` : ""}]
-          </Link>
+          {canViewHistory && (
+            <Link href={`/scp/${file.id}/history`} className="term-link">
+              [HISTORY{file.revisionCount > 0 ? ` (${file.revisionCount})` : ""}]
+            </Link>
+          )}
           <Link href="/scp" className="term-link">
             [BACK TO ARCHIVE]
           </Link>

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { listRevisions, REVISION_ENTITIES } from "@/lib/revisions";
 import { RevisionHistory } from "@/components/revision-history";
@@ -12,6 +12,11 @@ export default async function ScpHistoryPage({
 }) {
   const user = await requireUser();
   const { id } = await params;
+
+  // Revision history exposes prior versions of a file — including text that has
+  // since been amended away — so it is Admin and above only. Staff can amend
+  // files but cannot read what an amendment replaced.
+  if (!hasAdminPowers(user)) notFound();
 
   const file = await db.scpFile.findUnique({ where: { id } });
   if (!file || file.clearanceRequired > user.clearance) notFound();
