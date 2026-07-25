@@ -321,6 +321,36 @@ export async function toggleCanLogTestAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+// Rewriting other members' personnel files. Staff may grant it: it is a
+// recordkeeping duty, not an elevation — the grant confers nothing else.
+export async function toggleCanEditPersonnelAction(formData: FormData) {
+  const actor = await requireStaff();
+  const userId = String(formData.get("userId") ?? "");
+  const canEditPersonnel = formData.get("canEditPersonnel") === "true";
+
+  if (!userId) return;
+
+  const name = await targetName(userId);
+
+  await db.user.update({
+    where: { id: userId },
+    data: { canEditPersonnel },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.personnelEditToggled,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: name,
+    summary: canEditPersonnel
+      ? "Granted personnel-file edit permission"
+      : "Revoked personnel-file edit permission",
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function toggleHelperAction(formData: FormData) {
   // Helper sits below Staff, but granting it is reserved for Admin and above —
   // Staff cannot appoint their own juniors.
@@ -706,6 +736,26 @@ export async function bulkMemberAction(
           summary: canLogTest
             ? "Granted experiment-log permission (bulk)"
             : "Revoked experiment-log permission (bulk)",
+        });
+        break;
+      }
+
+      case "grantPersonnelEdit":
+      case "revokePersonnelEdit": {
+        const canEditPersonnel = op === "grantPersonnelEdit";
+        await db.user.update({
+          where: { id: target.id },
+          data: { canEditPersonnel },
+        });
+        await logAudit({
+          action: AUDIT_ACTIONS.personnelEditToggled,
+          actor,
+          targetType: "user",
+          targetId: target.id,
+          targetName: name,
+          summary: canEditPersonnel
+            ? "Granted personnel-file edit permission (bulk)"
+            : "Revoked personnel-file edit permission (bulk)",
         });
         break;
       }

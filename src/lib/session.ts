@@ -19,18 +19,25 @@ export function canAnnotateMembers(user: {
   );
 }
 
-// RAISA recordkeepers (the L-R5 designation) plus staff/admin/owner. RAISA are
-// the custodians of personnel records, so they may rewrite any member's
-// personal file, not only their own. Mirrors the RAISA definition used for the
-// message logs — clearance rank alone never confers this.
+// Holders of the per-member personnel-file grant, RAISA recordkeepers (the
+// L-R5 designation), and staff/admin/owner. RAISA are the custodians of
+// personnel records, so they may rewrite any member's personal file, not only
+// their own; the explicit grant lets the same duty be handed to anyone else.
+// Mirrors the RAISA definition used for the message logs — clearance rank alone
+// never confers this.
 export function canEditAnyPersonalFile(user: {
   designation?: string | null;
+  canEditPersonnel?: boolean;
   isOwner: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
 }): boolean {
-  return user.designation === R5_DESIGNATION || hasStaffPowers(user);
+  return (
+    user.canEditPersonnel === true ||
+    user.designation === R5_DESIGNATION ||
+    hasStaffPowers(user)
+  );
 }
 
 // The member as stored — never downgraded by "view as". Used by the Settings

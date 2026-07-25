@@ -21,6 +21,7 @@ type Member = {
   canPostScp: boolean;
   canFileIncident: boolean;
   canLogTest: boolean;
+  canEditPersonnel: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;

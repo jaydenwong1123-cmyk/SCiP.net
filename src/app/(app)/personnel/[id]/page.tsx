@@ -108,7 +108,7 @@ export default async function PersonnelFilePage({
         {canEditAnyPersonalFile(viewer) && viewer.id !== person.id && (
           <div className="space-y-2 pt-2 border-t border-[var(--term-fg-dim)]/30">
             <p className="text-sm text-[var(--term-amber)]">
-              ⧉ RAISA RECORDKEEPING — EDIT THIS FILE
+              ⧉ RECORDKEEPING — EDIT THIS FILE
             </p>
             <ProfileForm
               initialContent={person.personalFile ?? ""}

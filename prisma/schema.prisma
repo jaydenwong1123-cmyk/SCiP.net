@@ -25,7 +25,11 @@ model User {
   // canPostScp: authoring containment documentation and running tests on a
   // contained anomaly are different jobs, held by different personnel.
   canLogTest   Boolean  @default(false)
-  isOwner      Boolean  @default(false)
+  // Rewriting another member's personnel file. Previously implied by the RAISA
+  // (L-R5) designation alone; now a grant in its own right, so recordkeeping
+  // duty can be handed out without also handing out a clearance designation.
+  canEditPersonnel Boolean @default(false)
+  isOwner     Boolean  @default(false)
   // Co-Owner: owner-equivalent powers, held by at most one member at a time.
   // Only the seeded owner can grant or revoke it.
   isCoOwner    Boolean  @default(false)

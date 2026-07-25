@@ -8,6 +8,7 @@ import {
   toggleCanPostScpAction,
   toggleCanFileIncidentAction,
   toggleCanLogTestAction,
+  toggleCanEditPersonnelAction,
   toggleHelperAction,
   toggleStaffAction,
   toggleAdminAction,
@@ -26,6 +27,7 @@ type Member = {
   canPostScp: boolean;
   canFileIncident: boolean;
   canLogTest: boolean;
+  canEditPersonnel: boolean;
   isCoOwner: boolean;
   isAdmin: boolean;
   isStaff: boolean;
@@ -195,6 +197,20 @@ export function MemberRow({
             />
             <button className="term-button text-xs">
               {member.canLogTest ? "REVOKE TEST-LOG" : "GRANT TEST-LOG"}
+            </button>
+          </form>
+
+          <form action={toggleCanEditPersonnelAction}>
+            <input type="hidden" name="userId" value={member.id} />
+            <input
+              type="hidden"
+              name="canEditPersonnel"
+              value={(!member.canEditPersonnel).toString()}
+            />
+            <button className="term-button text-xs">
+              {member.canEditPersonnel
+                ? "REVOKE PERSONNEL-EDIT"
+                : "GRANT PERSONNEL-EDIT"}
             </button>
           </form>
 
