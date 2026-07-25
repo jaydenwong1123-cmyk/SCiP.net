@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser, hasStaffPowers } from "@/lib/session";
+import { requireUser, hasStaffPowers, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { canEditIncident } from "@/lib/doc-permissions";
@@ -25,6 +25,8 @@ export default async function IncidentDetailPage({
 
   const canManage = hasStaffPowers(user);
   const canEdit = canEditIncident(user, report);
+  // Prior versions are Admin and above; the history page re-checks.
+  const canViewHistory = hasAdminPowers(user);
 
   return (
     <div className="term-panel space-y-4">
@@ -38,9 +40,12 @@ export default async function IncidentDetailPage({
               [AMEND]
             </Link>
           )}
-          <Link href={`/incidents/${report.id}/history`} className="term-link">
-            [HISTORY{report.revisionCount > 0 ? ` (${report.revisionCount})` : ""}]
-          </Link>
+          {canViewHistory && (
+            <Link href={`/incidents/${report.id}/history`} className="term-link">
+              [HISTORY
+              {report.revisionCount > 0 ? ` (${report.revisionCount})` : ""}]
+            </Link>
+          )}
           <Link href="/incidents" className="term-link">
             [BACK TO REPORTS]
           </Link>

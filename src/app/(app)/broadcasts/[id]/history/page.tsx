@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { listRevisions, REVISION_ENTITIES } from "@/lib/revisions";
 import { RevisionHistory } from "@/components/revision-history";
@@ -12,6 +12,10 @@ export default async function BroadcastHistoryPage({
 }) {
   const user = await requireUser();
   const { id } = await params;
+
+  // Prior versions can hold text that was later amended away, so reading them
+  // is Admin and above — matching SCP and incident revision history.
+  if (!hasAdminPowers(user)) notFound();
 
   const broadcast = await db.broadcast.findUnique({ where: { id } });
   if (!broadcast) notFound();

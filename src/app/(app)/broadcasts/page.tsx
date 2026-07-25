@@ -121,7 +121,7 @@ export default async function BroadcastsPage() {
                   [AMEND]
                 </Link>
               )}
-              {b.revisionCount > 0 && (
+              {canManage && b.revisionCount > 0 && (
                 <Link href={`/broadcasts/${b.id}/history`} className="term-link">
                   [HISTORY ({b.revisionCount})]
                 </Link>
