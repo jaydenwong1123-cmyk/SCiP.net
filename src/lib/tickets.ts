@@ -63,7 +63,9 @@ export function canRequestScpAccess(user: { department: string | null }): boolea
 //   bug         → the seeded Owner alone. Deliberately NOT owner-equivalent:
 //                 the Co-Owner does not see these, because "owner powers"
 //                 elsewhere means authority, and this is an inbox.
-//   scp_access  → Staff and above (staff, admin, co-owner, owner)
+//   scp_access  → Admin and above (admin, co-owner, owner). Approving one of
+//                 these issues a temporary access grant, and granting access is
+//                 an Admin power, so Staff do not work this queue either.
 //
 // A ticket's own author can always read their own ticket regardless of type —
 // that is `canViewTicket`, below.
@@ -78,10 +80,14 @@ type Viewer = {
   isHelper: boolean;
 };
 
-// Mirrors hasStaffPowers / hasHelperPowers in @/lib/session. Kept local so
-// this module stays importable from Client Components.
+// Mirrors hasAdminPowers / hasStaffPowers / hasHelperPowers in @/lib/session.
+// Kept local so this module stays importable from Client Components.
+function adminOrAbove(v: Viewer): boolean {
+  return v.isOwner || v.isCoOwner || v.isAdmin;
+}
+
 function staffOrAbove(v: Viewer): boolean {
-  return v.isOwner || v.isCoOwner || v.isAdmin || v.isStaff;
+  return adminOrAbove(v) || v.isStaff;
 }
 
 function helperOrAbove(v: Viewer): boolean {
@@ -97,7 +103,7 @@ export function canHandleTicketType(viewer: Viewer, type: string): boolean {
     case TICKET_TYPES.bug:
       return viewer.isOwner;
     case TICKET_TYPES.scpAccess:
-      return staffOrAbove(viewer);
+      return adminOrAbove(viewer);
     default:
       return false;
   }

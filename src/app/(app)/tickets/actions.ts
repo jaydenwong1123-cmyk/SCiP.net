@@ -32,7 +32,8 @@ async function handlersFor(type: string) {
     return db.user.findMany({
       where: {
         suspended: false,
-        OR: [{ isOwner: true }, { isCoOwner: true }, { isAdmin: true }, { isStaff: true }],
+        // Admin and above, matching canHandleTicketType for this type.
+        OR: [{ isOwner: true }, { isCoOwner: true }, { isAdmin: true }],
       },
       select: { id: true },
     });

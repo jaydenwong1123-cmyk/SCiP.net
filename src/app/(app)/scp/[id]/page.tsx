@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser, hasStaffPowers } from "@/lib/session";
+import { requireUser, hasStaffPowers, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import {
@@ -49,6 +49,9 @@ export default async function ScpDetailPage({
   if (!hasClearance && !activeGrant) notFound();
 
   const canManage = hasStaffPowers(user);
+  // Issuing a temporary grant is Admin and above; Staff still see the active
+  // grants and may revoke them.
+  const canGrantAccess = hasAdminPowers(user);
   const canEdit = canEditScpFile(user, file);
   const canAddTest = canLogScpTest(user);
 
@@ -75,14 +78,16 @@ export default async function ScpDetailPage({
           include: { user: { select: { displayName: true } } },
           orderBy: { expiresAt: "asc" },
         }),
-        db.user.findMany({
-          where: {
-            displayName: { not: null },
-            clearance: { lt: file.clearanceRequired },
-          },
-          orderBy: { displayName: "asc" },
-          select: { id: true, displayName: true, clearance: true },
-        }),
+        canGrantAccess
+          ? db.user.findMany({
+              where: {
+                displayName: { not: null },
+                clearance: { lt: file.clearanceRequired },
+              },
+              orderBy: { displayName: "asc" },
+              select: { id: true, displayName: true, clearance: true },
+            })
+          : [],
       ])
     : [[], []];
 
@@ -197,18 +202,20 @@ export default async function ScpDetailPage({
 
       {canManage && (
         <div className="pt-2 border-t border-[var(--term-border)]/30 space-y-4">
-          <div className="space-y-2">
-            <h2 className="text-sm text-[var(--term-fg-dim)]">
-              GRANT TEMPORARY ACCESS
-            </h2>
-            {members.length > 0 ? (
-              <AccessForm scpFileId={file.id} members={members} />
-            ) : (
-              <p className="text-xs text-[var(--term-fg-dim)]">
-                NO MEMBERS BELOW THIS FILE&apos;S CLEARANCE REQUIREMENT.
-              </p>
-            )}
-          </div>
+          {canGrantAccess && (
+            <div className="space-y-2">
+              <h2 className="text-sm text-[var(--term-fg-dim)]">
+                GRANT TEMPORARY ACCESS
+              </h2>
+              {members.length > 0 ? (
+                <AccessForm scpFileId={file.id} members={members} />
+              ) : (
+                <p className="text-xs text-[var(--term-fg-dim)]">
+                  NO MEMBERS BELOW THIS FILE&apos;S CLEARANCE REQUIREMENT.
+                </p>
+              )}
+            </div>
+          )}
 
           {grants.length > 0 && (
             <div className="space-y-2">

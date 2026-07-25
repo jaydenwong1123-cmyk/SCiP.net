@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireUser, requireStaff } from "@/lib/session";
+import { requireUser, requireStaff, requireAdminPowers } from "@/lib/session";
 import {
   canCreateScpFile,
   canEditScpFile,
@@ -196,11 +196,15 @@ export async function updateScpFileAction(
 const MIN_GRANT_DAYS = 1;
 const MAX_GRANT_DAYS = 30;
 
+// Reading a file above your clearance is a permission, so issuing the grant is
+// Admin and above — the same bar as the per-member permission toggles in the
+// admin panel. Staff may still revoke an existing grant below: taking access
+// away is a containment action, not a grant.
 export async function grantScpAccessAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
-  const actor = await requireStaff();
+  const actor = await requireAdminPowers();
   const scpFileId = String(formData.get("scpFileId") ?? "");
   const userId = String(formData.get("userId") ?? "");
   const days = Number(formData.get("days"));
