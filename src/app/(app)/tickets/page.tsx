@@ -8,10 +8,14 @@ import {
   handleableTicketTypes,
   statusColor,
 } from "@/lib/tickets";
+import { renderRedactedName } from "@/lib/redact";
+
+type Viewer = Parameters<typeof renderRedactedName>[1];
 
 function TicketRow({
   ticket,
   showAuthor,
+  viewer,
 }: {
   ticket: {
     id: string;
@@ -22,6 +26,7 @@ function TicketRow({
     author: { displayName: string | null };
   };
   showAuthor: boolean;
+  viewer: Viewer;
 }) {
   return (
     <Link
@@ -38,7 +43,13 @@ function TicketRow({
         </span>
         <span>
           [{ticket.status.toUpperCase()}]
-          {showAuthor && ` — ${ticket.author.displayName}`} —{" "}
+          {showAuthor && (
+            <>
+              {" — "}
+              {renderRedactedName(ticket.author.displayName ?? "", viewer)}
+            </>
+          )}{" "}
+          —{" "}
           {ticket.createdAt.toISOString().slice(0, 10)}
         </span>
       </span>
@@ -95,7 +106,7 @@ export default async function TicketsPage() {
             <p className="text-sm">NO OPEN TICKETS IN YOUR QUEUE.</p>
           )}
           {openQueue.map((t) => (
-            <TicketRow key={t.id} ticket={t} showAuthor />
+            <TicketRow key={t.id} ticket={t} showAuthor viewer={user} />
           ))}
           {closedQueue.length > 0 && (
             <details className="pt-2">
@@ -104,7 +115,7 @@ export default async function TicketsPage() {
               </summary>
               <div className="pt-2">
                 {closedQueue.map((t) => (
-                  <TicketRow key={t.id} ticket={t} showAuthor />
+                  <TicketRow key={t.id} ticket={t} showAuthor viewer={user} />
                 ))}
               </div>
             </details>
@@ -129,7 +140,7 @@ export default async function TicketsPage() {
           </div>
         )}
         {myTickets.map((t) => (
-          <TicketRow key={t.id} ticket={t} showAuthor={false} />
+          <TicketRow key={t.id} ticket={t} showAuthor={false} viewer={user} />
         ))}
       </div>
     </div>

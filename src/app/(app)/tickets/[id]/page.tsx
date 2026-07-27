@@ -66,7 +66,10 @@ export default async function TicketDetailPage({
             {ticket.status.toUpperCase()}
           </span>
           <span>— {TICKET_TYPE_LABELS[ticket.type]}</span>
-          <span>— OPENED BY: {ticket.author.displayName}</span>
+          <span>
+            — OPENED BY:{" "}
+            {renderRedactedName(ticket.author.displayName ?? "", user)}
+          </span>
           {ticket.author.department && <span>({ticket.author.department})</span>}
           <span>
             — {ticket.createdAt.toISOString().slice(0, 16).replace("T", " ")}
@@ -109,7 +112,8 @@ export default async function TicketDetailPage({
             className="text-sm border-b border-[var(--term-border)]/30 py-2 space-y-1"
           >
             <div className="text-xs text-[var(--term-fg-dim)]">
-              {r.authorName || "SYSTEM"} —{" "}
+              {r.authorName ? renderRedactedName(r.authorName, user) : "SYSTEM"}{" "}
+              —{" "}
               {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
             </div>
             <div className="break-words whitespace-pre-wrap">{r.body}</div>
@@ -150,7 +154,8 @@ export default async function TicketDetailPage({
           <h2 className="text-sm text-[var(--term-fg-dim)]">CLOSE TICKET</h2>
           {requestedFile && (
             <p className="text-xs text-[var(--term-amber)]">
-              APPROVING ISSUES {ticket.author.displayName} A{" "}
+              APPROVING ISSUES{" "}
+              {renderRedactedName(ticket.author.displayName ?? "", user)} A{" "}
               {ticket.requestedDays}-DAY ACCESS GRANT FOR THIS FILE
               AUTOMATICALLY.
             </p>
