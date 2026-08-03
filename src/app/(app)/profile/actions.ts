@@ -13,6 +13,7 @@ import {
   isValidDepartment,
 } from "@/lib/departments";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import { authoringClearance } from "@/lib/clearance";
 import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
@@ -70,7 +71,10 @@ export async function updatePersonalFileAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 

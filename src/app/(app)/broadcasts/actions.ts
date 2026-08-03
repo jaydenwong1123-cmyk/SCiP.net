@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, requireAdminPowers } from "@/lib/session";
-import { canPostBroadcast } from "@/lib/clearance";
+import { canPostBroadcast, authoringClearance } from "@/lib/clearance";
 import { canEditBroadcast } from "@/lib/doc-permissions";
 import {
   REVISION_ENTITIES,
@@ -24,7 +24,7 @@ export async function createBroadcastAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  if (!canPostBroadcast(user.clearance)) {
+  if (!canPostBroadcast(authoringClearance(user))) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE TO BROADCAST." };
   }
   if (findNonAsciiFormField(formData)) {
@@ -40,7 +40,10 @@ export async function createBroadcastAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 
@@ -124,7 +127,10 @@ export async function updateBroadcastAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 

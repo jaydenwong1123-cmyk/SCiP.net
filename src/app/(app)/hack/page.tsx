@@ -1,0 +1,158 @@
+import { requireUser, hasStaffPowers } from "@/lib/session";
+import { clearanceLabel } from "@/lib/clearance";
+import {
+  MAX_STAGE,
+  RUN_STATUS,
+  STAGES,
+  formatDuration,
+} from "@/lib/hack/config";
+import {
+  getOrIssueChallenge,
+  publicChallenge,
+  pruneHackChallenges,
+  resolveStaleRuns,
+} from "@/lib/hack/engine";
+import { getActiveHackGrant, hackCooldownState } from "@/lib/hack/grant";
+import { RunConsole } from "./run-console";
+import { BreachForm } from "./breach-form";
+
+export default async function HackPage() {
+  const user = await requireUser();
+  void pruneHackChallenges();
+
+  // Resolve anything left dangling by a closed tab before reading state, so
+  // the page never shows a run that has in fact already timed out.
+  const run = await resolveStaleRuns(user.id);
+  const tierLabels = STAGES.map((s) => clearanceLabel(s.tier));
+
+  if (run && run.status === RUN_STATUS.active) {
+    const challenge = run.atCheckpoint
+      ? null
+      : publicChallenge(await getOrIssueChallenge(run));
+
+    return (
+      <div className="space-y-4">
+        <div className="term-panel">
+          <h1 className="text-lg tracking-widest text-[var(--term-red)]">
+            :: INTRUSION IN PROGRESS ::
+          </h1>
+        </div>
+        <RunConsole
+          initial={challenge}
+          atCheckpoint={run.atCheckpoint}
+          stage={run.stage}
+          clearedStages={run.clearedStages}
+          tierLabels={tierLabels}
+          maxStage={MAX_STAGE}
+        />
+      </div>
+    );
+  }
+
+  const staff = hasStaffPowers(user);
+  const [grant, cooldown] = await Promise.all([
+    getActiveHackGrant(user.id),
+    hackCooldownState(user.id, staff),
+  ]);
+  // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
+  const now = Date.now();
+
+  return (
+    <div className="space-y-4">
+      <div className="term-panel alert-panel space-y-3">
+        <div className="alert-stripe" />
+        <h1 className="text-lg tracking-widest text-[var(--term-red)]">
+          :: UNAUTHORIZED ACCESS TERMINAL ::
+        </h1>
+        <div className="space-y-2 text-sm">
+          <p>
+            THIS INTERFACE IS NOT SANCTIONED. ATTEMPTING TO ELEVATE YOUR OWN
+            CLEARANCE BY CIRCUMVENTING THE ACCESS CONTROL SYSTEM IS A CLASS-3
+            INFRACTION UNDER SITE DIRECTIVE 11-C.
+          </p>
+          <p className="text-[var(--term-amber)]">
+            EVERY ATTEMPT IS LOGGED AND TRACED BY THE RECORDKEEPING &amp;
+            INFORMATION SECURITY ADMINISTRATION. YOUR IDENTITY IS RECORDED AT
+            THE MOMENT OF BREACH AND WILL BE RECOVERED.
+          </p>
+        </div>
+
+        <div className="space-y-1 text-xs text-[var(--term-fg-dim)]">
+          <p>
+            {"> "}FIVE LAYERS. EACH BREACHED LAYER BANKS A HIGHER TEMPORARY
+            CLEARANCE.
+          </p>
+          <p>
+            {"> "}AFTER EACH LAYER YOU MAY EXTRACT WITH WHAT YOU HOLD, OR PUSH
+            DEEPER.
+          </p>
+          <p className="text-[var(--term-red)]">
+            {"> "}FAILURE FORFEITS EVERY BANKED TIER AND DOUBLES THE COOLDOWN.
+          </p>
+          <p>
+            {"> "}GRANTED CLEARANCE IS READ-ONLY. IT CONFERS NO AUTHORITY TO
+            AUTHOR, EDIT, OR ANNOTATE.
+          </p>
+        </div>
+
+        <div className="hack-table-scroll">
+          <table className="text-xs w-full">
+            <thead>
+              <tr className="text-[var(--term-fg-dim)] text-left">
+                <th className="pr-4 pb-1">LAYER</th>
+                <th className="pr-4 pb-1">PAYS</th>
+                <th className="pr-4 pb-1">ROUNDS</th>
+                <th className="pb-1">HOLD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {STAGES.map((s) => (
+                <tr key={s.stage} className={s.stage >= 3 ? "text-[var(--term-amber)]" : ""}>
+                  <td className="pr-4">{s.stage}</td>
+                  <td className="pr-4">{clearanceLabel(s.tier)}</td>
+                  <td className="pr-4">{s.rounds}</td>
+                  <td>{formatDuration(s.grantMs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {grant && (
+        <div className="term-panel space-y-1 text-sm">
+          <h2 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
+            ACTIVE ILLICIT ACCESS
+          </h2>
+          <p>
+            {clearanceLabel(grant.tier)} READ ACCESS — EXPIRES IN{" "}
+            {formatDuration(grant.expiresAt.getTime() - now)}
+          </p>
+        </div>
+      )}
+
+      <div className="term-panel space-y-3">
+        {cooldown.bypassed && (
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            STAFF OVERRIDE — COOLDOWN NOT ENFORCED ON THIS ACCOUNT.
+          </p>
+        )}
+        {cooldown.blocked ? (
+          <div className="space-y-1">
+            <p className="text-sm text-[var(--term-red)]">
+              COUNTERMEASURE COOLDOWN ACTIVE.
+            </p>
+            <p className="text-xs text-[var(--term-fg-dim)]">
+              {cooldown.penalty
+                ? "PREVIOUS INTRUSION WAS REPELLED — EXTENDED LOCKOUT IN EFFECT. "
+                : ""}
+              RETRY IN {formatDuration(cooldown.retryAfterMs)}.
+            </p>
+          </div>
+        ) : (
+          <BreachForm />
+        )}
+      </div>
+    </div>
+  );
+}

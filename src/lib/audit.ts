@@ -44,6 +44,14 @@ export const AUDIT_ACTIONS = {
   messageLogViewed: "message_log.view",
   scpTestLogged: "scp.test.log",
   scpTestDeleted: "scp.test.delete",
+  // Terminal intrusion. The two intruder-side verbs are logged with a NULL
+  // actor on purpose — see the note in app/(app)/hack/actions.ts. The
+  // RAISA-side verbs do carry their actor: that is oversight of the overseer.
+  hackRunStarted: "hack.run.start",
+  hackRunFailed: "hack.run.fail",
+  hackGrantIssued: "hack.grant.issue",
+  hackGrantRevoked: "hack.grant.revoke",
+  hackTraceRevealed: "hack.trace.reveal",
   bulkMemberAction: "user.bulk",
 } as const;
 
@@ -84,6 +92,11 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.messageLogViewed]: "MESSAGE LOG READ",
   [AUDIT_ACTIONS.scpTestLogged]: "TEST LOG FILED",
   [AUDIT_ACTIONS.scpTestDeleted]: "TEST LOG RETRACTED",
+  [AUDIT_ACTIONS.hackRunStarted]: "INTRUSION DETECTED",
+  [AUDIT_ACTIONS.hackRunFailed]: "INTRUSION REPELLED",
+  [AUDIT_ACTIONS.hackGrantIssued]: "ILLICIT ACCESS BANKED",
+  [AUDIT_ACTIONS.hackGrantRevoked]: "ILLICIT ACCESS REVOKED",
+  [AUDIT_ACTIONS.hackTraceRevealed]: "INTRUSION TRACED",
   [AUDIT_ACTIONS.bulkMemberAction]: "BULK MEMBER ACTION",
 };
 

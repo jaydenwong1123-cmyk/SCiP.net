@@ -8,6 +8,7 @@ import {
   MAX_CLEARANCE,
   MIN_CLEARANCE,
   MAX_REQUESTABLE_CLEARANCE,
+  authoringClearance,
 } from "@/lib/clearance";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 
@@ -29,7 +30,10 @@ export async function createClearanceRequestAction(
   ) {
     return { ok: false, error: "INVALID CLEARANCE LEVEL." };
   }
-  if (requestedLevel <= user.clearance) {
+  // Compared against the stored rank, not the effective one: a member holding
+  // a temporary intrusion grant must still be able to request the level they
+  // actually lack.
+  if (requestedLevel <= authoringClearance(user)) {
     return { ok: false, error: "REQUESTED LEVEL MUST BE ABOVE YOUR CURRENT CLEARANCE." };
   }
   if (requestedLevel > MAX_REQUESTABLE_CLEARANCE) {

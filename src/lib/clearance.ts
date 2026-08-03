@@ -22,6 +22,30 @@ export function canAccessSecureChannel(rank: number): boolean {
   return rank >= SECURE_CHANNEL_CLEARANCE;
 }
 
+// The highest rank a terminal intrusion may ever bank. Deliberately below
+// OWNER_CLEARANCE: rank 7 is what canBypassRedaction() keys off, and an
+// illicit grant must never buy its way past a full redaction.
+export const HACK_MAX_TIER = 6;
+
+// The clearance a member may ACT at, as opposed to the one they may read at.
+//
+// Two features push `clearance` away from the stored rank, in opposite
+// directions: "view as" lowers it (see lib/view-as.ts), and an intrusion grant
+// raises it (see lib/hack/grant.ts). Reads honor whatever `clearance` says —
+// that is the point of both features. Writes must not: an intrusion grant is
+// read-only by design, and a member running a simulation should author as the
+// persona they are testing, not as themselves.
+//
+// Taking the minimum satisfies both without either feature having to know the
+// other exists. Every value returned by getCurrentUser() carries the
+// `realClearance` this needs.
+export function authoringClearance(user: {
+  clearance: number;
+  realClearance: number;
+}): number {
+  return Math.min(user.clearance, user.realClearance);
+}
+
 export function clearanceLabel(rank: number): string {
   return CLEARANCE_LEVELS.find((l) => l.rank === rank)?.label ?? `L-${rank}`;
 }

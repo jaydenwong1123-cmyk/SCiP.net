@@ -12,6 +12,7 @@ import {
   storeAttachment,
   pruneExpiredAttachments,
 } from "@/lib/attachments";
+import { authoringClearance } from "@/lib/clearance";
 import { isInfractionSeverity } from "@/lib/infractions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
@@ -53,7 +54,7 @@ export async function addPersonnelAttachmentAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  if (user.clearance < PERSONNEL_ATTACH_CLEARANCE) {
+  if (authoringClearance(user) < PERSONNEL_ATTACH_CLEARANCE) {
     return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED." };
   }
 
@@ -85,7 +86,7 @@ export async function addPersonnelAttachmentAction(
 
 export async function deletePersonnelAttachmentAction(formData: FormData) {
   const user = await requireUser();
-  if (user.clearance < PERSONNEL_ATTACH_CLEARANCE) return;
+  if (authoringClearance(user) < PERSONNEL_ATTACH_CLEARANCE) return;
 
   const attachmentId = String(formData.get("attachmentId") ?? "");
   if (!attachmentId) return;

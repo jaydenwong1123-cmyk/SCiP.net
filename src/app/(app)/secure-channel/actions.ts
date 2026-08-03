@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { canAccessSecureChannel } from "@/lib/clearance";
+import { canAccessSecureChannel, authoringClearance } from "@/lib/clearance";
 import {
   ATTACHMENT_ENTITIES,
   validateUpload,
@@ -19,7 +19,9 @@ export async function postSecureMessageAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  if (!canAccessSecureChannel(user.clearance)) {
+  // Posting only. Reading the channel still honors the effective clearance —
+  // an intrusion that reaches L-5 may listen in, but not speak.
+  if (!canAccessSecureChannel(authoringClearance(user))) {
     return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED." };
   }
   if (findNonAsciiFormField(formData)) {

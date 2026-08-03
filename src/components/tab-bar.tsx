@@ -16,6 +16,8 @@ const SECTIONS: { base: string; label: string }[] = [
   { base: "/clearance-request", label: "CLEARANCE" },
   { base: "/tickets", label: "IT SUPPORT" },
   { base: "/secure-channel", label: "SECURE CHANNEL" },
+  { base: "/hack", label: "TERMINAL" },
+  { base: "/counter-intel", label: "COUNTER-INTEL" },
   { base: "/admin", label: "ADMIN" },
   { base: "/profile", label: "PROFILE" },
   { base: "/settings", label: "SETTINGS" },

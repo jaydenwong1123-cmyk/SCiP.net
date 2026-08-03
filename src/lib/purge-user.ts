@@ -83,6 +83,30 @@ export async function purgeUser(userId: string): Promise<void> {
     where: { uploaderId: userId },
     data: { uploaderId: null },
   });
+  // Their intrusion history goes with them, challenges and grant included.
+  // Nothing here is denormalized for survival: an intrusion record exists to
+  // name a member, so once the account is gone there is no case left to answer.
+  const ownRuns = await db.hackRun.findMany({
+    where: { userId },
+    select: { id: true },
+  });
+  const ownRunIds = ownRuns.map((r) => r.id);
+  if (ownRunIds.length > 0) {
+    await db.hackChallenge.deleteMany({ where: { runId: { in: ownRunIds } } });
+    await db.hackGrant.deleteMany({ where: { runId: { in: ownRunIds } } });
+  }
+  await db.hackGrant.deleteMany({ where: { userId } });
+  await db.hackRun.deleteMany({ where: { userId } });
+  // Traces and revocations they performed against OTHER members' runs stay —
+  // that is RAISA's work product, and it outlives the officer who did it.
+  await db.hackRun.updateMany({
+    where: { traceById: userId },
+    data: { traceById: null },
+  });
+  await db.hackGrant.updateMany({
+    where: { revokedById: userId },
+    data: { revokedById: null },
+  });
   // Audit rows and revisions deliberately survive: both denormalize the
   // actor's name so the history stays readable, and detaching the id keeps
   // the record without dangling at a deleted user.

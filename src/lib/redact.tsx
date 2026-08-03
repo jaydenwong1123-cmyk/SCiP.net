@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import {
   parseClearanceToken,
   clearanceLabel,
+  authoringClearance,
   OWNER_CLEARANCE,
   MAX_CLEARANCE,
   R5_DESIGNATION,
@@ -187,6 +188,13 @@ export function checkRedactionAuthorization(
   text: string,
   author: {
     clearance: number;
+    // Present on every getCurrentUser() result. Applying a redaction is
+    // authorship, so the ceiling is resolved against the authoring rank: a
+    // terminal intrusion grant raises `clearance` for reading only and must
+    // not buy the authority to redact at the rank it bought. Optional, and
+    // falling back to `clearance`, because a couple of callers legitimately
+    // pass a raw User row that has no notion of an effective clearance.
+    realClearance?: number;
     designation?: string | null;
     isOwner: boolean;
     isCoOwner: boolean;
@@ -194,7 +202,11 @@ export function checkRedactionAuthorization(
   }
 ): { ok: true } | { ok: false; requiredRank: number } {
   if (canApproveRedactions(author)) return { ok: true };
-  const cap = author.clearance + SELF_REDACT_OFFSET;
+  const cap =
+    authoringClearance({
+      clearance: author.clearance,
+      realClearance: author.realClearance ?? author.clearance,
+    }) + SELF_REDACT_OFFSET;
   let offending: number | null = null;
   for (const rank of redactionRanks(text)) {
     if (rank > cap && (offending === null || rank > offending)) offending = rank;

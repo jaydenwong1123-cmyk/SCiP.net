@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canEditIncident } from "@/lib/doc-permissions";
+import { authoringClearance } from "@/lib/clearance";
 import { EditIncidentForm } from "./edit-incident-form";
 
 export default async function EditIncidentPage({
@@ -14,7 +15,7 @@ export default async function EditIncidentPage({
   const { id } = await params;
 
   const report = await db.incidentReport.findUnique({ where: { id } });
-  if (!report || report.clearanceRequired > user.clearance) notFound();
+  if (!report || report.clearanceRequired > authoringClearance(user)) notFound();
   if (!canEditIncident(user, report)) redirect(`/incidents/${id}`);
 
   return (
@@ -40,7 +41,7 @@ export default async function EditIncidentPage({
           severity: report.severity,
           clearanceRequired: report.clearanceRequired,
         }}
-        maxClearance={user.clearance}
+        maxClearance={authoringClearance(user)}
       />
     </div>
   );

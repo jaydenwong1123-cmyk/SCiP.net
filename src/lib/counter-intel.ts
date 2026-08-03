@@ -1,0 +1,129 @@
+import type { HackRun } from "@prisma/client";
+import { REVEAL_MAX } from "@/lib/hack/config";
+import { clearanceLabel } from "@/lib/clearance";
+
+// RAISA's counter-intrusion desk.
+//
+// Access is the DEPARTMENT STRING and nothing else — not the L-R5 designation,
+// not clearance rank, not staff powers. This is deliberate and differs from
+// canAccessMessageLogs(), which admits staff: an intrusion case file names a
+// member who has done something they will be disciplined for, and the people
+// who hold the discipline power are exactly the people who should not also be
+// the ones deciding whose name gets uncovered.
+//
+// The department sits in RESTRICTED_DEPARTMENTS (lib/departments.ts), so only
+// staff may assign it — a member cannot walk into this section by editing
+// their own profile.
+export const RAISA_DEPARTMENT =
+  "Recordkeeping & Information Security Administration";
+
+export function canAccessCounterIntel(user: {
+  department?: string | null;
+}): boolean {
+  return user.department === RAISA_DEPARTMENT;
+}
+
+export { REVEAL_MAX };
+
+// What each completed trace uncovers, in order.
+export const REVEAL_LABELS = [
+  "SIGNAL METADATA — TIMESTAMP, DEPTH REACHED, TIER GRANTED",
+  "TERMINAL SIGNATURE — ORIGIN ADDRESS AND CLIENT",
+  "ORGANISATIONAL VECTOR — DEPARTMENT AND CLEARANCE OF ORIGIN",
+  "PERSONNEL IDENTITY — FULL DOSSIER LINK",
+] as const;
+
+// Case designation shown in place of the intruder's name.
+//
+// Derived from the RUN id, never the user id: two runs by the same member must
+// not share a code, or the anonymity is defeated by collation alone.
+export function caseCode(runId: string): string {
+  return `INTRUSION-${runId.slice(-6).toUpperCase()}`;
+}
+
+export type AnonymisedRun = {
+  id: string;
+  code: string;
+  revealLevel: number;
+  status: string;
+  traceLockedUntilMs: number | null;
+  // Reveal 1.
+  startedAtLabel: string | null;
+  depthReached: number | null;
+  tierLabel: string | null;
+  // Reveal 2.
+  ip: string | null;
+  terminal: string | null;
+  // Reveal 3.
+  department: string | null;
+  clearanceLabelAtBreach: string | null;
+  // Reveal 4.
+  userId: string | null;
+  displayName: string | null;
+  // Grant state, shown from reveal 1 so RAISA knows whether it is still live.
+  grant: { id: string; tier: number; expiresAtMs: number; revoked: boolean } | null;
+};
+
+type RunWithExtras = HackRun & {
+  user?: { id: string; displayName: string | null; email: string } | null;
+  grant?: {
+    id: string;
+    tier: number;
+    expiresAt: Date;
+    revokedAt: Date | null;
+  } | null;
+};
+
+// Field-by-field projection, gated on revealLevel.
+//
+// THIS IS A SECURITY BOUNDARY, not a display helper. Gating must happen here
+// and not as conditional JSX over a hydrated row: React would serialize the
+// whole row into the RSC payload and the un-revealed values would ship to the
+// browser regardless of what rendered. Same rule renderRedacted() follows in
+// lib/redact.tsx — never emit the hidden content.
+//
+// Consequently the page MUST pass only this function's output into JSX, and
+// must not hand a raw run (or an `include: { user: true }` result) any further.
+export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
+  const level = Math.max(0, Math.min(run.revealLevel, REVEAL_MAX));
+
+  const grant = run.grant
+    ? {
+        id: run.grant.id,
+        tier: run.grant.tier,
+        expiresAtMs: run.grant.expiresAt.getTime(),
+        revoked: run.grant.revokedAt !== null,
+      }
+    : null;
+
+  return {
+    id: run.id,
+    code: caseCode(run.id),
+    revealLevel: level,
+    status: run.status,
+    traceLockedUntilMs: run.traceLockedUntil
+      ? run.traceLockedUntil.getTime()
+      : null,
+
+    startedAtLabel:
+      level >= 1
+        ? run.startedAt.toISOString().slice(0, 16).replace("T", " ")
+        : null,
+    depthReached: level >= 1 ? run.clearedStages : null,
+    tierLabel: level >= 1 && grant ? clearanceLabel(grant.tier) : null,
+
+    ip: level >= 2 ? run.ip || "UNRECORDED" : null,
+    terminal: level >= 2 ? run.terminal || "UNRECORDED" : null,
+
+    department: level >= 3 ? run.actorDepartment || "UNASSIGNED" : null,
+    clearanceLabelAtBreach: level >= 3 ? clearanceLabel(run.actorClearance) : null,
+
+    userId: level >= REVEAL_MAX ? run.userId : null,
+    displayName:
+      level >= REVEAL_MAX
+        ? (run.user?.displayName ?? run.user?.email ?? "UNKNOWN")
+        : null,
+
+    grant: level >= 1 ? grant : null,
+  };
+}

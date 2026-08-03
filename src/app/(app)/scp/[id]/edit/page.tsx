@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canEditScpFile } from "@/lib/doc-permissions";
+import { authoringClearance } from "@/lib/clearance";
 import { EditScpForm } from "./edit-scp-form";
 
 export default async function EditScpPage({
@@ -16,7 +17,7 @@ export default async function EditScpPage({
   const file = await db.scpFile.findUnique({ where: { id } });
   // A file above the viewer's clearance is treated as nonexistent, matching
   // the detail page — the edit route must not leak that it exists.
-  if (!file || file.clearanceRequired > user.clearance) notFound();
+  if (!file || file.clearanceRequired > authoringClearance(user)) notFound();
   // Readable but not editable: send them back to the document rather than to
   // a 403, matching how the rest of the app degrades permission failures.
   if (!canEditScpFile(user, file)) redirect(`/scp/${id}`);
@@ -43,7 +44,7 @@ export default async function EditScpPage({
           classification: file.classification,
           clearanceRequired: file.clearanceRequired,
         }}
-        maxClearance={user.clearance}
+        maxClearance={authoringClearance(user)}
       />
     </div>
   );

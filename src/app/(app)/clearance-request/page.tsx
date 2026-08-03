@@ -1,6 +1,10 @@
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { clearanceLabel, clearanceDisplay } from "@/lib/clearance";
+import {
+  clearanceLabel,
+  clearanceDisplay,
+  authoringClearance,
+} from "@/lib/clearance";
 import { ClearanceRequestForm } from "./request-form";
 
 export default async function ClearanceRequestPage() {
@@ -17,14 +21,18 @@ export default async function ClearanceRequestPage() {
       <div className="term-panel space-y-3">
         <h1 className="text-lg tracking-widest">:: CLEARANCE ADJUSTMENT REQUEST ::</h1>
         <p className="text-sm text-[var(--term-fg-dim)]">
-          CURRENT CLEARANCE: {clearanceDisplay(user.clearance, user.designation)}
+          {/* The member's real standing, not an effective clearance propped up
+              by a temporary intrusion grant — this page is about what they are
+              actually entitled to. */}
+          CURRENT CLEARANCE:{" "}
+          {clearanceDisplay(authoringClearance(user), user.designation)}
         </p>
         {hasPending ? (
           <p className="text-sm text-[var(--term-amber)]">
             YOU HAVE A PENDING REQUEST AWAITING REVIEW.
           </p>
         ) : (
-          <ClearanceRequestForm currentClearance={user.clearance} />
+          <ClearanceRequestForm currentClearance={authoringClearance(user)} />
         )}
       </div>
 

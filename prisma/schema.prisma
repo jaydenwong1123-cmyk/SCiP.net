@@ -73,6 +73,10 @@ model User {
   ticketsOpened    Ticket[]       @relation("TicketAuthor")
   ticketsClosed    Ticket[]       @relation("TicketCloser")
   ticketReplies    TicketReply[]  @relation("TicketReplyAuthor")
+  hackRuns          HackRun[]   @relation("HackRunUser")
+  hackRunsTraced    HackRun[]   @relation("HackRunTracer")
+  hackGrants        HackGrant[] @relation("HackGrantUser")
+  hackGrantsRevoked HackGrant[] @relation("HackGrantRevoker")
 }
 
 // An IT support ticket. One table backs all three kinds because they share
@@ -308,6 +312,127 @@ model ScpAccessGrant {
   @@index([scpFileId, userId])
   @@index([userId])
   @@index([expiresAt])
+}
+
+// One intrusion attempt: a member's run at the five-stage terminal breach.
+//
+// The row doubles as the forensic record RAISA works from, which is why the
+// intruder's clearance and department are SNAPSHOT here rather than joined at
+// read time — a counter-intel case file has to stay truthful after the member
+// is promoted or transferred.
+model HackRun {
+  id            String   @id @default(cuid())
+  // "active" | "extracted" | "failed" | "abandoned"
+  status        String   @default("active")
+  // Highest stage fully cleared, 0-5. The banked tier derives from this.
+  clearedStages Int      @default(0)
+  stage         Int      @default(1)
+  round         Int      @default(1)
+  // Monotonic challenge counter. Every challenge records the cursor value it
+  // was issued at, and a submission is accepted only while the two still
+  // match. It never decrements, so a back-button, a refresh or a second tab
+  // replaying an old nonce can never re-enter a stage already resolved — and
+  // because the game for a round is drawn when that round is issued, it also
+  // means the draw cannot be re-rolled.
+  cursor        Int      @default(0)
+  // True while the ladder waits on the EXTRACT / PUSH DEEPER decision.
+  atCheckpoint  Boolean  @default(false)
+  // Stage 5 carries a global cap on top of the per-round deadlines.
+  stageDeadlineAt DateTime?
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  failReason    String   @default("")
+
+  // Captured at breach time, released to RAISA one field per completed trace.
+  ip              String @default("")
+  terminal        String @default("")
+  actorClearance  Int    @default(1)
+  actorDepartment String @default("")
+
+  // RAISA progressive reveal: 0 = anonymous .. 4 = fully identified.
+  revealLevel      Int      @default(0)
+  traceCursor      Int      @default(0)
+  // Backs off a failed trace so the reveal ladder cannot be brute-forced.
+  traceLockedUntil DateTime?
+  traceById        String?
+  traceBy          User?    @relation("HackRunTracer", fields: [traceById], references: [id])
+  identifiedAt     DateTime?
+
+  userId String
+  user   User   @relation("HackRunUser", fields: [userId], references: [id])
+
+  challenges HackChallenge[]
+  grant      HackGrant?
+
+  @@index([userId, startedAt])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// The read-only clearance a completed intrusion bought.
+//
+// Deliberately a separate model from HackRun (the record of the attempt) for
+// the same reason ScpAccessGrant is separate from ScpFile: expiry and
+// revocation are evaluated on every single request, so they get their own
+// narrow indexed table. Rows are never deleted — an expired grant is simply
+// ignored, and the row stays for the trail.
+//
+// This raises READ access only. Nothing derives authoring rights, role flags
+// or redaction bypass from it; see authoringClearance() in lib/clearance.ts.
+model HackGrant {
+  id        String    @id @default(cuid())
+  // 2-6. Never 7 — OWNER_CLEARANCE is what canBypassRedaction() keys off, and
+  // no illicit grant may reach it.
+  tier      Int
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  revokedById String?
+  revokedBy   User?   @relation("HackGrantRevoker", fields: [revokedById], references: [id])
+
+  userId String
+  user   User    @relation("HackGrantUser", fields: [userId], references: [id])
+  runId  String  @unique
+  run    HackRun @relation(fields: [runId], references: [id])
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+// One puzzle instance.
+//
+// `solution` is the security boundary of the whole feature: written at issue
+// time, never selected into anything that reaches a browser. Every read that
+// feeds the client goes through publicChallenge() in lib/hack/engine.ts.
+model HackChallenge {
+  id     String  @id @default(cuid())
+  runId  String
+  run    HackRun @relation(fields: [runId], references: [id])
+  // "intrusion" (the member's ladder) | "trace" (RAISA's identification run).
+  // One table because both sides run the identical engine.
+  kind   String  @default("intrusion")
+  game   String
+  stage  Int
+  round  Int
+  cursor Int
+  // Opaque handle the client echoes back. The client never learns the run id.
+  nonce  String  @unique
+  // JSON the client renders. Contains no solution material.
+  payload  String
+  // JSON answer key. NEVER leaves the server.
+  solution String
+  // Multi-guess games (ICE PASSWORD CRACK) burn attempts instead of failing
+  // outright. Held here so a client that hides its own "out of attempts" UI
+  // still gets refused.
+  attemptsLeft Int      @default(1)
+  issuedAt     DateTime @default(now())
+  deadlineAt   DateTime
+  answeredAt   DateTime?
+  correct      Boolean?
+
+  // Makes double-issue impossible at the DB level even under a two-tab race.
+  @@unique([runId, kind, cursor])
+  @@index([deadlineAt])
 }
 
 model Broadcast {

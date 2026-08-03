@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/session";
 import { getMentionCandidates, resolveMentionedUsers } from "@/lib/mentions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import { authoringClearance } from "@/lib/clearance";
 import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
@@ -34,7 +35,10 @@ export async function sendMessageAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 

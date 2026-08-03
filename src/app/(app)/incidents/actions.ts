@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, requireStaff } from "@/lib/session";
-import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
+import {
+  MAX_CLEARANCE,
+  MIN_CLEARANCE,
+  authoringClearance,
+} from "@/lib/clearance";
 import { DEFAULT_SEVERITY, isValidSeverity } from "@/lib/incident";
 import { canCreateIncident, canEditIncident } from "@/lib/doc-permissions";
 import {
@@ -48,7 +52,7 @@ export async function createIncidentReportAction(
   ) {
     return { ok: false, error: "INVALID CLEARANCE LEVEL." };
   }
-  if (clearanceRequired > user.clearance) {
+  if (clearanceRequired > authoringClearance(user)) {
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
@@ -61,7 +65,10 @@ export async function createIncidentReportAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 
@@ -93,7 +100,9 @@ export async function updateIncidentReportAction(
   if (!canEditIncident(user, existing)) {
     return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO EDIT THIS REPORT." };
   }
-  if (existing.clearanceRequired > user.clearance) {
+  // Resolved against the authoring rank: an intrusion grant opens a report for
+  // reading without opening it for rewriting.
+  if (existing.clearanceRequired > authoringClearance(user)) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE FOR THIS REPORT." };
   }
   if (findNonAsciiFormField(formData)) {
@@ -118,7 +127,7 @@ export async function updateIncidentReportAction(
   ) {
     return { ok: false, error: "INVALID CLEARANCE LEVEL." };
   }
-  if (clearanceRequired > user.clearance) {
+  if (clearanceRequired > authoringClearance(user)) {
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
@@ -131,7 +140,10 @@ export async function updateIncidentReportAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canRequestScpAccess } from "@/lib/tickets";
+import { authoringClearance } from "@/lib/clearance";
 import { NewTicketForm } from "./new-ticket-form";
 
 export default async function NewTicketPage() {
@@ -12,7 +13,7 @@ export default async function NewTicketPage() {
   // or below it they can already read.
   const requestableFiles = mayRequestScp
     ? await db.scpFile.findMany({
-        where: { clearanceRequired: { gt: user.clearance } },
+        where: { clearanceRequired: { gt: authoringClearance(user) } },
         orderBy: { title: "asc" },
         select: { id: true, title: true, clearanceRequired: true },
       })

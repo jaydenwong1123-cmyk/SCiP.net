@@ -10,8 +10,12 @@ import {
   canLogScpTest,
   canDeleteScpTest,
 } from "@/lib/doc-permissions";
-import { MAX_CLEARANCE, MIN_CLEARANCE } from "@/lib/clearance";
-import { canReadScpFile } from "@/lib/scp-access";
+import {
+  MAX_CLEARANCE,
+  MIN_CLEARANCE,
+  authoringClearance,
+} from "@/lib/clearance";
+import { canWriteScpFile } from "@/lib/scp-access";
 import { DEFAULT_CLASSIFICATION, isValidClassification } from "@/lib/classification";
 import {
   REVISION_ENTITIES,
@@ -55,7 +59,7 @@ export async function createScpFileAction(
   ) {
     return { ok: false, error: "INVALID CLEARANCE LEVEL." };
   }
-  if (clearanceRequired > user.clearance) {
+  if (clearanceRequired > authoringClearance(user)) {
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
@@ -65,7 +69,10 @@ export async function createScpFileAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 
@@ -97,8 +104,9 @@ export async function updateScpFileAction(
     return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO EDIT THIS FILE." };
   }
   // An editor who cannot read the file at their clearance must not be able to
-  // rewrite it either.
-  if (existing.clearanceRequired > user.clearance) {
+  // rewrite it either. Resolved against the authoring rank, so an intrusion
+  // grant opens the file for reading without opening it for editing.
+  if (existing.clearanceRequired > authoringClearance(user)) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE FOR THIS FILE." };
   }
   if (findNonAsciiFormField(formData)) {
@@ -124,7 +132,7 @@ export async function updateScpFileAction(
   ) {
     return { ok: false, error: "INVALID CLEARANCE LEVEL." };
   }
-  if (clearanceRequired > user.clearance) {
+  if (clearanceRequired > authoringClearance(user)) {
     return {
       ok: false,
       error: "YOU CANNOT SET A CLEARANCE REQUIREMENT ABOVE YOUR OWN LEVEL.",
@@ -134,7 +142,10 @@ export async function updateScpFileAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 
@@ -297,8 +308,10 @@ export async function addScpTestLogAction(
 
   const file = await db.scpFile.findUnique({ where: { id: scpFileId } });
   if (!file) return { ok: false, error: "FILE NOT FOUND." };
-  // Same gate as reading the document — no appending to a file you can't open.
-  if (!(await canReadScpFile(user, file))) {
+  // Same gate as reading the document — no appending to a file you can't open
+  // — but resolved against the authoring rank, so a file opened by a terminal
+  // intrusion can be read and not written.
+  if (!(await canWriteScpFile(user, file))) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE FOR THIS FILE." };
   }
 
@@ -317,7 +330,10 @@ export async function addScpTestLogAction(
   if (!redactCheck.ok) {
     return {
       ok: false,
-      error: redactionAuthorizationError(redactCheck.requiredRank, user.clearance),
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 
@@ -365,7 +381,7 @@ export async function deleteScpTestLogAction(formData: FormData) {
   });
   if (!log) return;
   if (!canDeleteScpTest(user, log)) return;
-  if (!(await canReadScpFile(user, log.scpFile))) return;
+  if (!(await canWriteScpFile(user, log.scpFile))) return;
 
   await db.scpTestLog.deleteMany({ where: { id } });
 

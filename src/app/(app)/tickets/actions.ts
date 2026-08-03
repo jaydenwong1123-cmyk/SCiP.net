@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/session";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import { authoringClearance } from "@/lib/clearance";
 import {
   TICKET_TYPES,
   TICKET_STATUSES,
@@ -102,7 +103,10 @@ export async function createTicketAction(
 
     const file = await db.scpFile.findUnique({ where: { id: scpFileId } });
     if (!file) return { ok: false, error: "FILE NOT FOUND." };
-    if (file.clearanceRequired <= user.clearance) {
+    // Against the stored rank: a member whose effective clearance is only
+    // propped up by a temporary intrusion grant still genuinely lacks access,
+    // and must be able to request it through the proper channel.
+    if (file.clearanceRequired <= authoringClearance(user)) {
       return {
         ok: false,
         error: "YOUR CLEARANCE ALREADY GRANTS ACCESS TO THAT FILE.",

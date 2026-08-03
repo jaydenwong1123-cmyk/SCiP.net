@@ -18,6 +18,11 @@ export type RateLimitRule = {
 export const LOGIN_RULE: RateLimitRule = { limit: 8, windowMs: 15 * 60 * 1000 };
 export const LOGIN_IP_RULE: RateLimitRule = { limit: 25, windowMs: 15 * 60 * 1000 };
 export const INVITE_RULE: RateLimitRule = { limit: 10, windowMs: 30 * 60 * 1000 };
+// Terminal intrusion answer submissions. Generous, because a legitimate full
+// run is ~11 rounds plus spent guesses: this exists to stop a script hammering
+// the guess-carrying games, not to police normal play. The per-challenge
+// attempt budget is the real limit.
+export const HACK_RULE: RateLimitRule = { limit: 40, windowMs: 5 * 60 * 1000 };
 
 export type RateLimitStatus = {
   blocked: boolean;

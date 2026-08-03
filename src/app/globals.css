@@ -708,7 +708,171 @@ a {
    that is lost when stilled.
    --------------------------------------------------------------------------- */
 
+/* ── Terminal intrusion ─────────────────────────────────────────────────── */
+
+/* Inner surface for a puzzle body: recessed against the enclosing term-panel
+   so the playfield reads as a separate thing from the console chrome. */
+.hack-surface {
+  border: 1px solid color-mix(in srgb, var(--term-border) 40%, transparent);
+  background: color-mix(in srgb, var(--term-fg) 4%, transparent);
+  padding: var(--term-pad-sm);
+}
+
+.hack-mono {
+  font-family: var(--term-font);
+  letter-spacing: 0.05em;
+}
+
+/* Wide puzzles (hexdumps, routing tables) scroll inside their own box rather
+   than pushing the page sideways. */
+.hack-scroll {
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.hack-table-scroll {
+  overflow-x: auto;
+}
+
+.hack-wrap {
+  word-break: break-all;
+}
+
+.hack-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--hack-cols, 8), minmax(2.25rem, 1fr));
+  gap: 2px;
+}
+
+.hack-cell {
+  font-family: var(--term-font);
+  font-size: 0.75rem;
+  padding: 0.4rem 0.15rem;
+  min-height: 2.2rem;
+  border: 1px solid color-mix(in srgb, var(--term-border) 45%, transparent);
+  color: var(--term-fg);
+  background: transparent;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.hack-cell:hover:not(:disabled),
+.hack-cell:focus-visible {
+  background: color-mix(in srgb, var(--term-fg) 14%, transparent);
+  color: var(--term-fg-bright);
+}
+
+.hack-cell--picked {
+  border-color: var(--term-amber);
+  color: var(--term-amber);
+  background: color-mix(in srgb, var(--term-amber) 16%, transparent);
+}
+
+/* A clickable candidate embedded in a dump line. Underlined rather than
+   colour-only, so the affordance survives a monochrome theme. */
+.hack-pick {
+  color: var(--term-fg-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: none;
+  font: inherit;
+  padding: 0;
+}
+
+.hack-pick:hover:not(:disabled),
+.hack-pick:focus-visible {
+  color: var(--term-amber);
+}
+
+.hack-chip {
+  font-family: var(--term-font);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.5rem;
+  min-height: 2rem;
+  border: 1px solid color-mix(in srgb, var(--term-border) 50%, transparent);
+  color: var(--term-fg);
+  background: transparent;
+}
+
+.hack-chip:hover:not(:disabled),
+.hack-chip:focus-visible {
+  border-color: var(--term-amber);
+  color: var(--term-amber);
+}
+
+/* Offset marker under each byte in a memory dump. */
+.hack-byte {
+  display: inline-block;
+  text-align: center;
+  padding: 0 0.35rem;
+}
+
+.hack-offset {
+  display: block;
+  font-size: 0.5rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--term-fg-dim) 70%, transparent);
+}
+
+.hack-banned {
+  color: var(--term-red);
+  text-decoration: line-through;
+}
+
+.hack-timer {
+  font-family: var(--term-font);
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  color: var(--term-fg-bright);
+}
+
+/* The pulse is the only new animation, and it is paired with a colour change
+   and a rising number — never the sole signal that time is short. */
+.hack-timer--critical {
+  color: var(--term-red);
+  animation: hack-pulse 0.6s steps(2, end) infinite;
+}
+
+@keyframes hack-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.hack-stage {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--term-border) 45%, transparent);
+  color: var(--term-fg-dim);
+}
+
+.hack-stage--done {
+  border-color: var(--term-fg-bright);
+  color: var(--term-fg-bright);
+}
+
+.hack-stage--active {
+  border-color: var(--term-amber);
+  color: var(--term-amber);
+}
+
+/* Destructive / irreversible controls: extraction gambles, aborts, severing
+   another member's access. */
+.hack-button--risk {
+  border-color: var(--term-red);
+  color: var(--term-red);
+}
+
+.hack-button--risk:hover:not(:disabled),
+.hack-button--risk:focus-visible {
+  background: color-mix(in srgb, var(--term-red) 16%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .hack-timer--critical {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {

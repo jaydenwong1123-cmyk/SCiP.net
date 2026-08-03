@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
-import { canPostBroadcast } from "@/lib/clearance";
+import { canPostBroadcast, authoringClearance } from "@/lib/clearance";
 import { canEditBroadcast } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
 import {
@@ -23,7 +23,7 @@ export default async function BroadcastsPage() {
   // Everyone sees live directives. People who could edit a directive also see
   // its scheduled and expired ones, so a pending notice isn't invisible to
   // the person who scheduled it.
-  const canSeeAllSchedules = hasAdminPowers(user) || canPostBroadcast(user.clearance);
+  const canSeeAllSchedules = hasAdminPowers(user) || canPostBroadcast(authoringClearance(user));
   const broadcasts = await db.broadcast.findMany({
     where: canSeeAllSchedules ? undefined : liveBroadcastWhere(now),
     orderBy: { createdAt: "desc" },
@@ -53,7 +53,7 @@ export default async function BroadcastsPage() {
         <h1 className="text-lg tracking-widest">:: FOUNDATION BROADCASTS ::</h1>
       </div>
 
-      {canPostBroadcast(user.clearance) && (
+      {canPostBroadcast(authoringClearance(user)) && (
         <div className="term-panel space-y-3">
           <h2 className="text-sm text-[var(--term-fg-dim)]">POST NEW ANNOUNCEMENT</h2>
           <BroadcastForm />

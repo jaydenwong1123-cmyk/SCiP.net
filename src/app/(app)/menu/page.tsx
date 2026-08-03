@@ -8,6 +8,8 @@ import {
   canAccessMessageLogs,
 } from "@/lib/message-logs";
 import { messageRetentionCutoff } from "@/lib/message-retention";
+import { canAccessCounterIntel, REVEAL_MAX } from "@/lib/counter-intel";
+import { getActiveHackGrant } from "@/lib/hack/grant";
 
 type Tile = {
   href: string;
@@ -28,7 +30,10 @@ export default async function MenuPage() {
   // a single round trip.
   const ticketQueues = handleableTicketTypes(user);
 
-  const [unreadMessages, pendingRequests, openTickets] = await Promise.all([
+  const raisa = canAccessCounterIntel(user);
+
+  const [unreadMessages, pendingRequests, openTickets, activeGrant, openCases] =
+    await Promise.all([
     db.message.count({
       where: {
         recipientId: user.id,
@@ -49,6 +54,10 @@ export default async function MenuPage() {
             authorId: { not: user.id },
           },
         })
+      : Promise.resolve(0),
+    getActiveHackGrant(user.id),
+    raisa
+      ? db.hackRun.count({ where: { revealLevel: { lt: REVEAL_MAX } } })
       : Promise.resolve(0),
   ]);
 
@@ -93,6 +102,30 @@ export default async function MenuPage() {
       code: "R5",
       desc: `Member correspondence oversight (${MESSAGE_LOG_RETENTION_DAYS}d retention)`,
       accent: "amber",
+    });
+  }
+
+  // Shown to everyone, unlabelled as to what it actually is. Finding out is
+  // the point; the warning screen behind it does the explaining.
+  tiles.push({
+    href: "/hack",
+    label: "⚠ UNKNOWN TERMINAL",
+    code: "???",
+    desc: activeGrant
+      ? `ILLICIT ${clearanceDisplay(activeGrant.tier, null)} ACCESS ACTIVE`
+      : "Unlisted access node — origin unverified",
+    accent: "amber",
+  });
+
+  if (canAccessCounterIntel(user)) {
+    tiles.push({
+      href: "/counter-intel",
+      label: "COUNTER-INTEL",
+      code: "RAISA",
+      desc: "Intrusion signals awaiting trace",
+      accent: "red",
+      badge: openCases,
+      badgeLabel: "untraced intrusion signals",
     });
   }
 
