@@ -36,6 +36,7 @@ export function MemberList({
   canManageStaff,
   canManageAdmin,
   canManageCoOwner,
+  coOwnerSeatsLeft,
   canManageHelper,
   hasAdminPowers,
 }: {
@@ -44,6 +45,9 @@ export function MemberList({
   canManageStaff: boolean;
   canManageAdmin: boolean;
   canManageCoOwner: boolean;
+  // Unfilled Co-Owner seats. At zero the role can only be moved by revoking a
+  // sitting Co-Owner first.
+  coOwnerSeatsLeft: number;
   canManageHelper: boolean;
   hasAdminPowers: boolean;
 }) {
@@ -256,6 +260,7 @@ export function MemberList({
                 canManageStaff={canManageStaff}
                 canManageAdmin={canManageAdmin}
                 canManageCoOwner={canManageCoOwner}
+                coOwnerSeatsLeft={coOwnerSeatsLeft}
                 canManageHelper={canManageHelper}
                 canGrantPermissions={hasAdminPowers}
               />

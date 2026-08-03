@@ -10,6 +10,7 @@ import {
   requireStaff,
   hasOwnerPowers,
 } from "@/lib/session";
+import { MAX_CO_OWNERS } from "@/lib/roles";
 import { generateInviteCode } from "@/lib/codeword";
 import {
   MAX_CLEARANCE,
@@ -435,7 +436,7 @@ export async function toggleAdminAction(formData: FormData) {
 }
 
 export async function toggleCoOwnerAction(formData: FormData) {
-  // Only the seeded owner may appoint or remove the Co-Owner — a co-owner
+  // Only the seeded owner may appoint or remove a Co-Owner — a co-owner
   // cannot hand the role to someone else or entrench themselves.
   const actor = await requireRootOwner();
   const userId = String(formData.get("userId") ?? "");
@@ -445,13 +446,15 @@ export async function toggleCoOwnerAction(formData: FormData) {
 
   const target = await db.user.findUnique({ where: { id: userId } });
   if (!target || target.isOwner) return; // the owner already outranks the role
+  if (target.isCoOwner === isCoOwner) return; // already in the requested state
 
   if (isCoOwner) {
-    // At most one co-owner: demote any current holder first.
-    await db.user.updateMany({
-      where: { isCoOwner: true },
-      data: { isCoOwner: false },
-    });
+    // The seats are capped. With more than one seat there is no sensible
+    // "current holder" to evict automatically, so a full bench is refused
+    // outright — the owner revokes a sitting Co-Owner first. The UI hides the
+    // button in that state; this is the check that actually enforces it.
+    const seated = await db.user.count({ where: { isCoOwner: true } });
+    if (seated >= MAX_CO_OWNERS) return;
   }
 
   await db.user.update({

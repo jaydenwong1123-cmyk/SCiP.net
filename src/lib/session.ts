@@ -93,11 +93,11 @@ export async function requireUser() {
 
 // Role hierarchy:
 //   Owner    (isOwner)   — seeded, supreme. Only the owner can grant/revoke
-//                          Admin, and only the owner can appoint the Co-Owner.
-//   Co-Owner (isCoOwner) — everything the owner can do, held by at most one
-//                          member. Cannot be demoted/suspended/deleted by
-//                          anyone but the owner, and cannot appoint itself a
-//                          replacement.
+//                          Admin, and only the owner can appoint a Co-Owner.
+//   Co-Owner (isCoOwner) — everything the owner can do, held by at most
+//                          MAX_CO_OWNERS members at a time (see roles.ts).
+//                          Cannot be demoted/suspended/deleted by anyone but
+//                          the owner, and cannot appoint a fellow Co-Owner.
 //   Admin    (isAdmin)   — owner-level powers: delete accounts, grant L-OMNI,
 //                          grant/revoke Staff, plus everything Staff can do.
 //   Staff    (isStaff)   — elevated panel access: rename, set clearance (below

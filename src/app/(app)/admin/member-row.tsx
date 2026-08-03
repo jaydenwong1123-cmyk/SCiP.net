@@ -18,6 +18,7 @@ import {
 } from "./actions";
 import { ALL_DEPARTMENTS } from "@/lib/departments";
 import { CLEARANCE_ASSIGN_OPTIONS, clearanceAssignValue } from "@/lib/clearance";
+import { MAX_CO_OWNERS } from "@/lib/roles";
 
 type Member = {
   id: string;
@@ -42,6 +43,7 @@ export function MemberRow({
   canManageStaff,
   canManageAdmin,
   canManageCoOwner,
+  coOwnerSeatsLeft,
   canManageHelper,
   canGrantPermissions,
 }: {
@@ -50,6 +52,9 @@ export function MemberRow({
   canManageStaff: boolean;
   canManageAdmin: boolean;
   canManageCoOwner: boolean;
+  // Unfilled Co-Owner seats. At zero the grant is withheld rather than
+  // silently evicting a sitting Co-Owner; the server refuses it either way.
+  coOwnerSeatsLeft: number;
   canManageHelper: boolean;
   // Admin and above only. Staff manage accounts but never the per-member
   // permission grants; the server enforces this independently.
@@ -272,29 +277,35 @@ export function MemberRow({
             </form>
           )}
 
-          {canManageCoOwner && (
-            <form
-              action={toggleCoOwnerAction}
-              onSubmit={(e) => {
-                if (
-                  !confirm(
-                    `Make ${member.displayName ?? "this member"} Co-Owner? They gain full owner-level authority, and any current Co-Owner is demoted.`
-                  )
-                ) {
-                  e.preventDefault();
-                }
-              }}
-            >
-              <input type="hidden" name="userId" value={member.id} />
-              <input type="hidden" name="isCoOwner" value="true" />
-              <button
-                className="term-button text-xs"
-                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+          {canManageCoOwner &&
+            (coOwnerSeatsLeft > 0 ? (
+              <form
+                action={toggleCoOwnerAction}
+                onSubmit={(e) => {
+                  if (
+                    !confirm(
+                      `Make ${member.displayName ?? "this member"} Co-Owner? They gain full owner-level authority. ${coOwnerSeatsLeft} of ${MAX_CO_OWNERS} Co-Owner seats remain open.`
+                    )
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
               >
-                GRANT CO-OWNER
-              </button>
-            </form>
-          )}
+                <input type="hidden" name="userId" value={member.id} />
+                <input type="hidden" name="isCoOwner" value="true" />
+                <button
+                  className="term-button text-xs"
+                  style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                >
+                  GRANT CO-OWNER
+                </button>
+              </form>
+            ) : (
+              <p className="text-xs text-[var(--term-fg-dim)]">
+                CO-OWNER SEATS FULL ({MAX_CO_OWNERS}/{MAX_CO_OWNERS}) — REVOKE ONE
+                TO APPOINT ANOTHER.
+              </p>
+            ))}
 
           {member.suspended ? (
             <form action={setSuspendedAction}>

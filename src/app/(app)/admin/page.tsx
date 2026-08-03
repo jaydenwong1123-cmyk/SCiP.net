@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { requireStaff, hasOwnerPowers } from "@/lib/session";
+import { MAX_CO_OWNERS } from "@/lib/roles";
 import { db } from "@/lib/db";
 import {
   CLEARANCE_LEVELS,
@@ -29,7 +30,7 @@ export default async function AdminPage() {
   const canManageAdmin = ownerPowers;
   // Helper ranks below Staff, but only Admin and above may appoint one.
   const canManageHelper = ownerPowers || viewer.isAdmin;
-  // Appointing the single Co-Owner is reserved for the seeded owner.
+  // Appointing a Co-Owner is reserved for the seeded owner.
   const canManageCoOwner = viewer.isOwner;
   const canGrantTopClearance = ownerPowers || viewer.isAdmin;
 
@@ -358,6 +359,12 @@ export default async function AdminPage() {
           canManageStaff={canManageStaff}
           canManageAdmin={canManageAdmin}
           canManageCoOwner={canManageCoOwner}
+          // `members` excludes the owner but lists every co-owner, so the
+          // seated count comes free with the rows already fetched.
+          coOwnerSeatsLeft={Math.max(
+            0,
+            MAX_CO_OWNERS - members.filter((m) => m.isCoOwner).length
+          )}
           canManageHelper={canManageHelper}
           hasAdminPowers={ownerPowers || viewer.isAdmin}
         />
