@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasStaffPowers } from "@/lib/session";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 import { clearanceLabel } from "@/lib/clearance";
@@ -48,7 +48,13 @@ export async function beginTraceAction(runId: string): Promise<TraceState> {
   if (run.revealLevel >= REVEAL_MAX) {
     return { ok: false, error: "CASE FULLY IDENTIFIED." };
   }
-  if (run.traceLockedUntil && run.traceLockedUntil.getTime() > Date.now()) {
+  // Staff and above are exempt from every cooldown in this feature — see the
+  // matching bypass on the intrusion side in hack/actions.ts.
+  if (
+    !hasStaffPowers(user) &&
+    run.traceLockedUntil &&
+    run.traceLockedUntil.getTime() > Date.now()
+  ) {
     return {
       ok: true,
       kind: "locked",
@@ -112,21 +118,28 @@ export async function submitTraceAnswerAction(
   if (!result.correct) {
     // A failed trace never REGRESSES the reveal level — RAISA does not lose
     // ground they already covered. It costs them a backoff instead, so the
-    // ladder cannot be brute-forced by resubmitting garbage.
+    // ladder cannot be brute-forced by resubmitting garbage. Staff and above
+    // are exempt from the backoff itself, same as every other cooldown in
+    // this feature.
+    const staffExempt = hasStaffPowers(user);
     await db.hackRun.update({
       where: { id: run.id },
       data: {
         traceCursor: run.traceCursor + 1,
-        traceLockedUntil: new Date(Date.now() + TRACE_LOCKOUT_MS),
+        traceLockedUntil: staffExempt
+          ? null
+          : new Date(Date.now() + TRACE_LOCKOUT_MS),
       },
     });
     revalidatePath(`/counter-intel/${run.id}`);
     return {
       ok: true,
       kind: "locked",
-      reason: `${result.feedback ?? "TRACE LOST"} — BACKOFF ${formatDuration(
-        TRACE_LOCKOUT_MS
-      )}.`,
+      reason: staffExempt
+        ? `${result.feedback ?? "TRACE LOST"} — STAFF OVERRIDE, NO BACKOFF.`
+        : `${result.feedback ?? "TRACE LOST"} — BACKOFF ${formatDuration(
+            TRACE_LOCKOUT_MS
+          )}.`,
     };
   }
 

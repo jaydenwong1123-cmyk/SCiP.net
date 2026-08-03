@@ -132,14 +132,18 @@ export async function submitHackAnswerAction(
 
   // Backstop against a script hammering the guess-carrying games. The per
   // challenge attempt budget is the real limit; this only stops abuse volume.
-  const throttle = await checkRateLimit("hack", user.id, HACK_RULE);
-  if (throttle.blocked) {
-    return {
-      ok: false,
-      error: `TERMINAL LOCKED — RETRY IN ${formatDuration(throttle.retryAfterMs)}.`,
-    };
+  // Staff and above are exempt from every cooldown in this feature, this one
+  // included — see hackCooldownState for the daily/failure lockout twin.
+  if (!hasStaffPowers(user)) {
+    const throttle = await checkRateLimit("hack", user.id, HACK_RULE);
+    if (throttle.blocked) {
+      return {
+        ok: false,
+        error: `TERMINAL LOCKED — RETRY IN ${formatDuration(throttle.retryAfterMs)}.`,
+      };
+    }
+    await recordAttempt("hack", user.id);
   }
-  await recordAttempt("hack", user.id);
 
   const nonce = String(formData.get("nonce") ?? "");
   const answer = String(formData.get("answer") ?? "").slice(0, 400);
