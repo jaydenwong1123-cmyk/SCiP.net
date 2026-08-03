@@ -6,9 +6,7 @@ import type {
 } from "@/lib/hack/games/cipher";
 import type { IcebreakerPayload } from "@/lib/hack/games/icebreaker";
 import type { WaveformPayload } from "@/lib/hack/games/waveform";
-import type { MemdumpPayload } from "@/lib/hack/games/memdump";
 import type { BytepairPayload } from "@/lib/hack/games/bytepair";
-import type { ChecksumPayload } from "@/lib/hack/games/checksum";
 import type { NodetracePayload } from "@/lib/hack/games/nodetrace";
 import type { KeypadPayload } from "@/lib/hack/games/keypad";
 import type { PacketfilterPayload } from "@/lib/hack/games/packetfilter";
@@ -165,29 +163,6 @@ function WaveformGame({ payload, value, onChange, disabled }: GameProps) {
   );
 }
 
-function MemdumpGame({ payload, value, onChange, disabled }: GameProps) {
-  const p = payload as MemdumpPayload;
-  return (
-    <div className="space-y-3">
-      <Hint>RULE: {p.rule} — OFFSET IS COUNTED FROM THE FIRST BYTE, STARTING AT 0.</Hint>
-      <div className={`${PANEL} hack-mono hack-scroll`}>
-        {p.rows.map((row, r) => (
-          <div key={row.address} className="whitespace-pre">
-            <span className="text-[var(--term-fg-dim)]">{row.address}  </span>
-            {row.bytes.map((b, i) => (
-              <span key={i} className="hack-byte">
-                {b}
-                <span className="hack-offset">{r * p.perRow + i}</span>
-              </span>
-            ))}
-          </div>
-        ))}
-      </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="RECOVERED STRING" />
-    </div>
-  );
-}
-
 function BytepairGame({ payload, value, onChange, disabled }: GameProps) {
   const p = payload as BytepairPayload;
   const picked = value.split(/[\s,]+/).filter(Boolean);
@@ -224,25 +199,6 @@ function BytepairGame({ payload, value, onChange, disabled }: GameProps) {
         </div>
       </div>
       <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="UNPAIRED BYTES" />
-    </div>
-  );
-}
-
-function ChecksumGame({ payload, value, onChange, disabled }: GameProps) {
-  const p = payload as ChecksumPayload;
-  return (
-    <div className="space-y-3">
-      <div className={`${PANEL} hack-mono hack-scroll`}>
-        <div className="hack-wrap">{p.bytes.join(" ")}</div>
-      </div>
-      <ol className="text-xs space-y-1">
-        {p.steps.map((step, i) => (
-          <li key={i} className="text-[var(--term-fg)]">
-            <span className="text-[var(--term-fg-dim)]">{i + 1}.</span> {step}
-          </li>
-        ))}
-      </ol>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="TWO HEX DIGITS" />
     </div>
   );
 }
@@ -442,9 +398,7 @@ const RENDERERS: Record<string, (props: GameProps) => React.ReactElement> = {
   cipher: CipherGame,
   icebreaker: IcebreakerGame,
   waveform: WaveformGame,
-  memdump: MemdumpGame,
   bytepair: BytepairGame,
-  checksum: ChecksumGame,
   nodetrace: NodetraceGame,
   keypad: KeypadGame,
   packetfilter: PacketfilterGame,

@@ -54,13 +54,6 @@ export const CIPHER_PHRASES: readonly string[] = [
   "BURN THE MANIFEST",
 ];
 
-// Hidden strings for STRING EXTRACTION. Kept short so a band-1 dump stays
-// readable and a band-4 one stays solvable inside the clock.
-export const HIDDEN_STRINGS: readonly string[] = [
-  "KETER", "SAFE", "VAULT", "PURGE", "BREACH", "SEALED", "OMEGA",
-  "WARDEN", "CINDER", "HOLLOW", "SHROUD", "TETHER", "MARROW", "GRAVEN",
-];
-
 // Specimen designations for CONTAINMENT TRIAGE.
 export const SPECIMEN_PREFIXES: readonly string[] = [
   "SPC", "ANO", "ITM", "OBJ", "ENT", "ART",

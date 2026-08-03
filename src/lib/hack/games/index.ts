@@ -4,9 +4,7 @@ import type { Rng } from "@/lib/hack/rng";
 import { cipherGame } from "./cipher";
 import { icebreakerGame } from "./icebreaker";
 import { waveformGame } from "./waveform";
-import { memdumpGame } from "./memdump";
 import { bytepairGame } from "./bytepair";
-import { checksumGame } from "./checksum";
 import { nodetraceGame } from "./nodetrace";
 import { keypadGame } from "./keypad";
 import { packetfilterGame } from "./packetfilter";
@@ -18,7 +16,7 @@ export type { HackGame, GameGeneration, GradeResult } from "./types";
 
 // The registry.
 //
-// Adding a thirteenth game is one file in this directory and one line here —
+// Adding another game is one file in this directory and one line here —
 // nothing in the engine, the stage config or any route knows the roster. The
 // only coupling is that a game needs a matching renderer in
 // app/(app)/hack/games/, dispatched by id.
@@ -26,9 +24,7 @@ const REGISTRY: HackGame[] = [
   cipherGame,
   icebreakerGame,
   waveformGame,
-  memdumpGame,
   bytepairGame,
-  checksumGame,
   nodetraceGame,
   keypadGame,
   packetfilterGame,

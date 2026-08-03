@@ -110,6 +110,23 @@ export async function submitTraceAnswerAction(
     ? { correct: false, feedback: "TRACE WINDOW CLOSED" }
     : gradeAnswer(challenge.game, JSON.parse(challenge.solution), answer);
 
+  // A guess-carrying game (e.g. icebreaker) burns an attempt rather than the
+  // trace itself, same as the intrusion side — a wrong guess must not cost a
+  // backoff while attempts remain, or the "attemptsLeft" the console shows
+  // would be a lie.
+  if (!result.correct && !expired && challenge.attemptsLeft > 1) {
+    const updated = await db.hackChallenge.update({
+      where: { id: challenge.id },
+      data: { attemptsLeft: challenge.attemptsLeft - 1 },
+    });
+    return {
+      ok: true,
+      kind: "challenge",
+      challenge: publicChallenge(updated),
+      feedback: result.feedback,
+    };
+  }
+
   await db.hackChallenge.update({
     where: { id: challenge.id },
     data: { correct: result.correct, answeredAt: new Date() },
