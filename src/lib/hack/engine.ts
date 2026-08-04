@@ -208,9 +208,11 @@ export async function resolveStaleRuns(userId: string): Promise<HackRun | null> 
 }
 
 // Grade a candidate answer for on-screen feedback ONLY — no attempt spent, no
-// challenge or run row touched. Exists so a player can see how close a guess
-// is (e.g. icebreaker's letters-correct count) without it costing anything,
-// which is the whole reason CHECK is a separate button from TRANSMIT.
+// challenge or run row touched. Exists so a player can see the letters-correct
+// count on ICE PASSWORD CRACK without it costing anything, which is the whole
+// reason CHECK is a separate button from TRANSMIT. Restricted to that one game:
+// every other game's grade() only ever returns a bare correct/incorrect, so a
+// free CHECK there would just be a no-cost extra guess.
 export async function checkIntrusionAnswer(
   userId: string,
   nonce: string,
@@ -227,7 +229,8 @@ export async function checkIntrusionAnswer(
     challenge.kind !== CHALLENGE_KINDS.intrusion ||
     challenge.run.status !== RUN_STATUS.active ||
     challenge.correct !== null ||
-    challenge.cursor !== challenge.run.cursor
+    challenge.cursor !== challenge.run.cursor ||
+    challenge.game !== "icebreaker"
   ) {
     return { ok: false };
   }

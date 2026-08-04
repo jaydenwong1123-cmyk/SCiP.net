@@ -178,14 +178,16 @@ export function RunConsole({
             {error && <p className="text-sm text-[var(--term-red)]">{error}</p>}
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={check}
-                disabled={pending || checkPending}
-                className="term-button"
-              >
-                {checkPending ? "CHECKING..." : "[ CHECK ]"}
-              </button>
+              {phase.challenge.game === "icebreaker" && (
+                <button
+                  type="button"
+                  onClick={check}
+                  disabled={pending || checkPending}
+                  className="term-button"
+                >
+                  {checkPending ? "CHECKING..." : "[ CHECK ]"}
+                </button>
+              )}
               <button type="submit" disabled={pending} className="term-button">
                 {pending ? "TRANSMITTING..." : "[ TRANSMIT ]"}
               </button>

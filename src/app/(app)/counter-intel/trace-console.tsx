@@ -133,23 +133,25 @@ export function TraceConsole({
             <p className="text-sm text-[var(--term-fg-bright)]">{checkFeedback}</p>
           )}
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={pending || checkPending}
-              className="term-button"
-              onClick={() => {
-                if (!challenge || pending || checkPending) return;
-                const form = new FormData();
-                form.set("nonce", challenge.nonce);
-                form.set("answer", answer);
-                startCheckTransition(async () => {
-                  const result = await checkTraceAnswerAction(null, form);
-                  setCheckFeedback(result.ok ? result.feedback : result.error);
-                });
-              }}
-            >
-              {checkPending ? "CHECKING..." : "[ CHECK ]"}
-            </button>
+            {challenge.game === "icebreaker" && (
+              <button
+                type="button"
+                disabled={pending || checkPending}
+                className="term-button"
+                onClick={() => {
+                  if (!challenge || pending || checkPending) return;
+                  const form = new FormData();
+                  form.set("nonce", challenge.nonce);
+                  form.set("answer", answer);
+                  startCheckTransition(async () => {
+                    const result = await checkTraceAnswerAction(null, form);
+                    setCheckFeedback(result.ok ? result.feedback : result.error);
+                  });
+                }}
+              >
+                {checkPending ? "CHECKING..." : "[ CHECK ]"}
+              </button>
+            )}
             <button type="submit" disabled={pending} className="term-button">
               {pending ? "RESOLVING..." : "[ RESOLVE ]"}
             </button>

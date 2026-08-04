@@ -221,7 +221,11 @@ export async function checkTraceAnswerAction(
     challenge.kind !== CHALLENGE_KINDS.trace ||
     challenge.correct !== null ||
     challenge.cursor !== challenge.run.traceCursor ||
-    challenge.run.revealLevel >= REVEAL_MAX
+    challenge.run.revealLevel >= REVEAL_MAX ||
+    // CHECK only exists for ICE PASSWORD CRACK — every other game's grade()
+    // only returns correct/incorrect, so a free preview there is just a
+    // no-cost extra guess.
+    challenge.game !== "icebreaker"
   ) {
     return { ok: false, error: "STALE TRACE — RESYNCHRONIZING." };
   }
