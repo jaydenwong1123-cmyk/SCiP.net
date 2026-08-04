@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type {
   CipherPayload,
 } from "@/lib/hack/games/cipher";
@@ -257,21 +257,33 @@ function KeypadGame({ payload, value, onChange, disabled }: GameProps) {
 
 function PacketfilterGame({ payload, value, onChange, disabled }: GameProps) {
   const p = payload as PacketfilterPayload;
+  // Each field gets its own grid column sized to its own content, so a long
+  // port range can never push a host name (or itself) out of view — unlike
+  // padded single-line text, a grid cell is never silently clipped.
   return (
     <div className="space-y-3">
-      <div className={`${PANEL} hack-mono hack-scroll text-xs`}>
+      <div className={`${PANEL} hack-mono hack-scroll hack-table-scroll text-xs`}>
         <div className="text-[var(--term-fg-dim)]">RULESET (FIRST MATCH WINS)</div>
-        {p.rules.map((r) => (
-          <div key={r.index} className="whitespace-pre">
-            {String(r.index).padStart(2, " ")}. {r.action.padEnd(7, " ")} HOST={r.host.padEnd(5, " ")} PORT={r.port}
-          </div>
-        ))}
+        <div className="grid gap-x-3 gap-y-0.5" style={{ gridTemplateColumns: "auto auto auto auto" }}>
+          {p.rules.map((r) => (
+            <Fragment key={r.index}>
+              <span>{r.index}.</span>
+              <span>{r.action}</span>
+              <span>HOST={r.host}</span>
+              <span>PORT={r.port}</span>
+            </Fragment>
+          ))}
+        </div>
         <div className="mt-2 text-[var(--term-fg-dim)]">PACKETS</div>
-        {p.packets.map((k) => (
-          <div key={k.id} className="whitespace-pre">
-            {k.id.padEnd(4, " ")} HOST={k.host.padEnd(5, " ")} PORT={k.port}
-          </div>
-        ))}
+        <div className="grid gap-x-3 gap-y-0.5" style={{ gridTemplateColumns: "auto auto auto" }}>
+          {p.packets.map((k) => (
+            <Fragment key={k.id}>
+              <span>{k.id}</span>
+              <span>HOST={k.host}</span>
+              <span>PORT={k.port}</span>
+            </Fragment>
+          ))}
+        </div>
       </div>
       <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="ACCEPTED IDS, OR NONE" />
     </div>

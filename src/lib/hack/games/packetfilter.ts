@@ -18,6 +18,10 @@ type PacketfilterSolution = { accepted: string[] };
 //
 // Wildcards are "*" for host and either "*" or a range for port, both of which
 // read naturally in a monospace table.
+//
+// Ranges are written "LOW TO HIGH" rather than "LOW-HIGH" — a bare hyphen
+// reads as a minus sign the moment the low end scrolls out of view in a
+// narrow panel, which made ports look negative for no reason.
 export const packetfilterGame: HackGame = {
   id: "packetfilter",
   label: "FIREWALL AUDIT",
@@ -42,7 +46,7 @@ export const packetfilterGame: HackGame = {
         index: i + 1,
         action: rng.bool(0.5) ? "ACCEPT" : "DROP",
         host: wildHost ? "*" : rng.pick(hosts),
-        port: wildPort ? "*" : `${low}-${low + rng.int(50, 400)}`,
+        port: wildPort ? "*" : `${low} TO ${low + rng.int(50, 400)}`,
       });
     }
     // A terminal catch-all, so every packet has a defined verdict and the
@@ -62,7 +66,7 @@ export const packetfilterGame: HackGame = {
 
     const portMatches = (spec: string, port: number) => {
       if (spec === "*") return true;
-      const [lo, hi] = spec.split("-").map(Number);
+      const [lo, hi] = spec.split(" TO ").map(Number);
       return port >= lo && port <= hi;
     };
 
