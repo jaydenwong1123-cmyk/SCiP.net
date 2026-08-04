@@ -20,6 +20,12 @@ type SignatureSolution = { token: string };
 // mutually satisfiable — and they are stated in terms of fragment CONTENT
 // rather than position, so they cannot be followed mechanically without first
 // working out which fragments belong.
+//
+// The opening anchor plus the full adjacency chain is the MINIMUM needed to
+// reconstruct the token unambiguously — every one of those is always shown.
+// Only flavor on top (the length statement, decoy call-outs) is ever sampled
+// down; trimming an adjacency link instead would leave a gap in the chain
+// with nothing on screen to fill it.
 export const signatureGame: HackGame = {
   id: "signature",
   label: "TOKEN REASSEMBLY",
@@ -32,7 +38,7 @@ export const signatureGame: HackGame = {
   generate(band, rng) {
     const realCount = band === 3 ? 5 : band === 4 ? 6 : 8;
     const decoyCount = band === 3 ? 3 : band === 4 ? 5 : 6;
-    const ruleCount = band === 3 ? 2 : band === 4 ? 4 : 5;
+    const extraCount = band === 3 ? 1 : band === 4 ? 2 : 3;
     const fragmentSize = 3;
 
     const chars = [...FRAGMENT_CHARS];
@@ -53,27 +59,26 @@ export const signatureGame: HackGame = {
       }
     }
 
-    const rulePool: string[] = [
-      `THE TOKEN OPENS WITH ${real[0]}`,
-      `THE TOKEN CLOSES WITH ${real[realCount - 1]}`,
-      `THE TOKEN IS EXACTLY ${realCount} FRAGMENTS LONG`,
-    ];
+    // Essential: the opening anchor plus every adjacency link. Together these
+    // fully determine the order — nothing here is ever left out.
+    const essential: string[] = [`THE TOKEN OPENS WITH ${real[0]}`];
     for (let i = 0; i < realCount - 1; i++) {
-      rulePool.push(`${real[i]} IMMEDIATELY PRECEDES ${real[i + 1]}`);
+      essential.push(`${real[i]} IMMEDIATELY PRECEDES ${real[i + 1]}`);
     }
-    for (const decoy of decoys) {
-      rulePool.push(`${decoy} IS NOT PART OF THE TOKEN`);
-    }
+    essential.push(`THE TOKEN CLOSES WITH ${real[realCount - 1]}`);
 
-    // Always lead with the two anchors, then fill with adjacency and exclusion
-    // facts — without the anchors the chain has no starting point.
-    const anchored = rulePool.slice(0, 2);
-    const rest = rng.sample(rulePool.slice(2), Math.max(0, ruleCount - 2));
+    // Flavor: redundant with the essential chain, so trimming these can never
+    // make the puzzle unsolvable — only easier to double-check.
+    const extraPool: string[] = [
+      `THE TOKEN IS EXACTLY ${realCount} FRAGMENTS LONG`,
+      ...decoys.map((decoy) => `${decoy} IS NOT PART OF THE TOKEN`),
+    ];
+    const extra = rng.sample(extraPool, Math.min(extraCount, extraPool.length));
 
     return {
       payload: {
         fragments: rng.shuffle([...real, ...decoys]),
-        rules: [...anchored, ...rest],
+        rules: [...essential, ...extra],
         tokenLength: realCount * fragmentSize,
       } satisfies SignaturePayload,
       solution: { token } satisfies SignatureSolution,
