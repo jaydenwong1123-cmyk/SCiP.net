@@ -123,55 +123,6 @@ function cluesFor(code: number[]): Clue[] {
   return clues;
 }
 
-// The deliberately-false mirror of a true clue, for decoy pairing. Returns
-// null for clue kinds with no natural opposite (e.g. NO DIGIT REPEATS).
-function falseVariant(kind: ClueKind, code: number[], i?: number): string | null {
-  switch (kind) {
-    case "sum":
-      return `THE DIGITS SUM TO ${code.reduce((a, b) => a + b, 0) + 1}`;
-    case "primeCount": {
-      const primeCount = code.filter((d) => PRIMES.has(d)).length;
-      const bad = primeCount === code.length ? primeCount - 1 : primeCount + 1;
-      return `EXACTLY ${bad} DIGIT(S) ARE PRIME`;
-    }
-    case "evenCount": {
-      const evenCount = code.filter((d) => d % 2 === 0).length;
-      const bad = evenCount === code.length ? evenCount - 1 : evenCount + 1;
-      return `EXACTLY ${bad} DIGIT(S) ARE EVEN`;
-    }
-    case "largest": {
-      const largest = Math.max(...code);
-      return `THE LARGEST DIGIT IS ${largest === 9 ? largest - 1 : largest + 1}`;
-    }
-    case "smallest": {
-      const smallest = Math.min(...code);
-      return `THE SMALLEST DIGIT IS ${smallest === 0 ? smallest + 1 : smallest - 1}`;
-    }
-    case "zeroCount": {
-      const zeroCount = code.filter((d) => d === 0).length;
-      const bad = zeroCount === code.length ? zeroCount - 1 : zeroCount + 1;
-      return `THE CODE CONTAINS ${bad} ZERO(S)`;
-    }
-    case "product":
-      return `THE DIGITS MULTIPLY TO ${code.reduce((a, b) => a * b, 1) + 1}`;
-    case "endsSum":
-      return `THE FIRST AND LAST DIGITS SUM TO ${code[0] + code[code.length - 1] + 1}`;
-    case "parity":
-      if (i === undefined) return null;
-      return `DIGIT ${i + 1} IS ${code[i] % 2 === 0 ? "ODD" : "EVEN"}`;
-    case "compare":
-      if (i === undefined) return null;
-      return code[i] < code[i + 1]
-        ? `DIGIT ${i + 1} IS GREATER THAN DIGIT ${i + 2}`
-        : `DIGIT ${i + 1} IS LESS THAN DIGIT ${i + 2}`;
-    case "equal":
-      if (i === undefined) return null;
-      return `DIGIT ${i + 1} IS GREATER THAN DIGIT ${i + 2}`;
-    default:
-      return null;
-  }
-}
-
 function* allCodes(length: number): Generator<number[]> {
   const digits = new Array(length).fill(0);
   const total = 10 ** length;
@@ -211,11 +162,12 @@ function solutionCount(length: number, chosen: Clue[]): number {
 // for that pinning set — NO DIGIT REPEATS, for instance, is false whenever the
 // code happens to repeat a digit, and must never be picked in that case.
 //
-// On top of the pinning set, a few extra true clues are shown alongside their
-// false mirror image (e.g. a real "DIGIT 2 IS EVEN" next to a fabricated
-// "DIGIT 2 IS ODD"). The two visibly contradict and cancel out — a player who
-// spots the pair can safely disregard both, since neither was ever needed to
-// pin down the code. Nothing in the pinning set is ever touched by this.
+// On top of the pinning set, up to two decoy pairs are added: "DIGIT i IS v"
+// next to "DIGIT i IS NOT v" for the same i and v. Exactly one half of each
+// pair is true no matter what v is, so they always cancel out — and because
+// they're a single-digit equality check rather than a global fact (sum,
+// product, etc.), verifying which half is true never requires more than
+// reading off one digit. Nothing in the pinning set is ever touched by this.
 export const keypadGame: HackGame = {
   id: "keypad",
   label: "CONSTRAINT DEDUCTION",
@@ -253,16 +205,19 @@ export const keypadGame: HackGame = {
       }
     }
 
-    // Extra true clues never needed to pin the code — decoy fodder, paired
-    // with a fabricated false negation so the two visibly contradict.
-    const unused = pool.filter((c) => !chosen.includes(c));
-    const decoyPairCount = band <= 2 ? 1 : band <= 4 ? 2 : 3;
-    const decoySource = rng.sample(unused, Math.min(decoyPairCount, unused.length));
-
+    // Decoy pairs: pick a digit position and a value, then state both
+    // "IS v" and "IS NOT v". Whichever half matches the real digit is true;
+    // the other is false — either way they cancel out, and never touch the
+    // pinning set above.
+    const decoyPairCount = Math.min(2, band <= 2 ? 1 : 2);
+    const decoyPositions = rng.sample(
+      Array.from({ length }, (_, i) => i),
+      decoyPairCount
+    );
     const decoyLines: string[] = [];
-    for (const clue of decoySource) {
-      const falseText = falseVariant(clue.kind, code, clue.i);
-      if (falseText) decoyLines.push(clue.text, falseText);
+    for (const i of decoyPositions) {
+      const v = rng.int(0, 9);
+      decoyLines.push(`DIGIT ${i + 1} IS ${v}`, `DIGIT ${i + 1} IS NOT ${v}`);
     }
 
     return {
