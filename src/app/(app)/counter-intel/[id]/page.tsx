@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import {
   anonymiseRun,
   canAccessCounterIntel,
+  canDeleteCounterIntelLog,
   REVEAL_LABELS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
@@ -12,6 +13,7 @@ import { clearanceLabel } from "@/lib/clearance";
 import { formatDuration } from "@/lib/hack/config";
 import { TraceConsole } from "../trace-console";
 import { RevokeForm } from "./revoke-form";
+import { DeleteForm } from "./delete-form";
 
 export default async function CounterIntelCasePage({
   params,
@@ -50,6 +52,11 @@ export default async function CounterIntelCasePage({
         <p className="text-xs text-[var(--term-fg-dim)]">
           TRACE PROGRESS {c.revealLevel}/{REVEAL_MAX} · STATUS {c.status.toUpperCase()}
         </p>
+        {canDeleteCounterIntelLog(user) && (
+          <div className="pt-1">
+            <DeleteForm runId={c.id} />
+          </div>
+        )}
       </div>
 
       <div className="term-panel space-y-2">

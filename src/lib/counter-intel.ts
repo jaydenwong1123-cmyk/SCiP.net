@@ -1,6 +1,7 @@
 import type { HackRun } from "@prisma/client";
+import { db } from "@/lib/db";
 import { REVEAL_MAX } from "@/lib/hack/config";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceLabel, R5_DESIGNATION } from "@/lib/clearance";
 
 // RAISA's counter-intrusion desk.
 //
@@ -23,7 +24,48 @@ export function canAccessCounterIntel(user: {
   return user.department === RAISA_DEPARTMENT;
 }
 
+// Deleting a case file is a step further than reading one: it also requires
+// the L-R5 recordkeeper designation specifically, not just desk membership.
+// Staff powers do not substitute here, same as everywhere else in this file.
+export function canDeleteCounterIntelLog(user: {
+  department?: string | null;
+  designation?: string | null;
+}): boolean {
+  return canAccessCounterIntel(user) && user.designation === R5_DESIGNATION;
+}
+
 export { REVEAL_MAX };
+
+// Case files are purged 30 days after the intrusion attempt started, whether
+// or not it was ever traced. Enforced lazily rather than by a cron (this
+// deployment has none — see MESSAGE_LOG_RETENTION_DAYS in lib/message-logs.ts
+// for the same reasoning) by sweeping expired rows on every visit to the desk.
+export const COUNTER_INTEL_RETENTION_DAYS = 30;
+
+export function counterIntelRetentionCutoff(now = new Date()): Date {
+  return new Date(
+    now.getTime() - COUNTER_INTEL_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  );
+}
+
+// Physically deletes case files older than the retention window, along with
+// their challenges and any grant — HackChallenge/HackGrant carry no cascade,
+// so the children must go first. Safe to call on every desk visit: a run with
+// nothing past the cutoff is a no-op query.
+export async function purgeExpiredCounterIntelLogs(): Promise<void> {
+  const cutoff = counterIntelRetentionCutoff();
+  const stale = await db.hackRun.findMany({
+    where: { startedAt: { lt: cutoff } },
+    select: { id: true },
+  });
+  if (stale.length === 0) return;
+  const ids = stale.map((r) => r.id);
+  await db.$transaction([
+    db.hackChallenge.deleteMany({ where: { runId: { in: ids } } }),
+    db.hackGrant.deleteMany({ where: { runId: { in: ids } } }),
+    db.hackRun.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+}
 
 // What each completed trace uncovers, in order.
 export const REVEAL_LABELS = [

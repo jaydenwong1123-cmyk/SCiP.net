@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GameSurface, useRoundInput } from "./games";
 import {
   abortHackRunAction,
+  checkHackAnswerAction,
   extractHackRunAction,
   pushDeeperAction,
   submitHackAnswerAction,
@@ -55,6 +56,8 @@ export function RunConsole({
 
   const challenge = phase.kind === "challenge" ? phase.challenge : null;
   const [answer, setAnswer] = useRoundInput(challenge?.nonce ?? "");
+  const [checkPending, startCheckTransition] = useTransition();
+  const [checkFeedback, setCheckFeedback] = useState<string | null>(null);
 
   const apply = useCallback(
     (state: HackActionState) => {
@@ -66,6 +69,7 @@ export function RunConsole({
         return;
       }
       setError(null);
+      setCheckFeedback(null);
       switch (state.kind) {
         case "challenge":
           setPhase({
@@ -91,6 +95,7 @@ export function RunConsole({
 
   const submit = useCallback(() => {
     if (!challenge || pending) return;
+    setCheckFeedback(null);
     const form = new FormData();
     form.set("nonce", challenge.nonce);
     form.set("answer", answer);
@@ -98,6 +103,20 @@ export function RunConsole({
       apply(await submitHackAnswerAction(null, form));
     });
   }, [challenge, answer, pending, apply]);
+
+  // A preview, not a submission: burns no attempt and never advances the
+  // round. Separate from TRANSMIT so a player can see how close a guess is
+  // (e.g. icebreaker's letters-correct count) without risking anything.
+  const check = useCallback(() => {
+    if (!challenge || pending || checkPending) return;
+    const form = new FormData();
+    form.set("nonce", challenge.nonce);
+    form.set("answer", answer);
+    startCheckTransition(async () => {
+      const result = await checkHackAnswerAction(null, form);
+      setCheckFeedback(result.ok ? (result.feedback ?? null) : (result.error ?? null));
+    });
+  }, [challenge, answer, pending, checkPending]);
 
   return (
     <div className="space-y-4">
@@ -143,16 +162,30 @@ export function RunConsole({
               game={phase.challenge.game}
               payload={phase.challenge.payload}
               value={answer}
-              onChange={setAnswer}
+              onChange={(v) => {
+                setCheckFeedback(null);
+                setAnswer(v);
+              }}
               disabled={pending}
             />
 
             {phase.feedback && (
               <p className="text-sm text-[var(--term-amber)]">{phase.feedback}</p>
             )}
+            {checkFeedback && (
+              <p className="text-sm text-[var(--term-fg-bright)]">{checkFeedback}</p>
+            )}
             {error && <p className="text-sm text-[var(--term-red)]">{error}</p>}
 
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={check}
+                disabled={pending || checkPending}
+                className="term-button"
+              >
+                {checkPending ? "CHECKING..." : "[ CHECK ]"}
+              </button>
               <button type="submit" disabled={pending} className="term-button">
                 {pending ? "TRANSMITTING..." : "[ TRANSMIT ]"}
               </button>
@@ -265,6 +298,14 @@ function Countdown({
     Math.max(0, deadlineMs - serverNowMs)
   );
   const fired = useRef(false);
+  // Kept in a ref rather than a dependency: `onExpire` is an inline callback
+  // that gets a new identity on every keystroke elsewhere in the tree, and
+  // this effect must not tear down and restart (which would reset the timer)
+  // just because unrelated state changed.
+  const onExpireRef = useRef(onExpire);
+  useEffect(() => {
+    onExpireRef.current = onExpire;
+  }, [onExpire]);
 
   useEffect(() => {
     // Offset between this browser's clock and the server's, measured once on
@@ -277,13 +318,13 @@ function Countdown({
       setRemaining(left);
       if (left <= 0 && !fired.current) {
         fired.current = true;
-        onExpire();
+        onExpireRef.current();
       }
     };
     tick();
     const id = setInterval(tick, 200);
     return () => clearInterval(id);
-  }, [deadlineMs, serverNowMs, onExpire]);
+  }, [deadlineMs, serverNowMs]);
 
   const seconds = remaining / 1000;
   const critical = seconds <= 5;

@@ -207,6 +207,44 @@ export async function resolveStaleRuns(userId: string): Promise<HackRun | null> 
   return active;
 }
 
+// Grade a candidate answer for on-screen feedback ONLY — no attempt spent, no
+// challenge or run row touched. Exists so a player can see how close a guess
+// is (e.g. icebreaker's letters-correct count) without it costing anything,
+// which is the whole reason CHECK is a separate button from TRANSMIT.
+export async function checkIntrusionAnswer(
+  userId: string,
+  nonce: string,
+  answer: string
+): Promise<{ ok: true; feedback: string } | { ok: false }> {
+  const challenge = await db.hackChallenge.findUnique({
+    where: { nonce },
+    include: { run: true },
+  });
+
+  if (
+    !challenge ||
+    challenge.run.userId !== userId ||
+    challenge.kind !== CHALLENGE_KINDS.intrusion ||
+    challenge.run.status !== RUN_STATUS.active ||
+    challenge.correct !== null ||
+    challenge.cursor !== challenge.run.cursor
+  ) {
+    return { ok: false };
+  }
+
+  const result = gradeAnswer(
+    challenge.game,
+    JSON.parse(challenge.solution),
+    answer
+  );
+  return {
+    ok: true,
+    feedback: result.correct
+      ? "MATCH — HIT TRANSMIT TO CONFIRM"
+      : (result.feedback ?? "NO MATCH"),
+  };
+}
+
 export type SubmitOutcome =
   | { kind: "stale" }
   | { kind: "wrong"; feedback?: string; challenge: PublicChallenge }

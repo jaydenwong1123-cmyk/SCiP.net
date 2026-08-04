@@ -38,16 +38,17 @@ const MIN = 60 * 1000;
 
 // The ladder.
 //
-// Stages 3-5 are meant to be brutal — that is the brief. Note stage 5's four
-// rounds budget roughly 135s of clock against a 150s stage cap, so a single
-// hesitation ends the run. Combined with total forfeiture on failure, choosing
-// to push past stage 3 is a genuine gamble rather than a formality.
+// Stages 3-5 are meant to be brutal — that is the brief. Difficulty now comes
+// entirely from round count, game band, and reward rather than a shrinking
+// clock: every stage gets the same per-round budget.
+const STAGE_ROUND_MS = 60_000;
+
 export const STAGES: StageSpec[] = [
-  { stage: 1, tier: 2, rounds: 1, band: 1, baseRoundMs: 60_000, stageCapMs: null, grantMs: 30 * MIN },
-  { stage: 2, tier: 3, rounds: 1, band: 2, baseRoundMs: 50_000, stageCapMs: null, grantMs: 60 * MIN },
-  { stage: 3, tier: 4, rounds: 2, band: 3, baseRoundMs: 40_000, stageCapMs: null, grantMs: 120 * MIN },
-  { stage: 4, tier: 5, rounds: 3, band: 4, baseRoundMs: 34_000, stageCapMs: null, grantMs: 240 * MIN },
-  { stage: 5, tier: HACK_MAX_TIER, rounds: 4, band: 5, baseRoundMs: 30_000, stageCapMs: 150_000, grantMs: 360 * MIN },
+  { stage: 1, tier: 2, rounds: 1, band: 1, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 30 * MIN },
+  { stage: 2, tier: 3, rounds: 1, band: 2, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 60 * MIN },
+  { stage: 3, tier: 4, rounds: 2, band: 3, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 120 * MIN },
+  { stage: 4, tier: 5, rounds: 3, band: 4, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 240 * MIN },
+  { stage: 5, tier: HACK_MAX_TIER, rounds: 4, band: 5, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 360 * MIN },
 ];
 
 export const MAX_STAGE = STAGES.length;
@@ -110,7 +111,7 @@ export const CHALLENGE_KINDS = {
 export const TRACE_BAND_MAX = 2;
 export const TRACE_TIME_SCALE = 2.5;
 export const TRACE_BASE_ROUND_MS = 45_000;
-export const TRACE_LOCKOUT_MS = 5 * MIN;
+export const TRACE_LOCKOUT_MS = 30 * MIN;
 export const REVEAL_MAX = 4;
 
 export function traceDeadlineMs(timeFactor: number): number {

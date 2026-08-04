@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GameSurface, useRoundInput } from "../hack/games";
 import {
   beginTraceAction,
+  checkTraceAnswerAction,
   submitTraceAnswerAction,
   type TraceState,
 } from "./actions";
@@ -35,6 +36,8 @@ export function TraceConsole({
   const [notice, setNotice] = useState<string | null>(lockedNotice);
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useRoundInput(challenge?.nonce ?? "");
+  const [checkPending, startCheckTransition] = useTransition();
+  const [checkFeedback, setCheckFeedback] = useState<string | null>(null);
 
   const apply = useCallback(
     (state: TraceState) => {
@@ -44,6 +47,7 @@ export function TraceConsole({
         return;
       }
       setError(null);
+      setCheckFeedback(null);
       switch (state.kind) {
         case "challenge":
           setNotice(null);
@@ -119,12 +123,37 @@ export function TraceConsole({
             game={challenge.game}
             payload={challenge.payload}
             value={answer}
-            onChange={setAnswer}
+            onChange={(v) => {
+              setCheckFeedback(null);
+              setAnswer(v);
+            }}
             disabled={pending}
           />
-          <button type="submit" disabled={pending} className="term-button">
-            {pending ? "RESOLVING..." : "[ RESOLVE ]"}
-          </button>
+          {checkFeedback && (
+            <p className="text-sm text-[var(--term-fg-bright)]">{checkFeedback}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pending || checkPending}
+              className="term-button"
+              onClick={() => {
+                if (!challenge || pending || checkPending) return;
+                const form = new FormData();
+                form.set("nonce", challenge.nonce);
+                form.set("answer", answer);
+                startCheckTransition(async () => {
+                  const result = await checkTraceAnswerAction(null, form);
+                  setCheckFeedback(result.ok ? result.feedback : result.error);
+                });
+              }}
+            >
+              {checkPending ? "CHECKING..." : "[ CHECK ]"}
+            </button>
+            <button type="submit" disabled={pending} className="term-button">
+              {pending ? "RESOLVING..." : "[ RESOLVE ]"}
+            </button>
+          </div>
         </form>
       )}
     </div>

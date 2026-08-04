@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, hasStaffPowers } from "@/lib/session";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
@@ -8,6 +9,7 @@ import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 import { clearanceLabel } from "@/lib/clearance";
 import {
   canAccessCounterIntel,
+  canDeleteCounterIntelLog,
   caseCode,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
@@ -30,6 +32,10 @@ export type TraceState =
   | { ok: true; kind: "revealed"; revealLevel: number }
   | { ok: true; kind: "locked"; reason: string }
   | { ok: false; error: string; resync?: boolean };
+
+export type TraceCheckState =
+  | { ok: true; feedback: string }
+  | { ok: false; error: string };
 
 // Shared gate. Department string only — see the header of lib/counter-intel.ts
 // for why staff powers deliberately do not open this desk.
@@ -187,6 +193,48 @@ export async function submitTraceAnswerAction(
   return { ok: true, kind: "revealed", revealLevel };
 }
 
+// Preview a trace answer's feedback without spending it — no cursor advance,
+// no backoff, no reveal. Mirrors checkHackAnswerAction on the intrusion side;
+// see its comment for why CHECK has to be a separate verb from RESOLVE.
+export async function checkTraceAnswerAction(
+  _prevState: TraceCheckState | null,
+  formData: FormData
+): Promise<TraceCheckState> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
+
+  const nonce = String(formData.get("nonce") ?? "");
+  const answer = String(formData.get("answer") ?? "").slice(0, 400);
+  if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
+
+  const challenge = await db.hackChallenge.findUnique({
+    where: { nonce },
+    include: { run: true },
+  });
+
+  if (
+    !challenge ||
+    challenge.kind !== CHALLENGE_KINDS.trace ||
+    challenge.correct !== null ||
+    challenge.cursor !== challenge.run.traceCursor ||
+    challenge.run.revealLevel >= REVEAL_MAX
+  ) {
+    return { ok: false, error: "STALE TRACE — RESYNCHRONIZING." };
+  }
+
+  const result = gradeAnswer(challenge.game, JSON.parse(challenge.solution), answer);
+  return {
+    ok: true,
+    feedback: result.correct
+      ? "MATCH — HIT RESOLVE TO CONFIRM"
+      : (result.feedback ?? "NO MATCH"),
+  };
+}
+
 // Cut off an identified intruder's access.
 export async function revokeHackGrantAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -225,4 +273,39 @@ export async function revokeHackGrantAction(
   revalidatePath("/counter-intel");
   revalidatePath(`/counter-intel/${run.id}`);
   return { ok: true };
+}
+
+// Early, manual purge of a single case file — the L-R5 recordkeeper
+// designation only. Desk membership (the department gate every other action
+// here uses) is not enough on its own; see canDeleteCounterIntelLog().
+export async function deleteHackRunAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  if (!canDeleteCounterIntelLog(user)) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const runId = String(formData.get("runId") ?? "");
+  if (!runId) return { ok: false, error: "MISSING CASE ID." };
+
+  const run = await db.hackRun.findUnique({ where: { id: runId } });
+  if (!run) return { ok: false, error: "CASE NOT FOUND." };
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackRunDeleted,
+    actor: user,
+    targetType: "hack_run",
+    targetId: run.id,
+    targetName: caseCode(run.id),
+    summary: "Case file deleted by L-R5",
+  });
+
+  await db.$transaction([
+    db.hackChallenge.deleteMany({ where: { runId } }),
+    db.hackGrant.deleteMany({ where: { runId } }),
+    db.hackRun.delete({ where: { id: runId } }),
+  ]);
+
+  revalidatePath("/counter-intel");
+  redirect("/counter-intel");
 }

@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/session";
 import {
   anonymiseRun,
   canAccessCounterIntel,
+  purgeExpiredCounterIntelLogs,
+  COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
 import { RUN_STATUS } from "@/lib/hack/config";
@@ -20,6 +22,10 @@ export default async function CounterIntelPage({
   // notFound rather than redirect: a member who is not RAISA should not learn
   // that this section exists at all.
   if (!canAccessCounterIntel(user)) notFound();
+
+  // Lazy retention sweep — see purgeExpiredCounterIntelLogs() for why there's
+  // no cron doing this instead.
+  await purgeExpiredCounterIntelLogs();
 
   const { page, filter } = await searchParams;
   const pageNum = Math.max(1, Number(page) || 1);
@@ -65,6 +71,10 @@ export default async function CounterIntelPage({
         <p className="text-xs text-[var(--term-fg-dim)]">
           RAISA EYES ONLY. EACH SIGNAL IS ANONYMOUS UNTIL TRACED. COMPLETE A
           TRACE TO UNCOVER ONE FURTHER FIELD.
+        </p>
+        <p className="text-xs text-[var(--term-fg-dim)]">
+          RETENTION {COUNTER_INTEL_RETENTION_DAYS}D — CASE FILES PURGE
+          AUTOMATICALLY. L-R5 MAY DELETE A CASE EARLY FROM ITS DETAIL VIEW.
         </p>
         <div className="flex flex-wrap gap-3 pt-1">
           <Link href="/counter-intel" className={chip(scope === "all")}>
