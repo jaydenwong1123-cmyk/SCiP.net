@@ -54,6 +54,15 @@ export function RunConsole({
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Tracked locally rather than read straight from props: `stage` and
+  // `clearedStages` are only as fresh as the last full page load, but the
+  // console advances rounds, checkpoints and stages entirely inside client
+  // transitions (see `apply` below) without ever asking the server component
+  // to re-render. Without this, the stage bar and the checkpoint banner would
+  // freeze at whatever stage the page happened to load on.
+  const [curStage, setCurStage] = useState(stage);
+  const [curCleared, setCurCleared] = useState(clearedStages);
+
   const challenge = phase.kind === "challenge" ? phase.challenge : null;
   const [answer, setAnswer] = useRoundInput(challenge?.nonce ?? "");
   const [checkPending, startCheckTransition] = useTransition();
@@ -77,9 +86,14 @@ export function RunConsole({
             challenge: state.challenge,
             feedback: state.feedback,
           });
+          setCurStage(state.challenge.stage);
           break;
         case "checkpoint":
           setPhase({ kind: "checkpoint" });
+          // The stage that was just cleared is whatever the console was
+          // running on the instant its last round graded — `curStage` here,
+          // not the (possibly stale) prop.
+          setCurCleared(curStage);
           break;
         case "failed":
           setPhase({ kind: "failed", reason: state.reason });
@@ -90,7 +104,7 @@ export function RunConsole({
           break;
       }
     },
-    [router]
+    [router, curStage]
   );
 
   const submit = useCallback(() => {
@@ -121,9 +135,9 @@ export function RunConsole({
   return (
     <div className="space-y-4">
       <StageBar
-        stage={stage}
+        stage={curStage}
         maxStage={maxStage}
-        clearedStages={clearedStages}
+        clearedStages={curCleared}
         tierLabels={tierLabels}
       />
 
@@ -199,10 +213,10 @@ export function RunConsole({
 
       {phase.kind === "checkpoint" && (
         <Checkpoint
-          stage={stage}
+          stage={curCleared}
           maxStage={maxStage}
-          tierLabel={tierLabels[clearedStages - 1] ?? "?"}
-          nextTierLabel={tierLabels[clearedStages] ?? null}
+          tierLabel={tierLabels[curCleared - 1] ?? "?"}
+          nextTierLabel={tierLabels[curCleared] ?? null}
           pending={pending}
           error={error}
           onExtract={() =>
@@ -236,7 +250,7 @@ export function RunConsole({
             :: EXTRACTION COMPLETE ::
           </h2>
           <p className="text-sm">
-            CLEARANCE {tierLabels[clearedStages - 1] ?? "?"} GRANTED. READ ACCESS ONLY.
+            CLEARANCE {tierLabels[curCleared - 1] ?? "?"} GRANTED. READ ACCESS ONLY.
           </p>
           <button onClick={() => router.refresh()} className="term-button">
             [ CLOSE LINK ]

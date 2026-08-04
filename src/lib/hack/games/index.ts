@@ -7,10 +7,10 @@ import { waveformGame } from "./waveform";
 import { bytepairGame } from "./bytepair";
 import { nodetraceGame } from "./nodetrace";
 import { keypadGame } from "./keypad";
-import { packetfilterGame } from "./packetfilter";
 import { anomalyGame } from "./anomaly";
 import { signatureGame } from "./signature";
 import { daemonGame } from "./daemon";
+import { minesweeperGame } from "./minesweeper";
 
 export type { HackGame, GameGeneration, GradeResult } from "./types";
 
@@ -27,10 +27,10 @@ const REGISTRY: HackGame[] = [
   bytepairGame,
   nodetraceGame,
   keypadGame,
-  packetfilterGame,
   anomalyGame,
   signatureGame,
   daemonGame,
+  minesweeperGame,
 ];
 
 export const HACK_GAMES: Record<string, HackGame> = Object.fromEntries(

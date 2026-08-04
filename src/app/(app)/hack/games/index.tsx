@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   CipherPayload,
 } from "@/lib/hack/games/cipher";
@@ -9,10 +9,10 @@ import type { WaveformPayload } from "@/lib/hack/games/waveform";
 import type { BytepairPayload } from "@/lib/hack/games/bytepair";
 import type { NodetracePayload } from "@/lib/hack/games/nodetrace";
 import type { KeypadPayload } from "@/lib/hack/games/keypad";
-import type { PacketfilterPayload } from "@/lib/hack/games/packetfilter";
 import type { AnomalyPayload } from "@/lib/hack/games/anomaly";
 import type { SignaturePayload } from "@/lib/hack/games/signature";
 import type { DaemonPayload } from "@/lib/hack/games/daemon";
+import type { MinesweeperPayload } from "@/lib/hack/games/minesweeper";
 
 // The twelve puzzle renderers.
 //
@@ -255,37 +255,54 @@ function KeypadGame({ payload, value, onChange, disabled }: GameProps) {
   );
 }
 
-function PacketfilterGame({ payload, value, onChange, disabled }: GameProps) {
-  const p = payload as PacketfilterPayload;
-  // Each field gets its own grid column sized to its own content, so a long
-  // port range can never push a host name (or itself) out of view — unlike
-  // padded single-line text, a grid cell is never silently clipped.
+function MinesweeperGame({ payload, value, onChange, disabled }: GameProps) {
+  const p = payload as MinesweeperPayload;
+  const picked = value.split(/[\s,]+/).filter(Boolean);
+
+  const toggle = (cell: string) => {
+    const next = picked.includes(cell)
+      ? picked.filter((c) => c !== cell)
+      : [...picked, cell];
+    onChange(next.join(" "));
+  };
+
   return (
     <div className="space-y-3">
-      <div className={`${PANEL} hack-mono hack-scroll hack-table-scroll text-xs`}>
-        <div className="text-[var(--term-fg-dim)]">RULESET (FIRST MATCH WINS)</div>
-        <div className="grid gap-x-3 gap-y-0.5" style={{ gridTemplateColumns: "auto auto auto auto" }}>
-          {p.rules.map((r) => (
-            <Fragment key={r.index}>
-              <span>{r.index}.</span>
-              <span>{r.action}</span>
-              <span>HOST={r.host}</span>
-              <span>PORT={r.port}</span>
-            </Fragment>
-          ))}
-        </div>
-        <div className="mt-2 text-[var(--term-fg-dim)]">PACKETS</div>
-        <div className="grid gap-x-3 gap-y-0.5" style={{ gridTemplateColumns: "auto auto auto" }}>
-          {p.packets.map((k) => (
-            <Fragment key={k.id}>
-              <span>{k.id}</span>
-              <span>HOST={k.host}</span>
-              <span>PORT={k.port}</span>
-            </Fragment>
-          ))}
+      <Hint>{p.mineCount} MINES ON THE FIELD. FLAG EVERY COVERED CELL THAT MUST BE ONE.</Hint>
+      <div className={`${PANEL} hack-scroll`}>
+        <div className="hack-grid" style={{ ["--hack-cols" as string]: String(p.size) }}>
+          {p.cells.map((row, r) =>
+            row.map((n, c) => {
+              const coord = `R${r + 1}C${c + 1}`;
+              if (n !== null) {
+                return (
+                  <span
+                    key={coord}
+                    className="hack-cell"
+                    aria-label={`${coord} adjacent mines ${n}`}
+                  >
+                    {n === 0 ? "" : n}
+                  </span>
+                );
+              }
+              const flagged = picked.includes(coord);
+              return (
+                <button
+                  key={coord}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => toggle(coord)}
+                  aria-pressed={flagged}
+                  className={`hack-cell${flagged ? " hack-cell--picked" : ""}`}
+                >
+                  {flagged ? "*" : "?"}
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="ACCEPTED IDS, OR NONE" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="MINE COORDINATES" />
     </div>
   );
 }
@@ -413,10 +430,10 @@ const RENDERERS: Record<string, (props: GameProps) => React.ReactElement> = {
   bytepair: BytepairGame,
   nodetrace: NodetraceGame,
   keypad: KeypadGame,
-  packetfilter: PacketfilterGame,
   anomaly: AnomalyGame,
   signature: SignatureGame,
   daemon: DaemonGame,
+  minesweeper: MinesweeperGame,
 };
 
 // Dispatch by the id the server drew. An unknown id can only mean the server
