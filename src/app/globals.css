@@ -868,6 +868,59 @@ a {
   background: color-mix(in srgb, var(--term-red) 16%, transparent);
 }
 
+/* MINE SURVEY's board. A dedicated grid rather than reusing .hack-grid: every
+   cell is forced square via aspect-ratio (so the whole NxN board reads as a
+   square regardless of panel width) and the digits run noticeably larger
+   than the other games' dense tables, since this one is read at a glance
+   rather than transcribed. */
+.hack-mine-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--hack-cols, 8), minmax(2.5rem, 1fr));
+  gap: 3px;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.hack-mine-cell {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--term-font);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--term-border) 45%, transparent);
+  color: var(--term-fg);
+  background: transparent;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.hack-mine-cell:hover:not(:disabled),
+.hack-mine-cell:focus-visible {
+  background: color-mix(in srgb, var(--term-fg) 14%, transparent);
+  color: var(--term-fg-bright);
+}
+
+.hack-mine-cell--revealed {
+  border-color: color-mix(in srgb, var(--term-border) 28%, transparent);
+  color: var(--term-fg-bright);
+  cursor: default;
+}
+
+.hack-mine-cell--flagged {
+  border-color: var(--term-amber);
+  color: var(--term-amber);
+  background: color-mix(in srgb, var(--term-amber) 16%, transparent);
+}
+
+.hack-mine-cell--mine {
+  border-color: var(--term-red);
+  color: var(--term-red);
+  background: color-mix(in srgb, var(--term-red) 16%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hack-timer--critical {
     animation: none;

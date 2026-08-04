@@ -4,7 +4,10 @@ import { normalizeList, sameSet } from "./types";
 export type MinesweeperPayload = {
   size: number;
   mineCount: number;
-  // null = still covered. 0-8 = revealed cell's adjacent mine count.
+  // null = a mine. 0-8 = that safe cell's adjacent mine count. Every safe
+  // cell is included — the client is the one that keeps them covered and
+  // reveals them progressively as the player clicks, exactly like a real
+  // board; the server has no notion of "revealed" at all.
   cells: (number | null)[][];
 };
 
@@ -31,19 +34,21 @@ function coord(size: number, key: number): string {
 }
 
 // FIREWALL AUDIT's replacement. Board size scales with band: 4x4 at L2-L3,
-// 6x6 at L4, 8x8 at L5, 10x10 at the deepest layer.
+// 6x6 at L4, 8x8 at L5, 10x10 at the deepest layer. Played like a real board
+// client-side — click to uncover, flag the mines — but the answer that is
+// actually graded is only ever the flag list.
 //
-// Every board is guaranteed solvable by pure single-point deduction (a
-// revealed number whose covered neighbors exactly match its remaining count
-// pins every one of them as a mine; a revealed number with nothing left
-// pinned clears the rest as safe). Mine layouts that basic propagation can't
-// fully resolve are rejected and re-rolled — see the retry loop below — so a
-// player is never asked to guess.
+// Generation still runs a single-point deduction solver (a cell whose
+// covered neighbors exactly match its remaining count pins every one of them
+// as a mine; a cell with nothing left pinned clears the rest as safe) purely
+// to GUARANTEE every mine is locatable without a blind guess. Layouts the
+// solver can't fully resolve are rejected and re-rolled — see the retry loop
+// below.
 export const minesweeperGame: HackGame = {
   id: "minesweeper",
   label: "MINE SURVEY",
   brief:
-    "REVEALED CELLS SHOW THEIR ADJACENT MINE COUNT. DEDUCE EVERY COVERED CELL THAT MUST BE A MINE. SUBMIT COORDINATES, E.G. R1C2 R3C4.",
+    "CLICK A COVERED CELL TO UNCOVER IT. FLAG EVERY CELL THAT MUST BE A MINE. CLEAR THE FIELD AND FLAG EVERY MINE, THEN TRANSMIT.",
   minBand: 1,
   maxBand: 5,
   timeFactor: 1.3,

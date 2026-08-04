@@ -255,53 +255,171 @@ function KeypadGame({ payload, value, onChange, disabled }: GameProps) {
   );
 }
 
+// Detonating a real cell forces an answer no flag list can ever match —
+// the round then fails the normal wrong-answer path on TRANSMIT, so the
+// server stays the sole authority on the outcome even though the "boom" is
+// entirely a client-side reaction.
+const DETONATED_ANSWER = "DETONATED";
+
+function mineNeighbors(r: number, c: number, size: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size) out.push([nr, nc]);
+    }
+  }
+  return out;
+}
+
 function MinesweeperGame({ payload, value, onChange, disabled }: GameProps) {
   const p = payload as MinesweeperPayload;
-  const picked = value.split(/[\s,]+/).filter(Boolean);
+  const flagged = value.split(/[\s,]+/).filter(Boolean);
 
-  const toggle = (cell: string) => {
-    const next = picked.includes(cell)
-      ? picked.filter((c) => c !== cell)
-      : [...picked, cell];
+  // Reveal state lives here rather than in `value` — only the flag list is
+  // ever graded, so what has been clicked open is pure client presentation.
+  // Reset whenever a new round hands this component a fresh payload object,
+  // mirroring the adjust-during-render pattern useRoundInput uses for nonce.
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  const [detonatedAt, setDetonatedAt] = useState<string | null>(null);
+  const [flagMode, setFlagMode] = useState(false);
+  const [seenPayload, setSeenPayload] = useState(payload);
+  if (payload !== seenPayload) {
+    setSeenPayload(payload);
+    setRevealed(new Set());
+    setDetonatedAt(null);
+    setFlagMode(false);
+  }
+
+  const locked = disabled || detonatedAt !== null;
+  const totalSafe = p.size * p.size - p.mineCount;
+  const cleared = revealed.size >= totalSafe && flagged.length === p.mineCount;
+
+  const toggleFlag = (r: number, c: number) => {
+    const key = `${r}-${c}`;
+    if (revealed.has(key)) return;
+    const coord = `R${r + 1}C${c + 1}`;
+    const next = flagged.includes(coord)
+      ? flagged.filter((f) => f !== coord)
+      : [...flagged, coord];
     onChange(next.join(" "));
+  };
+
+  const reveal = (r: number, c: number) => {
+    const key = `${r}-${c}`;
+    if (revealed.has(key) || flagged.includes(`R${r + 1}C${c + 1}`)) return;
+
+    if (p.cells[r][c] === null) {
+      setDetonatedAt(key);
+      onChange(DETONATED_ANSWER);
+      return;
+    }
+
+    // Flood-reveal from here, exactly like a real click: a 0 cascades into
+    // its neighbors, a nonzero number stops the spread at itself.
+    const next = new Set(revealed);
+    const stack: [number, number][] = [[r, c]];
+    while (stack.length > 0) {
+      const [rr, cc] = stack.pop() as [number, number];
+      const k = `${rr}-${cc}`;
+      if (next.has(k)) continue;
+      const v = p.cells[rr][cc];
+      if (v === null) continue;
+      next.add(k);
+      if (v === 0) {
+        for (const [nr, nc] of mineNeighbors(rr, cc, p.size)) {
+          if (!next.has(`${nr}-${nc}`)) stack.push([nr, nc]);
+        }
+      }
+    }
+    setRevealed(next);
   };
 
   return (
     <div className="space-y-3">
-      <Hint>{p.mineCount} MINES ON THE FIELD. FLAG EVERY COVERED CELL THAT MUST BE ONE.</Hint>
+      <Hint>
+        {p.mineCount} MINES ON THE FIELD. CLICK A COVERED CELL TO UNCOVER IT.
+        {" "}FLAG EVERY MINE — RIGHT-CLICK, OR TOGGLE FLAG MODE BELOW. TRANSMIT
+        ONCE THE FIELD IS FULLY CLEARED AND EVERY MINE IS FLAGGED.
+      </Hint>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => setFlagMode((m) => !m)}
+          aria-pressed={flagMode}
+          className={`term-button text-xs${flagMode ? " hack-button--risk" : ""}`}
+        >
+          {flagMode ? "[ FLAG MODE: ON ]" : "[ FLAG MODE: OFF ]"}
+        </button>
+        <span className="text-xs text-[var(--term-fg-dim)]">
+          {flagged.length}/{p.mineCount} FLAGGED
+        </span>
+      </div>
       <div className={`${PANEL} hack-scroll`}>
-        <div className="hack-grid" style={{ ["--hack-cols" as string]: String(p.size) }}>
+        <div className="hack-mine-grid" style={{ ["--hack-cols" as string]: String(p.size) }}>
           {p.cells.map((row, r) =>
             row.map((n, c) => {
+              const key = `${r}-${c}`;
               const coord = `R${r + 1}C${c + 1}`;
-              if (n !== null) {
+              const isRevealed = revealed.has(key);
+              const isFlagged = flagged.includes(coord);
+              const isMine = n === null;
+              const showAsMine = detonatedAt !== null && isMine;
+
+              if (isRevealed) {
                 return (
                   <span
                     key={coord}
-                    className="hack-cell"
+                    className="hack-mine-cell hack-mine-cell--revealed"
                     aria-label={`${coord} adjacent mines ${n}`}
                   >
                     {n === 0 ? "" : n}
                   </span>
                 );
               }
-              const flagged = picked.includes(coord);
+
               return (
                 <button
                   key={coord}
                   type="button"
-                  disabled={disabled}
-                  onClick={() => toggle(coord)}
-                  aria-pressed={flagged}
-                  className={`hack-cell${flagged ? " hack-cell--picked" : ""}`}
+                  disabled={locked}
+                  onClick={() => (flagMode ? toggleFlag(r, c) : reveal(r, c))}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (!locked) toggleFlag(r, c);
+                  }}
+                  aria-pressed={isFlagged}
+                  aria-label={`${coord}${isFlagged ? " flagged" : " covered"}`}
+                  className={`hack-mine-cell${
+                    key === detonatedAt
+                      ? " hack-mine-cell--mine"
+                      : showAsMine
+                        ? " hack-mine-cell--mine"
+                        : isFlagged
+                          ? " hack-mine-cell--flagged"
+                          : ""
+                  }`}
                 >
-                  {flagged ? "*" : "?"}
+                  {key === detonatedAt ? "*" : showAsMine ? "•" : isFlagged ? "F" : "?"}
                 </button>
               );
             })
           )}
         </div>
       </div>
+      {detonatedAt && (
+        <p className="text-sm text-[var(--term-red)]">
+          DETONATED — TRANSMIT TO CONFIRM THE FAILURE.
+        </p>
+      )}
+      {!detonatedAt && cleared && (
+        <p className="text-sm text-[var(--term-fg-bright)]">
+          FIELD CLEARED — TRANSMIT TO CONFIRM.
+        </p>
+      )}
       <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="MINE COORDINATES" />
     </div>
   );
