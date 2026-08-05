@@ -35,6 +35,27 @@ function caseStatusColor(status: AnonymisedRun["caseStatus"]): string {
   }
 }
 
+function CaseBadges({ c }: { c: AnonymisedRun }) {
+  return (
+    <>
+      {" · "}
+      <span className={resolutionColor(c.resolution)}>
+        {CASE_RESOLUTION_LABELS[c.resolution]}
+      </span>
+      {" · "}
+      <span className={caseStatusColor(c.caseStatus)}>
+        {CASE_STATUS_LABELS[c.caseStatus]}
+      </span>
+      {c.flagged && (
+        <span className="text-[var(--term-amber)]"> · ⚑ FLAGGED</span>
+      )}
+      {c.tracedByName && (
+        <span> · TRACED BY {c.tracedByName}</span>
+      )}
+    </>
+  );
+}
+
 // L-R5 only — see canDeleteCounterIntelLog(). Checkbox selection plus a
 // WIPE ALL escape hatch, both gated behind the same designation as the
 // per-case DeleteForm on the detail view.
@@ -182,18 +203,7 @@ export function CaseList({
                 {c.startedAtLabel ?? "TIMESTAMP SEALED"}
                 {" · TRACE "}
                 {c.revealLevel}/{revealMax}
-                {" · "}
-                <span className={resolutionColor(c.resolution)}>
-                  {CASE_RESOLUTION_LABELS[c.resolution]}
-                </span>
-                {c.caseStatus !== CASE_STATUSES.open && (
-                  <>
-                    {" · "}
-                    <span className={caseStatusColor(c.caseStatus)}>
-                      {CASE_STATUS_LABELS[c.caseStatus]}
-                    </span>
-                  </>
-                )}
+                <CaseBadges c={c} />
               </span>
             </Link>
           </div>

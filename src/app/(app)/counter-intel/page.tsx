@@ -13,7 +13,6 @@ import {
   COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
-import { RUN_STATUS } from "@/lib/hack/config";
 import { CaseList } from "./case-list";
 
 const PAGE_SIZE = 40;
@@ -35,31 +34,14 @@ export default async function CounterIntelPage({
   const { page, filter } = await searchParams;
   const pageNum = Math.max(1, Number(page) || 1);
   const scope =
-    filter === "open" ||
-    filter === "identified" ||
-    filter === "action" ||
-    filter === "flagged"
-      ? filter
-      : "all";
+    filter === "inProgress" || filter === "flagged" ? filter : "all";
 
-  const now = new Date();
   const where =
-    scope === "open"
-      ? { revealLevel: { lt: REVEAL_MAX } }
-      : scope === "identified"
-        ? { revealLevel: REVEAL_MAX }
-        : scope === "action"
-          ? {
-              status: RUN_STATUS.extracted,
-              grant: { revokedAt: null, expiresAt: { gt: now } },
-            }
-          : scope === "flagged"
-            ? {
-                caseStatus: {
-                  in: [CASE_STATUSES.inProgress, CASE_STATUSES.needsAction],
-                },
-              }
-            : {};
+    scope === "inProgress"
+      ? { caseStatus: CASE_STATUSES.inProgress }
+      : scope === "flagged"
+        ? { flagged: true }
+        : {};
 
   const grantSelect = {
     id: true,
@@ -80,6 +62,7 @@ export default async function CounterIntelPage({
       // in the RSC payload regardless of what rendered.
       include: {
         user: { select: { id: true, displayName: true, email: true } },
+        traceBy: { select: { id: true, displayName: true, email: true } },
         grant: { select: grantSelect },
       },
     }),
@@ -88,7 +71,7 @@ export default async function CounterIntelPage({
     // any one page's list, so it always reflects the whole log regardless of
     // which filter or page is currently open.
     db.hackRun.findMany({
-      select: { status: true, caseStatus: true, grant: { select: grantSelect } },
+      select: { status: true, flagged: true, grant: { select: grantSelect } },
     }),
   ]);
 
@@ -113,11 +96,7 @@ export default async function CounterIntelPage({
     {} as Partial<Record<ReturnType<typeof caseResolution>, number>>
   );
 
-  const flaggedCount = resolutionRows.filter(
-    (run) =>
-      run.caseStatus === CASE_STATUSES.inProgress ||
-      run.caseStatus === CASE_STATUSES.needsAction
-  ).length;
+  const flaggedCount = resolutionRows.filter((run) => run.flagged).length;
 
   const chip = (active: boolean) =>
     `term-link text-xs${active ? " text-[var(--term-fg-bright)]" : ""}`;
@@ -139,20 +118,11 @@ export default async function CounterIntelPage({
           <Link href="/counter-intel" className={chip(scope === "all")}>
             [ALL]
           </Link>
-          <Link href="/counter-intel?filter=open" className={chip(scope === "open")}>
-            [UNIDENTIFIED]
-          </Link>
           <Link
-            href="/counter-intel?filter=identified"
-            className={chip(scope === "identified")}
+            href="/counter-intel?filter=inProgress"
+            className={chip(scope === "inProgress")}
           >
-            [IDENTIFIED]
-          </Link>
-          <Link
-            href="/counter-intel?filter=action"
-            className={chip(scope === "action")}
-          >
-            [LIVE ACCESS]
+            [IN PROGRESS]
           </Link>
           <Link
             href="/counter-intel?filter=flagged"

@@ -51,19 +51,19 @@ export { REVEAL_MAX };
 // RAISA's manual investigative workflow tag. Independent of both the
 // intrusion's own status and the auto-derived technical resolution below —
 // this one tracks what the desk has done, not what the intrusion did.
+// Every new case starts at NEEDS_ACTION (see the default on HackRun.caseStatus)
+// — there is no separate "unseen" state, NEEDS_ACTION already means that.
 export const CASE_STATUSES = {
-  open: "OPEN",
-  inProgress: "IN_PROGRESS",
   needsAction: "NEEDS_ACTION",
+  inProgress: "IN_PROGRESS",
   resolved: "RESOLVED",
 } as const;
 
 export type CaseStatus = (typeof CASE_STATUSES)[keyof typeof CASE_STATUSES];
 
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
-  [CASE_STATUSES.open]: "OPEN",
-  [CASE_STATUSES.inProgress]: "IN PROGRESS",
   [CASE_STATUSES.needsAction]: "NEEDS ACTION",
+  [CASE_STATUSES.inProgress]: "IN PROGRESS",
   [CASE_STATUSES.resolved]: "RESOLVED",
 };
 
@@ -162,6 +162,11 @@ export type AnonymisedRun = {
   status: string;
   resolution: CaseResolution;
   caseStatus: CaseStatus;
+  flagged: boolean;
+  // Which RAISA officer's trace last advanced this case. Not gated by
+  // revealLevel — this names one of RAISA's own, not the intruder, so the
+  // anonymity boundary the rest of this projection enforces doesn't apply.
+  tracedByName: string | null;
   traceLockedUntilMs: number | null;
   // Reveal 1.
   startedAtLabel: string | null;
@@ -182,6 +187,7 @@ export type AnonymisedRun = {
 
 type RunWithExtras = HackRun & {
   user?: { id: string; displayName: string | null; email: string } | null;
+  traceBy?: { id: string; displayName: string | null; email: string } | null;
   grant?: {
     id: string;
     tier: number;
@@ -220,9 +226,15 @@ export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
     resolution: caseResolution({ status: run.status, grant }),
     // isCaseStatus() should always hold — the DB column only ever gets a
     // value through setCaseStatusAction(), which validates it — but a
-    // corrupt or pre-migration row falls back to OPEN rather than crashing
-    // the page.
-    caseStatus: isCaseStatus(run.caseStatus) ? run.caseStatus : CASE_STATUSES.open,
+    // corrupt or pre-migration row falls back to NEEDS_ACTION rather than
+    // crashing the page.
+    caseStatus: isCaseStatus(run.caseStatus)
+      ? run.caseStatus
+      : CASE_STATUSES.needsAction,
+    flagged: run.flagged,
+    tracedByName: run.traceById
+      ? (run.traceBy?.displayName ?? run.traceBy?.email ?? "UNKNOWN")
+      : null,
     traceLockedUntilMs: run.traceLockedUntil
       ? run.traceLockedUntil.getTime()
       : null,

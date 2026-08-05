@@ -284,8 +284,8 @@ export async function revokeHackGrantAction(
 }
 
 // Move a case through RAISA's manual investigative workflow. Any desk member
-// may pick a case up (IN_PROGRESS) or flag it (NEEDS_ACTION); closing it
-// (RESOLVED) is L-R5 only — see canResolveCounterIntelCase() for why.
+// may pick a case up (IN_PROGRESS) or send it back to the queue (NEEDS_ACTION);
+// closing it (RESOLVED) is L-R5 only — see canResolveCounterIntelCase() for why.
 export async function setCaseStatusAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
@@ -317,6 +317,42 @@ export async function setCaseStatusAction(
     targetId: run.id,
     targetName: caseCode(run.id),
     summary: `Case status set to ${CASE_STATUS_LABELS[status]}`,
+  });
+
+  revalidatePath("/counter-intel");
+  revalidatePath(`/counter-intel/${run.id}`);
+  return { ok: true };
+}
+
+// Flag a case for attention. Any desk member may toggle this — unlike
+// caseStatus it carries no closing authority, so it needs no L-R5 gate.
+// Independent of caseStatus: a case can be IN_PROGRESS and flagged at once.
+export async function toggleCaseFlagAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const runId = String(formData.get("runId") ?? "");
+  if (!runId) return { ok: false, error: "MISSING CASE ID." };
+
+  const run = await db.hackRun.findUnique({
+    where: { id: runId },
+    select: { id: true, flagged: true },
+  });
+  if (!run) return { ok: false, error: "CASE NOT FOUND." };
+
+  const flagged = !run.flagged;
+  await db.hackRun.update({ where: { id: runId }, data: { flagged } });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackCaseFlagToggled,
+    actor: user,
+    targetType: "hack_run",
+    targetId: run.id,
+    targetName: caseCode(run.id),
+    summary: flagged ? "Case flagged" : "Case unflagged",
   });
 
   revalidatePath("/counter-intel");

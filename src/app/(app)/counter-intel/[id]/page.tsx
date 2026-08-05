@@ -31,6 +31,7 @@ export default async function CounterIntelCasePage({
     where: { id },
     include: {
       user: { select: { id: true, displayName: true, email: true } },
+      traceBy: { select: { id: true, displayName: true, email: true } },
       grant: { select: { id: true, tier: true, expiresAt: true, revokedAt: true } },
     },
   });
@@ -54,6 +55,7 @@ export default async function CounterIntelCasePage({
         </div>
         <p className="text-xs text-[var(--term-fg-dim)]">
           TRACE PROGRESS {c.revealLevel}/{REVEAL_MAX} · STATUS {c.status.toUpperCase()}
+          {c.tracedByName ? ` · TRACED BY ${c.tracedByName}` : ""}
         </p>
         {canDeleteCounterIntelLog(user) && (
           <div className="pt-1">
@@ -69,6 +71,7 @@ export default async function CounterIntelCasePage({
         <CaseStatusForm
           runId={c.id}
           current={c.caseStatus}
+          flagged={c.flagged}
           canResolve={canResolveCounterIntelCase(user)}
         />
       </div>
