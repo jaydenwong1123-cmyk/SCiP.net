@@ -5,11 +5,12 @@ import { requireUser } from "@/lib/session";
 import {
   anonymiseRun,
   canAccessCounterIntel,
+  canDeleteCounterIntelLog,
   purgeExpiredCounterIntelLogs,
   COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
-import { RUN_STATUS } from "@/lib/hack/config";
+import { CaseList } from "./case-list";
 
 const PAGE_SIZE = 40;
 
@@ -60,6 +61,7 @@ export default async function CounterIntelPage({
 
   const cases = rows.map(anonymiseRun);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canDelete = canDeleteCounterIntelLog(user);
 
   const chip = (active: boolean) =>
     `term-link text-xs${active ? " text-[var(--term-fg-bright)]" : ""}`;
@@ -74,7 +76,8 @@ export default async function CounterIntelPage({
         </p>
         <p className="text-xs text-[var(--term-fg-dim)]">
           RETENTION {COUNTER_INTEL_RETENTION_DAYS}D — CASE FILES PURGE
-          AUTOMATICALLY. L-R5 MAY DELETE A CASE EARLY FROM ITS DETAIL VIEW.
+          AUTOMATICALLY. L-R5 MAY DELETE CASES EARLY, INDIVIDUALLY OR IN
+          BULK, OR WIPE THE ENTIRE DESK.
         </p>
         <div className="flex flex-wrap gap-3 pt-1">
           <Link href="/counter-intel" className={chip(scope === "all")}>
@@ -92,39 +95,7 @@ export default async function CounterIntelPage({
         </div>
       </div>
 
-      <div className="term-panel space-y-1">
-        {cases.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state__glyph">◇</div>
-            <div className="empty-state__title">NO SIGNALS ON RECORD</div>
-          </div>
-        )}
-
-        {cases.map((c) => (
-          <Link
-            key={c.id}
-            href={`/counter-intel/${c.id}`}
-            className="term-row flex flex-wrap items-baseline justify-between gap-2"
-          >
-            <span className="text-sm">
-              <span className="text-[var(--term-fg-bright)]">{c.code}</span>
-              {c.displayName ? (
-                <span className="text-[var(--term-red)]"> · {c.displayName}</span>
-              ) : (
-                <span className="text-[var(--term-fg-dim)]"> · ORIGIN UNKNOWN</span>
-              )}
-            </span>
-            <span className="text-xs text-[var(--term-fg-dim)]">
-              {c.startedAtLabel ?? "TIMESTAMP SEALED"}
-              {" · TRACE "}
-              {c.revealLevel}/{REVEAL_MAX}
-              {c.status === RUN_STATUS.extracted && c.grant && !c.grant.revoked
-                ? " · ACCESS LIVE"
-                : ""}
-            </span>
-          </Link>
-        ))}
-      </div>
+      <CaseList cases={cases} revealMax={REVEAL_MAX} canDelete={canDelete} />
 
       {pages > 1 && (
         <div className="term-panel flex justify-between text-xs">

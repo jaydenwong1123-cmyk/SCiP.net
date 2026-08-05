@@ -313,3 +313,89 @@ export async function deleteHackRunAction(
   revalidatePath("/counter-intel");
   redirect("/counter-intel");
 }
+
+// Multi-select purge of several case files at once, from the desk's list
+// view. Same L-R5 gate as deleteHackRunAction; a bad or already-gone id in
+// the batch is simply excluded rather than failing the whole submission —
+// same shape as bulkMemberAction in admin/actions.ts.
+export async function deleteHackRunsAction(
+  _prevState: { ok: boolean; error?: string; message?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const user = await requireUser();
+  if (!canDeleteCounterIntelLog(user)) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const runIds = [
+    ...new Set(
+      formData
+        .getAll("runIds")
+        .map((v) => String(v))
+        .filter(Boolean)
+    ),
+  ];
+  if (runIds.length === 0) return { ok: false, error: "NO CASES SELECTED." };
+
+  const runs = await db.hackRun.findMany({
+    where: { id: { in: runIds } },
+    select: { id: true },
+  });
+  if (runs.length === 0) return { ok: false, error: "NONE OF THOSE CASES EXIST." };
+
+  // One audit entry per case, same as the single-delete verb, so a bulk
+  // purge is no less traceable than deleting rows one at a time.
+  for (const run of runs) {
+    await logAudit({
+      action: AUDIT_ACTIONS.hackRunDeleted,
+      actor: user,
+      targetType: "hack_run",
+      targetId: run.id,
+      targetName: caseCode(run.id),
+      summary: "Case file deleted by L-R5 (bulk)",
+    });
+  }
+
+  const ids = runs.map((r) => r.id);
+  await db.$transaction([
+    db.hackChallenge.deleteMany({ where: { runId: { in: ids } } }),
+    db.hackGrant.deleteMany({ where: { runId: { in: ids } } }),
+    db.hackRun.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+
+  revalidatePath("/counter-intel");
+  return { ok: true, message: `${ids.length} CASE FILE(S) DELETED.` };
+}
+
+// Nuke every case file on the desk, regardless of trace state. Same L-R5
+// gate as the other two delete verbs. Logged as a single summary entry
+// rather than one per row — a wipe is one deliberate act, not N of them,
+// and by the time it runs the individual case codes are gone anyway.
+// useActionState requires this exact (prevState, formData) signature; the
+// verb itself takes no payload, hence the disable below.
+/* eslint-disable @typescript-eslint/no-unused-vars */
+export async function wipeAllHackRunsAction(
+  _prevState: { ok: boolean; error?: string; message?: string } | null,
+  _formData: FormData
+): Promise<{ ok: boolean; error?: string; message?: string }> {
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+  const user = await requireUser();
+  if (!canDeleteCounterIntelLog(user)) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const count = await db.hackRun.count();
+  if (count === 0) return { ok: true, message: "NOTHING TO WIPE." };
+
+  await db.$transaction([
+    db.hackChallenge.deleteMany({}),
+    db.hackGrant.deleteMany({}),
+    db.hackRun.deleteMany({}),
+  ]);
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackRunDeleted,
+    actor: user,
+    targetType: "hack_run",
+    summary: `ALL case files wiped by L-R5 (${count} deleted)`,
+  });
+
+  revalidatePath("/counter-intel");
+  return { ok: true, message: `${count} CASE FILE(S) WIPED.` };
+}
