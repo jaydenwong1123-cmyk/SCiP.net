@@ -358,6 +358,15 @@ model HackRun {
   traceBy          User?    @relation("HackRunTracer", fields: [traceById], references: [id])
   identifiedAt     DateTime?
 
+  // RAISA's manual investigative workflow tag — "OPEN" | "IN_PROGRESS" |
+  // "NEEDS_ACTION" | "RESOLVED". Deliberately separate from `status` (the
+  // intrusion's own outcome) and from the auto-derived technical resolution
+  // in lib/counter-intel.ts (grant live/expired/revoked): this one records
+  // what the desk has DONE about a case, not what the intrusion itself did.
+  // Any RAISA member may set it, except RESOLVED — see
+  // canResolveCounterIntelCase() for why that step is L-R5 only.
+  caseStatus String @default("OPEN")
+
   userId String
   user   User   @relation("HackRunUser", fields: [userId], references: [id])
 

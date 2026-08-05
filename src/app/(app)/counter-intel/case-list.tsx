@@ -6,6 +6,8 @@ import { deleteHackRunsAction, wipeAllHackRunsAction } from "./actions";
 import {
   CASE_RESOLUTIONS,
   CASE_RESOLUTION_LABELS,
+  CASE_STATUSES,
+  CASE_STATUS_LABELS,
   type AnonymisedRun,
 } from "@/lib/counter-intel";
 
@@ -15,6 +17,19 @@ function resolutionColor(resolution: AnonymisedRun["resolution"]): string {
       return "text-[var(--term-red)]";
     case CASE_RESOLUTIONS.active:
       return "text-[var(--term-amber)]";
+    default:
+      return "text-[var(--term-fg-dim)]";
+  }
+}
+
+function caseStatusColor(status: AnonymisedRun["caseStatus"]): string {
+  switch (status) {
+    case CASE_STATUSES.needsAction:
+      return "text-[var(--term-red)]";
+    case CASE_STATUSES.inProgress:
+      return "text-[var(--term-amber)]";
+    case CASE_STATUSES.resolved:
+      return "text-[var(--term-fg-dim)]";
     default:
       return "text-[var(--term-fg-dim)]";
   }
@@ -171,6 +186,14 @@ export function CaseList({
                 <span className={resolutionColor(c.resolution)}>
                   {CASE_RESOLUTION_LABELS[c.resolution]}
                 </span>
+                {c.caseStatus !== CASE_STATUSES.open && (
+                  <>
+                    {" · "}
+                    <span className={caseStatusColor(c.caseStatus)}>
+                      {CASE_STATUS_LABELS[c.caseStatus]}
+                    </span>
+                  </>
+                )}
               </span>
             </Link>
           </div>

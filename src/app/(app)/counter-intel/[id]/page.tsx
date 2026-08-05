@@ -6,6 +6,8 @@ import {
   anonymiseRun,
   canAccessCounterIntel,
   canDeleteCounterIntelLog,
+  canResolveCounterIntelCase,
+  CASE_STATUS_LABELS,
   REVEAL_LABELS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
@@ -14,6 +16,7 @@ import { formatDuration } from "@/lib/hack/config";
 import { TraceConsole } from "../trace-console";
 import { RevokeForm } from "./revoke-form";
 import { DeleteForm } from "./delete-form";
+import { CaseStatusForm } from "./case-status-form";
 
 export default async function CounterIntelCasePage({
   params,
@@ -57,6 +60,17 @@ export default async function CounterIntelCasePage({
             <DeleteForm runId={c.id} />
           </div>
         )}
+      </div>
+
+      <div className="term-panel space-y-2">
+        <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
+          CASE WORKFLOW — {CASE_STATUS_LABELS[c.caseStatus]}
+        </h2>
+        <CaseStatusForm
+          runId={c.id}
+          current={c.caseStatus}
+          canResolve={canResolveCounterIntelCase(user)}
+        />
       </div>
 
       <div className="term-panel space-y-2">

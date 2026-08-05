@@ -53,6 +53,7 @@ export const AUDIT_ACTIONS = {
   hackGrantRevoked: "hack.grant.revoke",
   hackTraceRevealed: "hack.trace.reveal",
   hackRunDeleted: "hack.run.delete",
+  hackCaseStatusSet: "hack.case_status.set",
   bulkMemberAction: "user.bulk",
 } as const;
 
@@ -99,6 +100,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.hackGrantRevoked]: "ILLICIT ACCESS REVOKED",
   [AUDIT_ACTIONS.hackTraceRevealed]: "INTRUSION TRACED",
   [AUDIT_ACTIONS.hackRunDeleted]: "CASE FILE DELETED",
+  [AUDIT_ACTIONS.hackCaseStatusSet]: "CASE STATUS SET",
   [AUDIT_ACTIONS.bulkMemberAction]: "BULK MEMBER ACTION",
 };
 

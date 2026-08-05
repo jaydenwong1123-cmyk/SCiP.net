@@ -9,6 +9,7 @@ import {
   purgeExpiredCounterIntelLogs,
   caseResolution,
   CASE_RESOLUTIONS,
+  CASE_STATUSES,
   COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
@@ -34,7 +35,10 @@ export default async function CounterIntelPage({
   const { page, filter } = await searchParams;
   const pageNum = Math.max(1, Number(page) || 1);
   const scope =
-    filter === "open" || filter === "identified" || filter === "action"
+    filter === "open" ||
+    filter === "identified" ||
+    filter === "action" ||
+    filter === "flagged"
       ? filter
       : "all";
 
@@ -49,7 +53,13 @@ export default async function CounterIntelPage({
               status: RUN_STATUS.extracted,
               grant: { revokedAt: null, expiresAt: { gt: now } },
             }
-          : {};
+          : scope === "flagged"
+            ? {
+                caseStatus: {
+                  in: [CASE_STATUSES.inProgress, CASE_STATUSES.needsAction],
+                },
+              }
+            : {};
 
   const grantSelect = {
     id: true,
@@ -78,7 +88,7 @@ export default async function CounterIntelPage({
     // any one page's list, so it always reflects the whole log regardless of
     // which filter or page is currently open.
     db.hackRun.findMany({
-      select: { status: true, grant: { select: grantSelect } },
+      select: { status: true, caseStatus: true, grant: { select: grantSelect } },
     }),
   ]);
 
@@ -102,6 +112,12 @@ export default async function CounterIntelPage({
     },
     {} as Partial<Record<ReturnType<typeof caseResolution>, number>>
   );
+
+  const flaggedCount = resolutionRows.filter(
+    (run) =>
+      run.caseStatus === CASE_STATUSES.inProgress ||
+      run.caseStatus === CASE_STATUSES.needsAction
+  ).length;
 
   const chip = (active: boolean) =>
     `term-link text-xs${active ? " text-[var(--term-fg-bright)]" : ""}`;
@@ -136,7 +152,13 @@ export default async function CounterIntelPage({
             href="/counter-intel?filter=action"
             className={chip(scope === "action")}
           >
-            [NEEDS ACTION]
+            [LIVE ACCESS]
+          </Link>
+          <Link
+            href="/counter-intel?filter=flagged"
+            className={chip(scope === "flagged")}
+          >
+            [FLAGGED]
           </Link>
         </div>
       </div>
@@ -147,10 +169,10 @@ export default async function CounterIntelPage({
         </h2>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
           <span className="text-[var(--term-amber)]">
-            IN PROGRESS {resolutionCounts[CASE_RESOLUTIONS.active] ?? 0}
+            INTRUSIONS ACTIVE {resolutionCounts[CASE_RESOLUTIONS.active] ?? 0}
           </span>
           <span className="text-[var(--term-red)]">
-            NEEDS ACTION {resolutionCounts[CASE_RESOLUTIONS.accessLive] ?? 0}
+            LIVE ACCESS {resolutionCounts[CASE_RESOLUTIONS.accessLive] ?? 0}
           </span>
           <span className="text-[var(--term-fg-dim)]">
             REVOKED {resolutionCounts[CASE_RESOLUTIONS.accessRevoked] ?? 0}
@@ -160,6 +182,9 @@ export default async function CounterIntelPage({
           </span>
           <span className="text-[var(--term-fg-dim)]">
             REPELLED {resolutionCounts[CASE_RESOLUTIONS.repelled] ?? 0}
+          </span>
+          <span className="text-[var(--term-amber)]">
+            FLAGGED {flaggedCount}
           </span>
         </div>
       </div>

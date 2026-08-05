@@ -34,7 +34,42 @@ export function canDeleteCounterIntelLog(user: {
   return canAccessCounterIntel(user) && user.designation === R5_DESIGNATION;
 }
 
+// Closing a case is a step further than working it: any desk member may pick
+// a case up (IN_PROGRESS) or flag it (NEEDS_ACTION), but only the L-R5
+// recordkeeper designation may mark it RESOLVED — same gate as deleting a
+// case file, for the same reason: closing the book on a case is a
+// recordkeeping decision, not an investigative one.
+export function canResolveCounterIntelCase(user: {
+  department?: string | null;
+  designation?: string | null;
+}): boolean {
+  return canDeleteCounterIntelLog(user);
+}
+
 export { REVEAL_MAX };
+
+// RAISA's manual investigative workflow tag. Independent of both the
+// intrusion's own status and the auto-derived technical resolution below —
+// this one tracks what the desk has done, not what the intrusion did.
+export const CASE_STATUSES = {
+  open: "OPEN",
+  inProgress: "IN_PROGRESS",
+  needsAction: "NEEDS_ACTION",
+  resolved: "RESOLVED",
+} as const;
+
+export type CaseStatus = (typeof CASE_STATUSES)[keyof typeof CASE_STATUSES];
+
+export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
+  [CASE_STATUSES.open]: "OPEN",
+  [CASE_STATUSES.inProgress]: "IN PROGRESS",
+  [CASE_STATUSES.needsAction]: "NEEDS ACTION",
+  [CASE_STATUSES.resolved]: "RESOLVED",
+};
+
+export function isCaseStatus(value: string): value is CaseStatus {
+  return (Object.values(CASE_STATUSES) as string[]).includes(value);
+}
 
 // Case files are purged 30 days after the intrusion attempt started, whether
 // or not it was ever traced. Enforced lazily rather than by a cron (this
@@ -126,6 +161,7 @@ export type AnonymisedRun = {
   revealLevel: number;
   status: string;
   resolution: CaseResolution;
+  caseStatus: CaseStatus;
   traceLockedUntilMs: number | null;
   // Reveal 1.
   startedAtLabel: string | null;
@@ -182,6 +218,11 @@ export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
     revealLevel: level,
     status: run.status,
     resolution: caseResolution({ status: run.status, grant }),
+    // isCaseStatus() should always hold — the DB column only ever gets a
+    // value through setCaseStatusAction(), which validates it — but a
+    // corrupt or pre-migration row falls back to OPEN rather than crashing
+    // the page.
+    caseStatus: isCaseStatus(run.caseStatus) ? run.caseStatus : CASE_STATUSES.open,
     traceLockedUntilMs: run.traceLockedUntil
       ? run.traceLockedUntil.getTime()
       : null,

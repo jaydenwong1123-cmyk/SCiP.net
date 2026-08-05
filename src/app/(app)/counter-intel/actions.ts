@@ -10,7 +10,11 @@ import { clearanceLabel } from "@/lib/clearance";
 import {
   canAccessCounterIntel,
   canDeleteCounterIntelLog,
+  canResolveCounterIntelCase,
   caseCode,
+  isCaseStatus,
+  CASE_STATUSES,
+  CASE_STATUS_LABELS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
 import {
@@ -274,6 +278,47 @@ export async function revokeHackGrantAction(
   // The intruder's session drops the grant on their very next request:
   // getActiveHackGrant filters revokedAt, and the JWT carries only a user id,
   // so nothing is cached that would keep them elevated.
+  revalidatePath("/counter-intel");
+  revalidatePath(`/counter-intel/${run.id}`);
+  return { ok: true };
+}
+
+// Move a case through RAISA's manual investigative workflow. Any desk member
+// may pick a case up (IN_PROGRESS) or flag it (NEEDS_ACTION); closing it
+// (RESOLVED) is L-R5 only — see canResolveCounterIntelCase() for why.
+export async function setCaseStatusAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const runId = String(formData.get("runId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (!runId) return { ok: false, error: "MISSING CASE ID." };
+  if (!isCaseStatus(status)) return { ok: false, error: "INVALID STATUS." };
+  if (status === CASE_STATUSES.resolved && !canResolveCounterIntelCase(user)) {
+    return { ok: false, error: "ONLY L-R5 MAY MARK A CASE RESOLVED." };
+  }
+
+  const run = await db.hackRun.findUnique({
+    where: { id: runId },
+    select: { id: true, caseStatus: true },
+  });
+  if (!run) return { ok: false, error: "CASE NOT FOUND." };
+  if (run.caseStatus === status) return { ok: true };
+
+  await db.hackRun.update({ where: { id: runId }, data: { caseStatus: status } });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackCaseStatusSet,
+    actor: user,
+    targetType: "hack_run",
+    targetId: run.id,
+    targetName: caseCode(run.id),
+    summary: `Case status set to ${CASE_STATUS_LABELS[status]}`,
+  });
+
   revalidatePath("/counter-intel");
   revalidatePath(`/counter-intel/${run.id}`);
   return { ok: true };
