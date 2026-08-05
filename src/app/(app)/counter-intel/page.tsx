@@ -7,9 +7,12 @@ import {
   canAccessCounterIntel,
   canDeleteCounterIntelLog,
   purgeExpiredCounterIntelLogs,
+  caseResolution,
+  CASE_RESOLUTIONS,
   COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
+import { RUN_STATUS } from "@/lib/hack/config";
 import { CaseList } from "./case-list";
 
 const PAGE_SIZE = 40;
@@ -30,16 +33,32 @@ export default async function CounterIntelPage({
 
   const { page, filter } = await searchParams;
   const pageNum = Math.max(1, Number(page) || 1);
-  const scope = filter === "open" || filter === "identified" ? filter : "all";
+  const scope =
+    filter === "open" || filter === "identified" || filter === "action"
+      ? filter
+      : "all";
 
+  const now = new Date();
   const where =
     scope === "open"
       ? { revealLevel: { lt: REVEAL_MAX } }
       : scope === "identified"
         ? { revealLevel: REVEAL_MAX }
-        : {};
+        : scope === "action"
+          ? {
+              status: RUN_STATUS.extracted,
+              grant: { revokedAt: null, expiresAt: { gt: now } },
+            }
+          : {};
 
-  const [rows, total] = await Promise.all([
+  const grantSelect = {
+    id: true,
+    tier: true,
+    expiresAt: true,
+    revokedAt: true,
+  } as const;
+
+  const [rows, total, resolutionRows] = await Promise.all([
     db.hackRun.findMany({
       where,
       orderBy: { startedAt: "desc" },
@@ -51,17 +70,38 @@ export default async function CounterIntelPage({
       // in the RSC payload regardless of what rendered.
       include: {
         user: { select: { id: true, displayName: true, email: true } },
-        grant: {
-          select: { id: true, tier: true, expiresAt: true, revokedAt: true },
-        },
+        grant: { select: grantSelect },
       },
     }),
     db.hackRun.count({ where }),
+    // Unpaginated, desk-wide — powers the resolution summary bar rather than
+    // any one page's list, so it always reflects the whole log regardless of
+    // which filter or page is currently open.
+    db.hackRun.findMany({
+      select: { status: true, grant: { select: grantSelect } },
+    }),
   ]);
 
   const cases = rows.map(anonymiseRun);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canDelete = canDeleteCounterIntelLog(user);
+
+  const resolutionCounts = resolutionRows.reduce(
+    (counts, run) => {
+      const resolution = caseResolution({
+        status: run.status,
+        grant: run.grant
+          ? {
+              expiresAtMs: run.grant.expiresAt.getTime(),
+              revoked: run.grant.revokedAt !== null,
+            }
+          : null,
+      });
+      counts[resolution] = (counts[resolution] ?? 0) + 1;
+      return counts;
+    },
+    {} as Partial<Record<ReturnType<typeof caseResolution>, number>>
+  );
 
   const chip = (active: boolean) =>
     `term-link text-xs${active ? " text-[var(--term-fg-bright)]" : ""}`;
@@ -92,6 +132,35 @@ export default async function CounterIntelPage({
           >
             [IDENTIFIED]
           </Link>
+          <Link
+            href="/counter-intel?filter=action"
+            className={chip(scope === "action")}
+          >
+            [NEEDS ACTION]
+          </Link>
+        </div>
+      </div>
+
+      <div className="term-panel space-y-2">
+        <h2 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
+          RESOLUTION LOG
+        </h2>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
+          <span className="text-[var(--term-amber)]">
+            IN PROGRESS {resolutionCounts[CASE_RESOLUTIONS.active] ?? 0}
+          </span>
+          <span className="text-[var(--term-red)]">
+            NEEDS ACTION {resolutionCounts[CASE_RESOLUTIONS.accessLive] ?? 0}
+          </span>
+          <span className="text-[var(--term-fg-dim)]">
+            REVOKED {resolutionCounts[CASE_RESOLUTIONS.accessRevoked] ?? 0}
+          </span>
+          <span className="text-[var(--term-fg-dim)]">
+            EXPIRED {resolutionCounts[CASE_RESOLUTIONS.accessExpired] ?? 0}
+          </span>
+          <span className="text-[var(--term-fg-dim)]">
+            REPELLED {resolutionCounts[CASE_RESOLUTIONS.repelled] ?? 0}
+          </span>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import type { HackRun } from "@prisma/client";
 import { db } from "@/lib/db";
-import { REVEAL_MAX } from "@/lib/hack/config";
+import { REVEAL_MAX, RUN_STATUS } from "@/lib/hack/config";
 import { clearanceLabel, R5_DESIGNATION } from "@/lib/clearance";
 
 // RAISA's counter-intrusion desk.
@@ -83,11 +83,49 @@ export function caseCode(runId: string): string {
   return `INTRUSION-${runId.slice(-6).toUpperCase()}`;
 }
 
+// The desk's resolution log classifies every case into exactly one bucket,
+// independent of trace progress — RAISA can tell whether a case still needs
+// action (a live illicit grant) without ever identifying who holds it.
+export const CASE_RESOLUTIONS = {
+  active: "ACTIVE_INTRUSION",
+  repelled: "REPELLED",
+  accessLive: "ACCESS_LIVE",
+  accessExpired: "ACCESS_EXPIRED",
+  accessRevoked: "ACCESS_REVOKED",
+} as const;
+
+export type CaseResolution = (typeof CASE_RESOLUTIONS)[keyof typeof CASE_RESOLUTIONS];
+
+export const CASE_RESOLUTION_LABELS: Record<CaseResolution, string> = {
+  [CASE_RESOLUTIONS.active]: "INTRUSION IN PROGRESS",
+  [CASE_RESOLUTIONS.repelled]: "REPELLED — NO ACCESS GAINED",
+  [CASE_RESOLUTIONS.accessLive]: "ACCESS LIVE — REVOKE PENDING",
+  [CASE_RESOLUTIONS.accessExpired]: "ACCESS EXPIRED — NO ACTION NEEDED",
+  [CASE_RESOLUTIONS.accessRevoked]: "ACCESS REVOKED",
+};
+
+export function caseResolution(
+  run: {
+    status: string;
+    grant: { expiresAtMs: number; revoked: boolean } | null;
+  },
+  now = Date.now()
+): CaseResolution {
+  if (run.status === RUN_STATUS.active) return CASE_RESOLUTIONS.active;
+  if (run.status !== RUN_STATUS.extracted || !run.grant) {
+    return CASE_RESOLUTIONS.repelled;
+  }
+  if (run.grant.revoked) return CASE_RESOLUTIONS.accessRevoked;
+  if (run.grant.expiresAtMs <= now) return CASE_RESOLUTIONS.accessExpired;
+  return CASE_RESOLUTIONS.accessLive;
+}
+
 export type AnonymisedRun = {
   id: string;
   code: string;
   revealLevel: number;
   status: string;
+  resolution: CaseResolution;
   traceLockedUntilMs: number | null;
   // Reveal 1.
   startedAtLabel: string | null;
@@ -143,6 +181,7 @@ export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
     code: caseCode(run.id),
     revealLevel: level,
     status: run.status,
+    resolution: caseResolution({ status: run.status, grant }),
     traceLockedUntilMs: run.traceLockedUntil
       ? run.traceLockedUntil.getTime()
       : null,

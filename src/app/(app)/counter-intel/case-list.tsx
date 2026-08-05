@@ -3,8 +3,22 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { deleteHackRunsAction, wipeAllHackRunsAction } from "./actions";
-import { RUN_STATUS } from "@/lib/hack/config";
-import type { AnonymisedRun } from "@/lib/counter-intel";
+import {
+  CASE_RESOLUTIONS,
+  CASE_RESOLUTION_LABELS,
+  type AnonymisedRun,
+} from "@/lib/counter-intel";
+
+function resolutionColor(resolution: AnonymisedRun["resolution"]): string {
+  switch (resolution) {
+    case CASE_RESOLUTIONS.accessLive:
+      return "text-[var(--term-red)]";
+    case CASE_RESOLUTIONS.active:
+      return "text-[var(--term-amber)]";
+    default:
+      return "text-[var(--term-fg-dim)]";
+  }
+}
 
 // L-R5 only — see canDeleteCounterIntelLog(). Checkbox selection plus a
 // WIPE ALL escape hatch, both gated behind the same designation as the
@@ -153,9 +167,10 @@ export function CaseList({
                 {c.startedAtLabel ?? "TIMESTAMP SEALED"}
                 {" · TRACE "}
                 {c.revealLevel}/{revealMax}
-                {c.status === RUN_STATUS.extracted && c.grant && !c.grant.revoked
-                  ? " · ACCESS LIVE"
-                  : ""}
+                {" · "}
+                <span className={resolutionColor(c.resolution)}>
+                  {CASE_RESOLUTION_LABELS[c.resolution]}
+                </span>
               </span>
             </Link>
           </div>

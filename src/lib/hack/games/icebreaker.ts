@@ -36,7 +36,7 @@ export const icebreakerGame: HackGame = {
     // budget tightening at the same time.
     const wordLength = band <= 2 ? 6 : band === 3 ? 7 : band === 4 ? 8 : 9;
     const candidateCount = band <= 2 ? 10 : band === 3 ? 13 : band === 4 ? 16 : 20;
-    const attempts = band <= 2 ? 4 : band === 3 ? 3 : 2;
+    const attempts = 5 + Math.floor((wordLength - 6) / 2);
 
     const pool = PASSWORD_POOL[wordLength];
     const candidates = rng.sample(pool, candidateCount);

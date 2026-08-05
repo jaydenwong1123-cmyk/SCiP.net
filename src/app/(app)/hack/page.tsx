@@ -13,8 +13,10 @@ import {
   resolveStaleRuns,
 } from "@/lib/hack/engine";
 import { getActiveHackGrant, hackCooldownState } from "@/lib/hack/grant";
+import { hackStreakForUser } from "@/lib/hack/streak";
 import { RunConsole } from "./run-console";
 import { BreachForm } from "./breach-form";
+import { StreakPanel } from "./streak-panel";
 
 export default async function HackPage() {
   const user = await requireUser();
@@ -50,9 +52,10 @@ export default async function HackPage() {
   }
 
   const staff = hasStaffPowers(user);
-  const [grant, cooldown] = await Promise.all([
+  const [grant, cooldown, streak] = await Promise.all([
     getActiveHackGrant(user.id),
     hackCooldownState(user.id, staff),
+    hackStreakForUser(user.id),
   ]);
   // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
   const now = Date.now();
@@ -118,6 +121,8 @@ export default async function HackPage() {
           </table>
         </div>
       </div>
+
+      <StreakPanel streak={streak} />
 
       {grant && (
         <div className="term-panel space-y-1 text-sm">
