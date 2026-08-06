@@ -1,26 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { GameSurface, useRoundInput } from "./games";
+import { Countdown } from "./countdown";
+import { DuelPanel } from "./duel-panel";
 import {
   abortHackRunAction,
   checkHackAnswerAction,
   extractHackRunAction,
+  pollDuelAction,
   pushDeeperAction,
   submitHackAnswerAction,
   type HackActionState,
 } from "./actions";
 import type { PublicChallenge } from "@/lib/hack/engine";
+import type { PublicDuel } from "@/lib/hack/duel";
+
+// How often the console asks whether RAISA has engaged it.
+//
+// There is no realtime transport in this deployment, so this poll is the only
+// way an intruder learns they are being hunted. Deliberately slower than it
+// could be: DUEL_ROUND_MS is sized so that up to one interval of discovery
+// latency can never be what decided a duel, and the attacker's own clock does
+// not start until this poll delivers the puzzle.
+const DUEL_POLL_MS = 4000;
 
 type Phase =
   | { kind: "challenge"; challenge: PublicChallenge; feedback?: string }
+  | { kind: "duel"; duel: PublicDuel; feedback?: string }
   | { kind: "checkpoint" }
   | { kind: "failed"; reason: string }
   | { kind: "extracted" };
 
 type Props = {
   initial: PublicChallenge | null;
+  // Set when the page loaded into an already-open duel — a reload mid-duel, or
+  // an officer who engaged between the last render and this one.
+  initialDuel: PublicDuel | null;
   atCheckpoint: boolean;
   stage: number;
   clearedStages: number;
@@ -37,6 +54,7 @@ type Props = {
 // server's own deadline check anyway.
 export function RunConsole({
   initial,
+  initialDuel,
   atCheckpoint,
   stage,
   clearedStages,
@@ -46,11 +64,15 @@ export function RunConsole({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [phase, setPhase] = useState<Phase>(
-    atCheckpoint
-      ? { kind: "checkpoint" }
-      : initial
-        ? { kind: "challenge", challenge: initial }
-        : { kind: "failed", reason: "NO ACTIVE INTRUSION" }
+    // A live duel outranks everything else: it has suspended the ladder and it
+    // is about to end the run one way or the other.
+    initialDuel
+      ? { kind: "duel", duel: initialDuel }
+      : atCheckpoint
+        ? { kind: "checkpoint" }
+        : initial
+          ? { kind: "challenge", challenge: initial }
+          : { kind: "failed", reason: "NO ACTIVE INTRUSION" }
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +99,9 @@ export function RunConsole({
         if (state.resync) router.refresh();
         return;
       }
+      // A poll that found nothing must not clear an error the player is still
+      // reading, nor disturb the phase they are mid-puzzle on.
+      if (state.kind === "idle") return;
       setError(null);
       setCheckFeedback(null);
       switch (state.kind) {
@@ -87,6 +112,9 @@ export function RunConsole({
             feedback: state.feedback,
           });
           setCurStage(state.challenge.stage);
+          break;
+        case "duel":
+          setPhase({ kind: "duel", duel: state.duel, feedback: state.feedback });
           break;
         case "checkpoint":
           setPhase({ kind: "checkpoint" });
@@ -106,6 +134,19 @@ export function RunConsole({
     },
     [router, curStage]
   );
+
+  // Ask the server whether a RAISA officer has engaged this run.
+  //
+  // Runs only while the intrusion is still live, and stops the moment the run
+  // reaches a terminal phase or a duel takes over — once the duel is on screen
+  // its own panel owns the exchange.
+  useEffect(() => {
+    if (phase.kind !== "challenge" && phase.kind !== "checkpoint") return;
+    const id = setInterval(() => {
+      void pollDuelAction().then(apply);
+    }, DUEL_POLL_MS);
+    return () => clearInterval(id);
+  }, [phase.kind, apply]);
 
   const submit = useCallback(() => {
     if (!challenge || pending) return;
@@ -211,6 +252,15 @@ export function RunConsole({
         </div>
       )}
 
+      {phase.kind === "duel" && (
+        <DuelPanel
+          duel={phase.duel}
+          feedback={phase.feedback}
+          error={error}
+          onDone={apply}
+        />
+      )}
+
       {phase.kind === "checkpoint" && (
         <Checkpoint
           stage={curCleared}
@@ -288,71 +338,6 @@ function StageBar({
           </span>
         );
       })}
-    </div>
-  );
-}
-
-// Countdown.
-//
-// Rendered from the server's own clock: `serverNowMs` was captured alongside
-// `deadlineMs`, so the difference between it and the local clock is a known
-// offset that can be subtracted. A player who winds their OS clock forward
-// therefore sees an unchanged timer, and one who winds it back gains nothing —
-// the server re-checks the deadline on submit regardless.
-function Countdown({
-  deadlineMs,
-  serverNowMs,
-  onExpire,
-}: {
-  deadlineMs: number;
-  serverNowMs: number;
-  onExpire: () => void;
-}) {
-  // Seeded from the server's own budget rather than from the local clock, so
-  // the first paint is correct without reading Date.now() during render.
-  const [remaining, setRemaining] = useState(() =>
-    Math.max(0, deadlineMs - serverNowMs)
-  );
-  const fired = useRef(false);
-  // Kept in a ref rather than a dependency: `onExpire` is an inline callback
-  // that gets a new identity on every keystroke elsewhere in the tree, and
-  // this effect must not tear down and restart (which would reset the timer)
-  // just because unrelated state changed.
-  const onExpireRef = useRef(onExpire);
-  useEffect(() => {
-    onExpireRef.current = onExpire;
-  }, [onExpire]);
-
-  useEffect(() => {
-    // Offset between this browser's clock and the server's, measured once on
-    // mount. Subtracting it means a player who winds their OS clock forward
-    // sees an unchanged timer — and the server re-checks the deadline on
-    // submit regardless, so the display is never load-bearing.
-    const skew = Date.now() - serverNowMs;
-    const tick = () => {
-      const left = Math.max(0, deadlineMs - (Date.now() - skew));
-      setRemaining(left);
-      if (left <= 0 && !fired.current) {
-        fired.current = true;
-        onExpireRef.current();
-      }
-    };
-    tick();
-    const id = setInterval(tick, 200);
-    return () => clearInterval(id);
-  }, [deadlineMs, serverNowMs]);
-
-  const seconds = remaining / 1000;
-  const critical = seconds <= 5;
-
-  return (
-    <div
-      className={`hack-timer${critical ? " hack-timer--critical" : ""}`}
-      role="timer"
-      aria-live="off"
-    >
-      <span className="tabular-nums">{seconds.toFixed(1)}</span>
-      <span className="text-[var(--term-fg-dim)]"> SEC TO TRACE</span>
     </div>
   );
 }

@@ -33,6 +33,12 @@ export default async function CounterIntelCasePage({
       user: { select: { id: true, displayName: true, email: true } },
       traceBy: { select: { id: true, displayName: true, email: true } },
       grant: { select: { id: true, tier: true, expiresAt: true, revokedAt: true } },
+      duel: {
+        select: {
+          winner: true,
+          defender: { select: { displayName: true, email: true } },
+        },
+      },
     },
   });
   if (!run) notFound();
@@ -75,6 +81,32 @@ export default async function CounterIntelCasePage({
           canResolve={canResolveCounterIntelCase(user)}
         />
       </div>
+
+      {c.duel && (
+        <div className="term-panel space-y-1">
+          <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
+            COUNTER-INTRUSION RECORD
+          </h2>
+          <p className="text-sm">
+            {c.duel.outcome === "LIVE" ? (
+              <span className="text-[var(--term-amber)]">
+                DUEL IN PROGRESS — ENGAGED FROM THE DESK
+              </span>
+            ) : c.duel.outcome === "WON" ? (
+              <span className="text-[var(--term-fg-bright)]">
+                BREACH CONTAINED — THE OPERATOR WAS REPELLED IN A DIRECT DUEL
+              </span>
+            ) : (
+              <span className="text-[var(--term-red)]">
+                CONTAINMENT FAILED — THE OPERATOR WON THE DUEL AND SEIZED ACCESS
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            ENGAGED BY {c.duel.defenderName ?? "UNKNOWN OFFICER"}
+          </p>
+        </div>
+      )}
 
       <div className="term-panel space-y-2">
         <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">

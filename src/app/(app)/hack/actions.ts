@@ -27,14 +27,33 @@ import {
   submitIntrusionAnswer,
   type PublicChallenge,
 } from "@/lib/hack/engine";
+import {
+  deliverDuel,
+  liveDuelFor,
+  submitDuelAnswer,
+  type DuelOutcome,
+  type PublicDuel,
+} from "@/lib/hack/duel";
 import { hackCooldownState, issueGrant } from "@/lib/hack/grant";
+import { DUEL_RULE } from "@/lib/rate-limit";
 
 export type HackActionState =
   | { ok: true; kind: "challenge"; challenge: PublicChallenge; feedback?: string }
   | { ok: true; kind: "checkpoint" }
   | { ok: true; kind: "failed"; reason: string }
   | { ok: true; kind: "extracted" }
+  // A RAISA officer has engaged this run head-to-head. Winning the duel is an
+  // extraction and losing it is a failed run, so the two terminal kinds above
+  // cover the outcomes and only the live puzzle needs a kind of its own.
+  | { ok: true; kind: "duel"; duel: PublicDuel; feedback?: string }
+  // The duel poll found nothing. Distinct from an error so the console can
+  // ignore it without clearing whatever is on screen.
+  | { ok: true; kind: "idle" }
   | { ok: false; error: string; resync?: boolean };
+
+// Shown when a verb is refused because a counter-intrusion has the run frozen.
+// The console resyncs on it, and its poll then puts the duel on screen.
+const DUEL_LOCK_ERROR = "COUNTER-INTRUSION IN PROGRESS — THE LINK IS CONTESTED.";
 
 // Begin a run.
 //
@@ -49,6 +68,10 @@ export async function beginHackRunAction(): Promise<HackActionState> {
 
   const existing = await resolveStaleRuns(user.id);
   if (existing && existing.status === RUN_STATUS.active) {
+    // Resuming into a run that has since been engaged: hand back the duel, not
+    // the intrusion challenge it suspended.
+    const duel = await deliverDuel(existing.id);
+    if (duel) return duelActionState(duel);
     const challenge = await getOrIssueChallenge(existing);
     return { ok: true, kind: "challenge", challenge: publicChallenge(challenge) };
   }
@@ -213,6 +236,94 @@ export async function checkHackAnswerAction(
   return { ok: true, feedback: outcome.feedback };
 }
 
+// ---------------------------------------------------------------------------
+// Counter-intrusion duel
+// ---------------------------------------------------------------------------
+
+// Fold a seat-relative duel outcome into the console's own state machine.
+//
+// The intruder needs no new terminal phases: winning the duel IS an extraction
+// (Layer 3 access, banked by resolveDuel) and losing it IS a failed run.
+async function duelActionState(
+  outcome: DuelOutcome | null
+): Promise<HackActionState> {
+  if (!outcome) return { ok: true, kind: "idle" };
+  switch (outcome.kind) {
+    case "stale":
+      return { ok: false, error: "STALE DUEL — RESYNCHRONIZING.", resync: true };
+    case "live":
+      return { ok: true, kind: "duel", duel: outcome.duel };
+    case "wrong":
+      return {
+        ok: true,
+        kind: "duel",
+        duel: outcome.duel,
+        feedback: outcome.feedback,
+      };
+    case "won":
+      // Effective clearance changed — the header chip, the nav and the menu
+      // all have to re-render, exactly as a normal extraction does.
+      revalidatePath("/", "layout");
+      return { ok: true, kind: "extracted" };
+    case "lost":
+      revalidatePath("/hack");
+      return { ok: true, kind: "failed", reason: outcome.reason };
+  }
+}
+
+// "Has anyone engaged me?"
+//
+// There is no realtime transport in this deployment, so the intruder's console
+// asks on a timer. Deliberately unthrottled: this is a read the console makes
+// on its own schedule, not user input, and rate-limiting it would let a member
+// dodge a duel by burning their own bucket.
+export async function pollDuelAction(): Promise<HackActionState> {
+  const user = await requireUser();
+
+  // Cheap guard so the poll is a single indexed lookup on the common path
+  // where no run is even open.
+  const run = await db.hackRun.findFirst({
+    where: { userId: user.id, status: RUN_STATUS.active },
+    orderBy: { startedAt: "desc" },
+    select: { id: true },
+  });
+  if (!run) return { ok: true, kind: "idle" };
+
+  return duelActionState(await deliverDuel(run.id));
+}
+
+// The intruder's half of the race.
+export async function submitDuelAnswerAction(
+  _prevState: HackActionState | null,
+  formData: FormData
+): Promise<HackActionState> {
+  const user = await requireUser();
+
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
+
+  // Its own bucket, separate from HACK_RULE: a member who spent their ladder
+  // allowance on a long run must still be able to answer a duel they did not
+  // ask for.
+  if (!hasStaffPowers(user)) {
+    const throttle = await checkRateLimit("hack_duel", user.id, DUEL_RULE);
+    if (throttle.blocked) {
+      return {
+        ok: false,
+        error: `TERMINAL LOCKED — RETRY IN ${formatDuration(throttle.retryAfterMs)}.`,
+      };
+    }
+    await recordAttempt("hack_duel", user.id);
+  }
+
+  const nonce = String(formData.get("nonce") ?? "");
+  const answer = String(formData.get("answer") ?? "").slice(0, 400);
+  if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
+
+  return duelActionState(await submitDuelAnswer(user.id, nonce, answer));
+}
+
 async function logHackFailure(reason: string) {
   await logAudit({
     action: AUDIT_ACTIONS.hackRunFailed,
@@ -230,6 +341,12 @@ export async function extractHackRunAction(): Promise<HackActionState> {
 
   if (!run || run.status !== RUN_STATUS.active || !run.atCheckpoint) {
     return { ok: false, error: "NO ACTIVE EXTRACTION POINT.", resync: true };
+  }
+  // A live duel freezes the ladder. Without this, being engaged while parked
+  // at a checkpoint would be a gift: bank the tier, close the link, and never
+  // fight the duel at all.
+  if (await liveDuelFor(run.id)) {
+    return { ok: false, error: DUEL_LOCK_ERROR, resync: true };
   }
   if (run.clearedStages < 1) {
     return { ok: false, error: "NOTHING BANKED — NO TIER REACHED." };
@@ -272,6 +389,9 @@ export async function pushDeeperAction(): Promise<HackActionState> {
   if (!run || run.status !== RUN_STATUS.active || !run.atCheckpoint) {
     return { ok: false, error: "NO ACTIVE EXTRACTION POINT.", resync: true };
   }
+  if (await liveDuelFor(run.id)) {
+    return { ok: false, error: DUEL_LOCK_ERROR, resync: true };
+  }
   if (run.stage >= MAX_STAGE) {
     return { ok: false, error: "NO DEEPER LAYER EXISTS." };
   }
@@ -288,6 +408,12 @@ export async function abortHackRunAction(): Promise<HackActionState> {
   const run = await resolveStaleRuns(user.id);
   if (!run || run.status !== RUN_STATUS.active) {
     return { ok: false, error: "NO ACTIVE INTRUSION.", resync: true };
+  }
+  // Disconnecting mid-duel would rob the officer of the win they are racing
+  // for and turn the duel into a way to pick your own defeat. The run ends
+  // either way; it ends on the duel's terms.
+  if (await liveDuelFor(run.id)) {
+    return { ok: false, error: DUEL_LOCK_ERROR, resync: true };
   }
 
   await failRun(run, "OPERATOR DISCONNECTED");

@@ -77,6 +77,7 @@ model User {
   hackRunsTraced    HackRun[]   @relation("HackRunTracer")
   hackGrants        HackGrant[] @relation("HackGrantUser")
   hackGrantsRevoked HackGrant[] @relation("HackGrantRevoker")
+  hackDuelsDefended HackDuel[]  @relation("HackDuelDefender")
 }
 
 // An IT support ticket. One table backs all three kinds because they share
@@ -377,10 +378,70 @@ model HackRun {
 
   challenges HackChallenge[]
   grant      HackGrant?
+  duel       HackDuel?
 
   @@index([userId, startedAt])
   @@index([status])
   @@index([startedAt])
+}
+
+// The counter-intrusion duel: one puzzle, two seats, one winner.
+//
+// A RAISA officer who catches a run while it is still `active` may engage it,
+// and the intruder's console is interrupted with the SAME puzzle the officer
+// is looking at. First correct answer wins. A duel always ends the run — the
+// attacker extracts at Layer 3 minimum, or the run fails outright — which is
+// why there is no "resume the intrusion" state anywhere in this model.
+model HackDuel {
+  id    String  @id @default(cuid())
+  // One duel per run, enforced here rather than in application code: the
+  // first officer to click ENGAGE claims the case, and a second one racing
+  // them hits this constraint instead of opening a rival duel.
+  runId String  @unique
+  run   HackRun @relation(fields: [runId], references: [id])
+
+  defenderId String
+  defender   User   @relation("HackDuelDefender", fields: [defenderId], references: [id])
+
+  // The single puzzle, drawn once and served to both seats.
+  game     String
+  // JSON the browser renders. Identical for both sides — that is the point.
+  payload  String
+  // JSON answer key. NEVER leaves the server, same rule as HackChallenge.
+  solution String
+
+  // Two nonces, one per seat. The nonce identifies BOTH the duel and which
+  // seat is submitting, so no client ever sends a "side" parameter that would
+  // have to be trusted.
+  attackerNonce String @unique
+  defenderNonce String @unique
+
+  attackerAttemptsLeft Int @default(3)
+  defenderAttemptsLeft Int @default(3)
+  // Separates a stalemate (defender tried and neither solved it -> defender
+  // wins, the intrusion was contained) from a walkover (defender engaged and
+  // then abandoned the tab -> attacker wins).
+  defenderSubmitted    Boolean @default(false)
+
+  // The defender's clock starts at ENGAGE. The attacker's starts when their
+  // poll first DELIVERS the duel to them, so poll latency can never eat the
+  // intruder's time — see deliverDuel() in lib/hack/duel.ts.
+  startedAt          DateTime  @default(now())
+  deliveredAt        DateTime?
+  attackerDeadlineAt DateTime?
+  defenderDeadlineAt DateTime
+
+  // "attacker" | "defender", null while the duel is live. Claimed with a
+  // conditional updateMany on winner:null — two humans racing on one row is a
+  // real race, and the compare-and-set is what makes the consequences
+  // (issuing a grant, failing the run) fire exactly once.
+  winner     String?
+  resolvedAt DateTime?
+
+  @@index([winner])
+  @@index([startedAt])
+  // purgeUser deletes by defenderId when a RAISA officer's account goes.
+  @@index([defenderId])
 }
 
 // The read-only clearance a completed intrusion bought.

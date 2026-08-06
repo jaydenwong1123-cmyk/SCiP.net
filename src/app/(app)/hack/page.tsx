@@ -12,6 +12,7 @@ import {
   pruneHackChallenges,
   resolveStaleRuns,
 } from "@/lib/hack/engine";
+import { deliverDuel, pruneDuelPayloads } from "@/lib/hack/duel";
 import { getActiveHackGrant, hackCooldownState } from "@/lib/hack/grant";
 import { hackStreakForUser } from "@/lib/hack/streak";
 import { RunConsole } from "./run-console";
@@ -21,6 +22,7 @@ import { StreakPanel } from "./streak-panel";
 export default async function HackPage() {
   const user = await requireUser();
   void pruneHackChallenges();
+  void pruneDuelPayloads();
 
   // Resolve anything left dangling by a closed tab before reading state, so
   // the page never shows a run that has in fact already timed out.
@@ -28,9 +30,18 @@ export default async function HackPage() {
   const tierLabels = STAGES.map((s) => clearanceLabel(s.tier));
 
   if (run && run.status === RUN_STATUS.active) {
-    const challenge = run.atCheckpoint
-      ? null
-      : publicChallenge(await getOrIssueChallenge(run));
+    // A live duel outranks whatever intrusion challenge was in flight when the
+    // officer engaged — that one is abandoned, and rendering it would show a
+    // puzzle whose clock has already gone. Delivering here rather than waiting
+    // for the console's first poll also means a reload mid-duel comes straight
+    // back to the duel.
+    const duel = await deliverDuel(run.id);
+    const liveDuel = duel?.kind === "live" ? duel.duel : null;
+
+    const challenge =
+      liveDuel || run.atCheckpoint
+        ? null
+        : publicChallenge(await getOrIssueChallenge(run));
 
     return (
       <div className="space-y-4">
@@ -41,6 +52,7 @@ export default async function HackPage() {
         </div>
         <RunConsole
           initial={challenge}
+          initialDuel={liveDuel}
           atCheckpoint={run.atCheckpoint}
           stage={run.stage}
           clearedStages={run.clearedStages}

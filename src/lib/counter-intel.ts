@@ -84,7 +84,7 @@ export function counterIntelRetentionCutoff(now = new Date()): Date {
 }
 
 // Physically deletes case files older than the retention window, along with
-// their challenges and any grant — HackChallenge/HackGrant carry no cascade,
+// their challenges, any duel and any grant — none of those carry a cascade,
 // so the children must go first. Safe to call on every desk visit: a run with
 // nothing past the cutoff is a no-op query.
 export async function purgeExpiredCounterIntelLogs(): Promise<void> {
@@ -97,6 +97,7 @@ export async function purgeExpiredCounterIntelLogs(): Promise<void> {
   const ids = stale.map((r) => r.id);
   await db.$transaction([
     db.hackChallenge.deleteMany({ where: { runId: { in: ids } } }),
+    db.hackDuel.deleteMany({ where: { runId: { in: ids } } }),
     db.hackGrant.deleteMany({ where: { runId: { in: ids } } }),
     db.hackRun.deleteMany({ where: { id: { in: ids } } }),
   ]);
@@ -168,6 +169,13 @@ export type AnonymisedRun = {
   // anonymity boundary the rest of this projection enforces doesn't apply.
   tracedByName: string | null;
   traceLockedUntilMs: number | null;
+  // The counter-intrusion duel, if one was ever fought on this case. Ungated
+  // for the same reason tracedByName is: it records what the DESK did, and
+  // says nothing about the operator that reveal level 0 does not already.
+  duel: {
+    outcome: "LIVE" | "WON" | "LOST";
+    defenderName: string | null;
+  } | null;
   // Reveal 1.
   startedAtLabel: string | null;
   depthReached: number | null;
@@ -193,6 +201,12 @@ type RunWithExtras = HackRun & {
     tier: number;
     expiresAt: Date;
     revokedAt: Date | null;
+  } | null;
+  // Structural rather than imported, so lib/hack/duel.ts can go on importing
+  // from this file without the two forming a cycle.
+  duel?: {
+    winner: string | null;
+    defender?: { displayName: string | null; email: string } | null;
   } | null;
 };
 
@@ -237,6 +251,18 @@ export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
       : null,
     traceLockedUntilMs: run.traceLockedUntil
       ? run.traceLockedUntil.getTime()
+      : null,
+    duel: run.duel
+      ? {
+          outcome:
+            run.duel.winner === null
+              ? "LIVE"
+              : run.duel.winner === "defender"
+                ? "WON"
+                : "LOST",
+          defenderName:
+            run.duel.defender?.displayName ?? run.duel.defender?.email ?? null,
+        }
       : null,
 
     startedAtLabel:

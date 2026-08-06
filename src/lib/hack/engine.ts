@@ -9,6 +9,7 @@ import {
   generateChallenge,
   gradeAnswer,
 } from "@/lib/hack/games";
+import { liveDuelFor, sweepDuel } from "@/lib/hack/duel";
 import {
   CHALLENGE_KINDS,
   DEADLINE_GRACE_MS,
@@ -181,6 +182,19 @@ export async function resolveStaleRuns(userId: string): Promise<HackRun | null> 
 
   const now = Date.now();
 
+  // A run parked in a live duel answers to the DUEL's clock, not its own.
+  //
+  // Engaging abandons whatever intrusion challenge was in flight, so without
+  // this the checks below would fail the run out from under the duel — the act
+  // of being engaged would itself be the loss. Placed ahead of MAX_RUN_MS for
+  // the same reason: a duel opened at minute 19 must still be allowed to
+  // finish. It cannot be used to stall, because a duel is bounded (the pickup
+  // ceiling plus one round) and ALWAYS ends the run one way or the other.
+  const duel = await db.hackDuel.findUnique({ where: { runId: active.id } });
+  if (duel && duel.winner === null) {
+    return (await sweepDuel(duel)) ?? active;
+  }
+
   if (now - active.startedAt.getTime() > MAX_RUN_MS) {
     return failRun(active, "SESSION TIMED OUT");
   }
@@ -287,6 +301,13 @@ export async function submitIntrusionAnswer(
 
   const run = challenge.run;
   const now = Date.now();
+
+  // A live duel has suspended this run. The intrusion challenge in flight when
+  // the officer engaged is abandoned, and grading it now would decide the run
+  // on the wrong clock — its deadline has almost certainly passed, which would
+  // hand the intruder a cheaper loss than the duel they are supposed to fight.
+  // Reported as stale so the console resyncs and its poll surfaces the duel.
+  if (await liveDuelFor(run.id)) return { kind: "stale" };
 
   if (now > challenge.deadlineAt.getTime() + DEADLINE_GRACE_MS) {
     await failRun(run, "TIMER EXPIRED");

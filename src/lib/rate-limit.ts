@@ -23,6 +23,12 @@ export const INVITE_RULE: RateLimitRule = { limit: 10, windowMs: 30 * 60 * 1000 
 // the guess-carrying games, not to police normal play. The per-challenge
 // attempt budget is the real limit.
 export const HACK_RULE: RateLimitRule = { limit: 40, windowMs: 5 * 60 * 1000 };
+// Counter-intrusion duel submissions, both seats. A duel is at most three
+// guesses inside 90 seconds, so this is pure abuse headroom — the per-seat
+// attempt budget on HackDuel is the real limit. Kept separate from HACK_RULE
+// so a duel cannot be starved by a bucket the intruder already spent on the
+// ladder: being engaged mid-run must never be unwinnable for that reason.
+export const DUEL_RULE: RateLimitRule = { limit: 20, windowMs: 5 * 60 * 1000 };
 
 export type RateLimitStatus = {
   blocked: boolean;

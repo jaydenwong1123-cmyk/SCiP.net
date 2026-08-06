@@ -120,6 +120,56 @@ export function traceDeadlineMs(timeFactor: number): number {
   );
 }
 
+// The counter-intrusion duel: one puzzle, two seats, one winner.
+//
+// A RAISA officer who catches a run while it is still active engages it, and
+// both sides are served the SAME puzzle. Whoever answers correctly first takes
+// it. Unlike the trace ladder this is not oversight — it is the confrontation,
+// and both sides are meant to sweat.
+
+// Mid-registry. Deep enough to be a real contest, shallow enough that it is
+// the same contest for both seats — an officer is not running the ladder and
+// has no banked stages to draw on, so a band-5 puzzle would be a formality
+// for the intruder and an ambush for the desk.
+export const DUEL_BAND = 3;
+
+// Generous on purpose. There is no realtime transport in this deployment, so
+// the intruder learns they have been engaged by polling; the clock has to be
+// long enough that up to one poll interval of discovery latency can never be
+// what decided a duel.
+export const DUEL_ROUND_MS = 90_000;
+
+// Per seat. A race wants room for a fumbled keystroke, but not so much room
+// that a small answer space can simply be enumerated before the clock runs.
+export const DUEL_ATTEMPTS = 3;
+
+// Ceiling on how long an unengaged duel waits for the intruder to pick it up.
+// Past this with nothing delivered, the terminal is dead and the defender
+// takes it — closing the tab must never be a way to sit out a duel.
+export const DUEL_PICKUP_MS = 3 * MIN;
+
+// What an intruder wins: Layer 3, which pays tier 4 (L-4). Applied as a FLOOR,
+// never a ceiling — see resolveDuel().
+export const DUEL_PRIZE_STAGE = 3;
+
+export const DUEL_WINNERS = {
+  attacker: "attacker",
+  defender: "defender",
+} as const;
+
+export type DuelWinner = (typeof DUEL_WINNERS)[keyof typeof DUEL_WINNERS];
+
+export const DUEL_SEATS = {
+  attacker: "attacker",
+  defender: "defender",
+} as const;
+
+export type DuelSeat = (typeof DUEL_SEATS)[keyof typeof DUEL_SEATS];
+
+export function duelDeadlineMs(timeFactor: number): number {
+  return Math.round(DUEL_ROUND_MS * timeFactor * TIME_SCALE);
+}
+
 // "4 MIN" / "45 SEC" / "2 HR", for lockout and expiry notices. Mirrors
 // formatRetryAfter in lib/rate-limit.ts rather than importing it, because that
 // one tops out at minutes and a 48h lockout would read as "2880 MIN".

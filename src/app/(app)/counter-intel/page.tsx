@@ -7,15 +7,24 @@ import {
   canAccessCounterIntel,
   canDeleteCounterIntelLog,
   purgeExpiredCounterIntelLogs,
+  caseCode,
   caseResolution,
   CASE_RESOLUTIONS,
   CASE_STATUSES,
   COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
+import { RUN_STATUS } from "@/lib/hack/config";
+import { duelsForRuns } from "@/lib/hack/duel";
 import { CaseList } from "./case-list";
+import { LiveIntrusions, type LiveCase } from "./live-intrusions";
 
 const PAGE_SIZE = 40;
+// How many live breaches the duel panel offers at once. There is never
+// realistically more than a handful — a run lasts twenty minutes at the very
+// most and members are on a 24h cooldown — so this is a guard rail, not a
+// pagination scheme.
+const LIVE_LIMIT = 10;
 
 export default async function CounterIntelPage({
   searchParams,
@@ -50,7 +59,7 @@ export default async function CounterIntelPage({
     revokedAt: true,
   } as const;
 
-  const [rows, total, resolutionRows] = await Promise.all([
+  const [rows, total, resolutionRows, liveRows] = await Promise.all([
     db.hackRun.findMany({
       where,
       orderBy: { startedAt: "desc" },
@@ -73,7 +82,37 @@ export default async function CounterIntelPage({
     db.hackRun.findMany({
       select: { status: true, flagged: true, grant: { select: grantSelect } },
     }),
+    // Breaches in progress, for the duel panel. Own runs are excluded HERE
+    // rather than disabled in the UI: a RAISA officer who is also the intruder
+    // must not be able to identify their own case code by spotting the row
+    // that will not engage.
+    db.hackRun.findMany({
+      where: { status: RUN_STATUS.active, userId: { not: user.id } },
+      select: { id: true, startedAt: true, clearedStages: true },
+      orderBy: { startedAt: "desc" },
+      take: LIVE_LIMIT,
+    }),
   ]);
+
+  const duels = await duelsForRuns(liveRows.map((r) => r.id));
+  const liveCases: LiveCase[] = liveRows.map((run) => {
+    const duel = duels.get(run.id);
+    return {
+      runId: run.id,
+      code: caseCode(run.id),
+      startedLabel: run.startedAt.toISOString().slice(11, 16) + " UTC",
+      clearedStages: run.clearedStages,
+      // A settled duel always ends the run, so anything still `active` here
+      // with a duel on it has one that is genuinely still running.
+      engagement:
+        !duel || duel.winner !== null
+          ? "none"
+          : duel.defenderId === user.id
+            ? "mine"
+            : "other",
+      engagedByName: duel?.defenderName ?? null,
+    };
+  });
 
   const cases = rows.map(anonymiseRun);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -132,6 +171,8 @@ export default async function CounterIntelPage({
           </Link>
         </div>
       </div>
+
+      <LiveIntrusions cases={liveCases} />
 
       <div className="term-panel space-y-2">
         <h2 className="text-sm tracking-widest text-[var(--term-fg-bright)]">

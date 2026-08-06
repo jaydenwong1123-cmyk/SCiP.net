@@ -20,16 +20,26 @@ import {
 import {
   CHALLENGE_KINDS,
   DEADLINE_GRACE_MS,
+  RUN_STATUS,
   TRACE_LOCKOUT_MS,
   formatDuration,
 } from "@/lib/hack/config";
 import {
   getOrIssueChallenge,
   publicChallenge,
+  resolveStaleRuns,
   type PublicChallenge,
 } from "@/lib/hack/engine";
+import {
+  duelState,
+  engageDuel,
+  readDuel,
+  submitDuelAnswer,
+  type DuelState,
+} from "@/lib/hack/duel";
 import { gradeAnswer } from "@/lib/hack/games";
 import { revokeGrant } from "@/lib/hack/grant";
+import { checkRateLimit, recordAttempt, DUEL_RULE } from "@/lib/rate-limit";
 
 export type TraceState =
   | { ok: true; kind: "challenge"; challenge: PublicChallenge; feedback?: string }
@@ -243,6 +253,96 @@ export async function checkTraceAnswerAction(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Counter-intrusion duel
+// ---------------------------------------------------------------------------
+
+// Engage a live intrusion head-to-head.
+//
+// Both seats are then served the same puzzle and the first correct answer
+// decides the run: the intruder walks away with Layer 3 access, or the breach
+// is repelled on the spot. See lib/hack/duel.ts for the rules.
+export async function engageDuelAction(runId: string): Promise<DuelState> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const run = await db.hackRun.findUnique({ where: { id: runId } });
+  if (!run) return { ok: false, error: "CASE NOT FOUND." };
+
+  // An officer must not duel themselves. The desk list already filters own
+  // runs out, so reaching this is either a stale page or a hand-rolled call;
+  // either way the error is deliberately the same one a non-live case gives,
+  // so it cannot be used to confirm which case code is your own.
+  if (run.userId === user.id || run.status !== RUN_STATUS.active) {
+    return { ok: false, error: "CASE IS NOT LIVE.", resync: true };
+  }
+
+  // Settles an intrusion that has already timed out but not yet been swept —
+  // engaging a corpse would open a duel the intruder can never answer.
+  const live = await resolveStaleRuns(run.userId);
+  if (!live || live.id !== run.id || live.status !== RUN_STATUS.active) {
+    return { ok: false, error: "CASE IS NOT LIVE.", resync: true };
+  }
+
+  const result = await engageDuel(live, user.id);
+  if (!result.ok) return { ok: false, error: result.error, resync: true };
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackDuelEngaged,
+    actor: user,
+    targetType: "hack_run",
+    targetId: run.id,
+    targetName: caseCode(run.id),
+    summary: "Counter-intrusion opened against a live breach",
+  });
+
+  revalidatePath("/counter-intel");
+  return { ok: true, kind: "live", duel: result.duel };
+}
+
+// The defender's tick. Also drives lazy expiry for the whole duel: an officer
+// sitting on this page is the most likely request to be running when either
+// clock finally goes.
+export async function pollDuelAction(runId: string): Promise<DuelState> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+  return duelState(await readDuel(runId, user.id));
+}
+
+export async function submitDuelAnswerAction(
+  _prevState: DuelState | null,
+  formData: FormData
+): Promise<DuelState> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  if (findNonAsciiFormField(formData)) {
+    return { ok: false, error: NON_ASCII_ERROR };
+  }
+
+  if (!hasStaffPowers(user)) {
+    const throttle = await checkRateLimit("hack_duel", user.id, DUEL_RULE);
+    if (throttle.blocked) {
+      return {
+        ok: false,
+        error: `TERMINAL LOCKED — RETRY IN ${formatDuration(throttle.retryAfterMs)}.`,
+      };
+    }
+    await recordAttempt("hack_duel", user.id);
+  }
+
+  const nonce = String(formData.get("nonce") ?? "");
+  const answer = String(formData.get("answer") ?? "").slice(0, 400);
+  if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
+
+  const state = duelState(await submitDuelAnswer(user.id, nonce, answer));
+  if (state.ok && (state.kind === "won" || state.kind === "lost")) {
+    revalidatePath("/counter-intel");
+    revalidatePath(`/counter-intel/${String(formData.get("runId") ?? "")}`);
+  }
+  return state;
+}
+
 // Cut off an identified intruder's access.
 export async function revokeHackGrantAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -387,6 +487,7 @@ export async function deleteHackRunAction(
 
   await db.$transaction([
     db.hackChallenge.deleteMany({ where: { runId } }),
+    db.hackDuel.deleteMany({ where: { runId } }),
     db.hackGrant.deleteMany({ where: { runId } }),
     db.hackRun.delete({ where: { id: runId } }),
   ]);
@@ -438,6 +539,7 @@ export async function deleteHackRunsAction(
   const ids = runs.map((r) => r.id);
   await db.$transaction([
     db.hackChallenge.deleteMany({ where: { runId: { in: ids } } }),
+    db.hackDuel.deleteMany({ where: { runId: { in: ids } } }),
     db.hackGrant.deleteMany({ where: { runId: { in: ids } } }),
     db.hackRun.deleteMany({ where: { id: { in: ids } } }),
   ]);
@@ -466,6 +568,7 @@ export async function wipeAllHackRunsAction(
 
   await db.$transaction([
     db.hackChallenge.deleteMany({}),
+    db.hackDuel.deleteMany({}),
     db.hackGrant.deleteMany({}),
     db.hackRun.deleteMany({}),
   ]);

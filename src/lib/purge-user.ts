@@ -93,10 +93,17 @@ export async function purgeUser(userId: string): Promise<void> {
   const ownRunIds = ownRuns.map((r) => r.id);
   if (ownRunIds.length > 0) {
     await db.hackChallenge.deleteMany({ where: { runId: { in: ownRunIds } } });
+    await db.hackDuel.deleteMany({ where: { runId: { in: ownRunIds } } });
     await db.hackGrant.deleteMany({ where: { runId: { in: ownRunIds } } });
   }
   await db.hackGrant.deleteMany({ where: { userId } });
   await db.hackRun.deleteMany({ where: { userId } });
+  // Counter-intrusions they fought as the DEFENDER go too. Unlike a trace,
+  // HackDuel.defenderId is not nullable — and unlike a trace, a duel is not a
+  // standing work product but a moment between two people, one of whom no
+  // longer exists. The run it decided keeps its status either way; that is the
+  // part of the record that mattered.
+  await db.hackDuel.deleteMany({ where: { defenderId: userId } });
   // Traces and revocations they performed against OTHER members' runs stay —
   // that is RAISA's work product, and it outlives the officer who did it.
   await db.hackRun.updateMany({
