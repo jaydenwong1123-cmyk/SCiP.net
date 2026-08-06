@@ -155,7 +155,7 @@ model Notification {
 // them when filed.
 model MemberInfraction {
   id        String   @id @default(cuid())
-  // "MINOR" | "MAJOR" | "SEVERE" — see INFRACTION_SEVERITIES in lib/infractions.ts
+  // "MINOR" | "MODERATE" | "MAJOR" | "SEVERE" — see INFRACTION_SEVERITIES in lib/infractions.ts
   severity  String
   reason    String
   createdAt DateTime @default(now())

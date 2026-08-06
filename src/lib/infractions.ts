@@ -1,4 +1,4 @@
-export const INFRACTION_SEVERITIES = ["MINOR", "MAJOR", "SEVERE"] as const;
+export const INFRACTION_SEVERITIES = ["MINOR", "MODERATE", "MAJOR", "SEVERE"] as const;
 export type InfractionSeverity = (typeof INFRACTION_SEVERITIES)[number];
 
 export function isInfractionSeverity(value: string): value is InfractionSeverity {
@@ -7,6 +7,7 @@ export function isInfractionSeverity(value: string): value is InfractionSeverity
 
 export const INFRACTION_SEVERITY_COLOR: Record<InfractionSeverity, string> = {
   MINOR: "var(--term-fg-dim)",
+  MODERATE: "var(--term-orange)",
   MAJOR: "var(--term-amber)",
   SEVERE: "var(--term-red)",
 };

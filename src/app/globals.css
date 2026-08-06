@@ -9,6 +9,7 @@
   --term-glow-rgb: 51, 255, 102;
   --term-red: #ff5555;
   --term-amber: #ffcc55;
+  --term-orange: #ff9955;
   --term-font: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Density scale — overridden per preset by the pre-paint script and the
