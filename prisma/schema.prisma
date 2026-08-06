@@ -65,6 +65,7 @@ model User {
   createdInvites   InviteCode[]      @relation("InviteCodeCreator")
   inviteRedemptions InviteRedemption[] @relation("InviteRedemptionUser")
   notifications      Notification[]      @relation("NotificationRecipient")
+  notificationPreferences NotificationPreference[] @relation("NotificationPreferenceUser")
   infractionsAbout   MemberInfraction[]  @relation("InfractionSubject")
   infractionsIssued  MemberInfraction[]  @relation("InfractionIssuer")
   scpAccessGrantsReceived ScpAccessGrant[] @relation("ScpAccessGrantUser")
@@ -149,6 +150,23 @@ model Notification {
 
   @@index([userId, read])
   @@index([userId, createdAt])
+}
+
+// Per-user, per-type notification opt-down. MUTED still logs the alert (so
+// history is complete) but skips the unread badge/ping. SILENCED skips
+// creating the row at all — a permanent "never tell me about this" opt-out.
+// Absence of a row for a (userId, type) pair means fully on, the default.
+model NotificationPreference {
+  id       String  @id @default(cuid())
+  type     String
+  muted    Boolean @default(false)
+  silenced Boolean @default(false)
+
+  userId String
+  user   User   @relation("NotificationPreferenceUser", fields: [userId], references: [id])
+
+  @@unique([userId, type])
+  @@index([userId])
 }
 
 // A formal disciplinary entry against a member, distinct from MemberNote:

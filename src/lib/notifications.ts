@@ -20,6 +20,12 @@ export async function createNotification(input: {
   body: string;
   link: string;
 }): Promise<void> {
+  const preference = await db.notificationPreference.findUnique({
+    where: { userId_type: { userId: input.userId, type: input.type } },
+  });
+  // SILENCED: skip the row entirely, a permanent "never tell me" opt-out.
+  if (preference?.silenced) return;
+
   // Never notify yourself about your own action (e.g. self-mention).
   await db.notification.create({
     data: {
@@ -27,8 +33,21 @@ export async function createNotification(input: {
       type: input.type,
       body: input.body.slice(0, 300),
       link: input.link,
+      // MUTED: still log it for history, but pre-mark it read so it never
+      // bumps the badge or pings the bell.
+      read: preference?.muted ?? false,
     },
   });
+}
+
+export async function getNotificationPreferences(userId: string) {
+  const rows = await db.notificationPreference.findMany({ where: { userId } });
+  const byType = new Map(rows.map((row) => [row.type, row]));
+  return Object.values(NOTIFICATION_TYPES).map((type) => ({
+    type,
+    muted: byType.get(type)?.muted ?? false,
+    silenced: byType.get(type)?.silenced ?? false,
+  }));
 }
 
 const RECENT_LIMIT = 20;

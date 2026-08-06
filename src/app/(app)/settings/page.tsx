@@ -1,5 +1,7 @@
 import { requireUser, getRealUser } from "@/lib/session";
 import { SettingsForm } from "./settings-form";
+import { NotificationPreferencesForm } from "./notification-preferences-form";
+import { getNotificationPreferences } from "@/lib/notifications";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
 import { canViewAs, getViewAsClearance, viewAsOptions } from "@/lib/view-as";
 import { setViewAsAction } from "./view-as-actions";
@@ -10,6 +12,7 @@ export default async function SettingsPage() {
   // back out of a simulation, so it must never be downgraded.
   const real = (await getRealUser())!;
   const viewAs = await getViewAsClearance(real);
+  const notificationPreferences = await getNotificationPreferences(real.id);
 
   return (
     <div className="term-panel space-y-4">
@@ -18,6 +21,11 @@ export default async function SettingsPage() {
         CUSTOMIZE THE TERMINAL APPEARANCE FOR YOUR SESSION.
       </p>
       <SettingsForm />
+
+      <div className="space-y-3 border-t border-[var(--term-border)] pt-4">
+        <h2 className="text-sm tracking-widest">:: NOTIFICATION PREFERENCES ::</h2>
+        <NotificationPreferencesForm preferences={notificationPreferences} />
+      </div>
 
       {canViewAs(real) && (
         <div className="space-y-2 border-t border-[var(--term-border)] pt-4">
