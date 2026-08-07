@@ -15,6 +15,7 @@ import {
   DEFAULT_FONT,
   DEFAULT_DENSITY,
 } from "@/lib/appearance";
+import { TickRule } from "@/components/hud";
 
 function applyTheme(themeKey: string) {
   const vars = THEME_MAP[themeKey] ?? THEME_MAP[DEFAULT_THEME];
@@ -73,8 +74,12 @@ export function SettingsForm() {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">DISPLAY COLOR SCHEME</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <h2 className="hud-readout__label">DISPLAY COLOR SCHEME</h2>
+        {/* Each swatch is a miniature of the console rendered in that preset's
+            own palette — a bordered surface, a title line, a body line and a
+            signal row — so the choice is made by looking at the thing rather
+            than by reading its name. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {THEMES.map((t) => {
             const active = t.key === theme;
             return (
@@ -82,25 +87,55 @@ export function SettingsForm() {
                 key={t.key}
                 type="button"
                 onClick={() => chooseTheme(t.key)}
-                className="term-button text-xs flex items-center gap-2 justify-start"
+                aria-pressed={active}
+                className="text-left p-0 border cursor-pointer"
                 style={{
-                  borderColor: active ? t.vars["--term-fg-bright"] : t.vars["--term-border"],
-                  color: t.vars["--term-fg"],
-                  background: active ? t.vars["--term-bg"] : "transparent",
+                  borderColor: active
+                    ? t.vars["--term-fg-bright"]
+                    : t.vars["--term-border"],
+                  background: t.vars["--term-bg"],
                   boxShadow: active
-                    ? `0 0 8px rgba(${t.vars["--term-glow-rgb"]}, 0.5)`
+                    ? `0 0 0 1px ${t.vars["--term-fg-bright"]}, 0 0 12px rgba(${t.vars["--term-glow-rgb"]}, 0.35)`
                     : "none",
                 }}
               >
                 <span
-                  className="inline-block w-3 h-3 rounded-full border"
+                  className="flex items-center justify-between px-2 py-1 border-b"
                   style={{
-                    backgroundColor: t.vars["--term-fg"],
-                    borderColor: t.vars["--term-fg-bright"],
+                    borderColor: t.vars["--term-border"],
+                    color: t.vars["--term-fg-bright"],
+                    fontSize: "var(--hud-t-micro)",
+                    letterSpacing: "0.16em",
                   }}
-                  aria-hidden
-                />
-                {active ? `[${t.label}]` : t.label}
+                >
+                  {t.label}
+                  {active && <span aria-hidden>◀</span>}
+                </span>
+                <span className="block px-2 py-2 space-y-1">
+                  <span
+                    className="block h-1"
+                    style={{ background: t.vars["--term-fg"], width: "70%" }}
+                    aria-hidden
+                  />
+                  <span
+                    className="block h-1"
+                    style={{ background: t.vars["--term-fg-dim"], width: "90%" }}
+                    aria-hidden
+                  />
+                  <span
+                    className="block h-1"
+                    style={{ background: t.vars["--term-fg-dim"], width: "45%" }}
+                    aria-hidden
+                  />
+                  <span className="flex gap-1 pt-1" aria-hidden>
+                    <span
+                      className="w-2 h-2"
+                      style={{ background: t.vars["--term-fg-bright"] }}
+                    />
+                    <span className="w-2 h-2" style={{ background: "#ffcc55" }} />
+                    <span className="w-2 h-2" style={{ background: "#ff5555" }} />
+                  </span>
+                </span>
               </button>
             );
           })}
@@ -108,8 +143,8 @@ export function SettingsForm() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">TERMINAL FONT</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <h2 className="hud-readout__label">TERMINAL FONT</h2>
+        <div className="hud-segmented flex-wrap">
           {FONTS.map((f) => {
             const active = f.key === font;
             return (
@@ -117,15 +152,12 @@ export function SettingsForm() {
                 key={f.key}
                 type="button"
                 onClick={() => chooseFont(f.key)}
-                className="term-button text-sm"
-                style={{
-                  fontFamily: f.stack,
-                  borderColor: active ? "var(--term-fg-bright)" : "var(--term-border)",
-                  boxShadow: active ? "0 0 8px rgba(var(--term-glow-rgb), 0.4)" : "none",
-                }}
+                aria-pressed={active}
+                className={`hud-seg flex-col items-start gap-0 ${active ? "hud-seg--on" : ""}`}
+                style={{ fontFamily: f.stack }}
               >
-                {active ? `[${f.label}]` : f.label}
-                <span className="block text-xs opacity-70">AaBb 0123</span>
+                {f.label}
+                <span className="block text-[10px] opacity-70">AaBb 0123</span>
               </button>
             );
           })}
@@ -133,8 +165,8 @@ export function SettingsForm() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">DISPLAY DENSITY</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <h2 className="hud-readout__label">DISPLAY DENSITY</h2>
+        <div className="hud-segmented flex-wrap">
           {DENSITIES.map((d) => {
             const active = d.key === density;
             return (
@@ -143,14 +175,10 @@ export function SettingsForm() {
                 type="button"
                 onClick={() => chooseDensity(d.key)}
                 aria-pressed={active}
-                className="term-button text-xs text-left"
-                style={{
-                  borderColor: active ? "var(--term-fg-bright)" : "var(--term-border)",
-                  boxShadow: active ? "0 0 8px rgba(var(--term-glow-rgb), 0.4)" : "none",
-                }}
+                className={`hud-seg flex-col items-start gap-0 text-left ${active ? "hud-seg--on" : ""}`}
               >
-                {active ? `[${d.label}]` : d.label}
-                <span className="block text-[10px] opacity-70 mt-1 normal-case">
+                {d.label}
+                <span className="block text-[10px] opacity-70 normal-case">
                   {d.hint}
                 </span>
               </button>
@@ -159,11 +187,16 @@ export function SettingsForm() {
         </div>
       </section>
 
-      <div className="pt-2 border-t border-[var(--term-border)]/40">
-        <button type="button" onClick={resetAll} className="term-button text-xs">
+      <TickRule />
+      <div>
+        <button
+          type="button"
+          onClick={resetAll}
+          className="term-button term-button--ghost term-button--sm"
+        >
           RESET TO DEFAULT
         </button>
-        <p className="text-xs text-[var(--term-fg-dim)] mt-2">
+        <p className="text-[10px] text-[var(--term-fg-dim)] mt-2">
           PREFERENCES ARE SAVED TO THIS BROWSER AND APPLY INSTANTLY.
         </p>
       </div>

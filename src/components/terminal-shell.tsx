@@ -3,15 +3,21 @@ import { SecretLogo } from "@/components/secret-logo";
 import { LogoutButton } from "@/components/logout-button";
 import { clearanceDisplay, clearanceAccent } from "@/lib/clearance";
 import { Tutorial } from "@/components/tutorial";
-import { TabBar } from "@/components/tab-bar";
+import { CommandRail } from "@/components/command-rail";
+import { UtcClock } from "@/components/utc-clock";
 import { NotificationBell, type NotificationRow } from "@/components/notification-bell";
+import { StationBreadcrumb } from "@/components/station-breadcrumb";
+import type { BadgeCounts, Section } from "@/lib/sections";
 
 export function TerminalShell({
   children,
   user,
+  sections,
+  counts,
   unreadMessages = 0,
   notifications = [],
   unreadNotifications = 0,
+  banners,
 }: {
   children: React.ReactNode;
   user: {
@@ -23,59 +29,85 @@ export function TerminalShell({
     isAdmin: boolean;
     isStaff: boolean;
   };
+  /** Stations this member is cleared to see — already filtered on the server. */
+  sections: Section[];
+  counts: BadgeCounts;
   unreadMessages?: number;
   notifications?: NotificationRow[];
   unreadNotifications?: number;
+  /** Full-bleed session-state strips (view-as simulation, illicit grant). */
+  banners?: React.ReactNode;
 }) {
   const accent = clearanceAccent(user.clearance, user.designation);
   const rank = clearanceDisplay(user.clearance, user.designation);
 
   return (
     <div
-      className="min-h-screen flex flex-col w-full max-w-5xl mx-auto p-2 sm:p-4 gap-3 sm:gap-4"
-      // Scopes the rank accent to the app shell; everything inside reads it
-      // through var(--term-clearance).
+      className="hud-shell"
+      // Scopes the rank accent to the app shell; the rail, stripe and chips
+      // all read it through var(--term-clearance).
       style={{ ["--term-clearance" as string]: accent }}
     >
-      <header className="term-panel shell-header flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div>
+      <CommandRail sections={sections} counts={counts} callsign={rank} />
+
+      <div className="hud-content">
+        <div className="hud-banner hud-banner--ts">
+          <span>TOP SECRET</span>
+          <span aria-hidden>{"//"}</span>
+          <span>SCiP-220</span>
+          <span aria-hidden>{"//"}</span>
+          <span>NOFORN</span>
+        </div>
+
+        <header className="hud-statusbar">
           <SecretLogo />
-          <span className="text-[var(--term-amber)] ml-2">FACILITY-220</span>
-          <span className="hidden sm:inline text-[var(--term-fg-dim)] ml-2">
-            {"// SECURE TERMINAL"}
+          <span className="hud-statusbar__sep" aria-hidden>
+            │
           </span>
+          <span className="text-[var(--term-amber)]">FACILITY-220</span>
+          <StationBreadcrumb />
+
+          <div className="hud-statusbar__right">
+            <UtcClock />
+            <span>
+              <span className="hidden sm:inline">USER: </span>
+              <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
+              <span className="clearance-chip">{rank}</span>
+            </span>
+            {unreadMessages > 0 && (
+              <Link
+                href="/messages"
+                className="term-link text-[var(--term-fg-bright)]"
+                aria-label={`${unreadMessages} unread ${
+                  unreadMessages === 1 ? "message" : "messages"
+                }`}
+              >
+                ✉ {unreadMessages}
+              </Link>
+            )}
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadNotifications}
+            />
+            <LogoutButton />
+            <Tutorial />
+          </div>
+        </header>
+
+        <div className="clearance-stripe" aria-hidden />
+
+        {banners}
+
+        <div className="hud-content__inner">
+          <main className="flex-1 flex flex-col gap-[var(--term-gap)] min-w-0">
+            {children}
+          </main>
         </div>
-        <div className="text-xs sm:text-sm flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4">
-          <span>
-            USER: <span className="text-[var(--term-fg-bright)]">{user.displayName}</span>{" "}
-            <span className="clearance-chip">{rank}</span>
-          </span>
-          {unreadMessages > 0 && (
-            <Link
-              href="/messages"
-              className="term-link text-[var(--term-fg-bright)]"
-              aria-label={`${unreadMessages} unread ${
-                unreadMessages === 1 ? "message" : "messages"
-              }`}
-            >
-              ✉ {unreadMessages} NEW
-            </Link>
-          )}
-          <NotificationBell notifications={notifications} unreadCount={unreadNotifications} />
-          <LogoutButton />
-          <Tutorial />
-        </div>
-      </header>
 
-      <div className="clearance-stripe" aria-hidden />
-
-      <TabBar />
-
-      <main className="flex-1 flex flex-col">{children}</main>
-
-      <footer className="text-xs text-[var(--term-fg-dim)] text-center py-2">
-        SCP FOUNDATION SECURE ACCESS TERMINAL — UNAUTHORIZED ACCESS WILL BE LOGGED
-      </footer>
+        <footer className="hud-banner hud-banner--ts">
+          <span>UNAUTHORIZED DISCLOSURE PUNISHABLE UNDER SITE DIRECTIVE 1-C</span>
+        </footer>
+      </div>
     </div>
   );
 }

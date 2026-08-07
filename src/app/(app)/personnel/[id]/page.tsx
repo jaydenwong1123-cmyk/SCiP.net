@@ -26,6 +26,14 @@ import {
 import { INFRACTION_SEVERITY_COLOR, type InfractionSeverity } from "@/lib/infractions";
 import { redactNameToText, renderRedactedName } from "@/lib/redact";
 import { ProfileForm } from "@/app/(app)/profile/profile-form";
+import { SeverityMeter } from "@/components/signal-badge";
+import {
+  StationHead,
+  HudPanel,
+  Lamp,
+  TickRule,
+  EmptyState,
+} from "@/components/hud";
 
 export default async function PersonnelFilePage({
   params,
@@ -81,33 +89,58 @@ export default async function PersonnelFilePage({
     : [];
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg tracking-widest">
-            :: PERSONNEL FILE —{" "}
-            {(viewer.id === person.id
-              ? person.displayName
-              : redactNameToText(person.displayName, viewer)
-            ).toUpperCase()}{" "}
-            ::
-          </h1>
-          <Link href="/personnel" className="term-link text-sm">
-            [BACK TO ROSTER]
-          </Link>
+    <>
+      <StationHead
+        code="SEC-01 // PERSONNEL FILE"
+        title={(viewer.id === person.id
+          ? person.displayName
+          : redactNameToText(person.displayName, viewer)
+        ).toUpperCase()}
+      >
+        <Link href="/personnel" className="term-link text-sm">
+          [BACK TO ROSTER]
+        </Link>
+      </StationHead>
+
+      {/* Identity block above the file body: the facts a reader needs before
+          the prose, laid out as a hairline field grid. */}
+      <div className="hud-fields">
+        <div>
+          <div className="hud-readout__label">Clearance</div>
+          <div className="clearance-chip inline-block mt-1 text-xs">
+            {clearanceDisplay(person.clearance, person.designation)}
+          </div>
         </div>
-        <p className="text-sm text-[var(--term-fg-dim)]">
-          CLEARANCE: {clearanceDisplay(person.clearance, person.designation)}
-          {person.department ? ` — ${person.department}` : ""}
-        </p>
-        <pre className="whitespace-pre-wrap break-words font-mono text-sm term-panel min-h-[10rem]">
+        <div>
+          <div className="hud-readout__label">Department</div>
+          <div className="text-sm mt-1">{person.department || "UNASSIGNED"}</div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Record ID</div>
+          <div className="hud-recid mt-1">
+            ID-{String(person.id).slice(0, 8).toUpperCase()}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">File Status</div>
+          <div className="mt-1">
+            <Lamp state={person.personalFile ? "on" : "off"}>
+              {person.personalFile ? "ON RECORD" : "NO FILE"}
+            </Lamp>
+          </div>
+        </div>
+      </div>
+
+      <HudPanel code="01" title="PERSONAL FILE">
+        <pre className="whitespace-pre-wrap break-words font-mono text-sm term-panel term-panel--sub min-h-[10rem]">
           {person.personalFile
             ? await renderBody(person.personalFile, viewer)
             : "[NO FILE ON RECORD]"}
         </pre>
         {canEditAnyPersonalFile(viewer) && viewer.id !== person.id && (
-          <div className="space-y-2 pt-2 border-t border-[var(--term-fg-dim)]/30">
-            <p className="text-sm text-[var(--term-amber)]">
+          <div className="space-y-2 pt-3">
+            <TickRule />
+            <p className="hud-readout__label text-[var(--term-amber)] pt-1">
               ⧉ RECORDKEEPING — EDIT THIS FILE
             </p>
             <ProfileForm
@@ -116,13 +149,15 @@ export default async function PersonnelFilePage({
             />
           </div>
         )}
-      </div>
+      </HudPanel>
 
       {canSeeAttachments && (
-        <div className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-amber)]">
-            ⧉ ATTACHED EVIDENCE — L-5+ ONLY
-          </h2>
+        <HudPanel
+          code="02"
+          title={<span className="text-[var(--term-amber)]">⧉ ATTACHED EVIDENCE</span>}
+          status="L-5+ ONLY"
+          variant="secure"
+        >
           {attachments.length === 0 ? (
             <p className="text-sm text-[var(--term-fg-dim)]">
               NO IMAGES ATTACHED TO THIS FILE.
@@ -138,13 +173,7 @@ export default async function PersonnelFilePage({
                   .map((a) => (
                     <form key={a.id} action={deletePersonnelAttachmentAction}>
                       <input type="hidden" name="attachmentId" value={a.id} />
-                      <button
-                        className="term-button text-[10px]"
-                        style={{
-                          borderColor: "var(--term-red)",
-                          color: "var(--term-red)",
-                        }}
-                      >
+                      <button className="term-button term-button--danger term-button--sm">
                         REMOVE {a.filename}
                       </button>
                     </form>
@@ -152,114 +181,113 @@ export default async function PersonnelFilePage({
               </div>
             </div>
           )}
-          <div className="pt-2 border-t border-[var(--term-border)]/40">
-            <PersonnelAttachmentForm subjectId={person.id} />
-          </div>
-        </div>
+          <TickRule className="my-3" />
+          <PersonnelAttachmentForm subjectId={person.id} />
+        </HudPanel>
       )}
 
       {canSeeInfractions && (
-        <div className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-amber)]">
-            ⚠ DISCIPLINARY RECORD
-          </h2>
-
-          <div className="space-y-2">
+        <HudPanel
+          code="03"
+          title={<span className="text-[var(--term-amber)]">⚠ DISCIPLINARY RECORD</span>}
+          status={`${infractions.length} ON FILE`}
+        >
+          <div className="hud-list">
             {infractions.length === 0 && (
-              <p className="text-sm text-[var(--term-fg-dim)]">
-                NO INFRACTIONS ON RECORD.
-              </p>
+              <EmptyState glyph="○" title="No infractions on record" />
             )}
-            {infractions.map((inf) => (
-              <div
-                key={inf.id}
-                className="border-b border-[var(--term-border)]/30 py-2 space-y-1"
-                style={{
-                  borderLeft: `3px solid ${
-                    INFRACTION_SEVERITY_COLOR[inf.severity as InfractionSeverity] ??
-                    "var(--term-fg-dim)"
-                  }`,
-                  paddingLeft: "0.5rem",
-                }}
-              >
-                <div className="flex items-center justify-between text-xs text-[var(--term-fg-dim)]">
-                  <span
-                    style={{
-                      color:
-                        INFRACTION_SEVERITY_COLOR[
-                          inf.severity as InfractionSeverity
-                        ] ?? undefined,
-                    }}
-                  >
-                    {inf.severity} — {inf.issuerName || "UNKNOWN"} —{" "}
-                    {inf.createdAt.toISOString().slice(0, 16).replace("T", " ")}
-                  </span>
-                  {(canDeleteAny || inf.issuerId === viewer.id) && (
-                    <form action={deleteInfractionAction}>
-                      <input type="hidden" name="infractionId" value={inf.id} />
-                      <button
-                        className="term-button text-xs"
-                        style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
-                      >
-                        DELETE
-                      </button>
-                    </form>
-                  )}
+            {infractions.map((inf) => {
+              const color =
+                INFRACTION_SEVERITY_COLOR[inf.severity as InfractionSeverity] ??
+                "var(--term-fg-dim)";
+              return (
+                <div
+                  key={inf.id}
+                  className="term-row py-2 space-y-1"
+                  style={{ borderLeft: `3px solid ${color}`, paddingLeft: "0.6rem" }}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <SeverityMeter severity={inf.severity as InfractionSeverity} />
+                      <span style={{ color }}>{inf.severity}</span>
+                      <span className="hud-recid">
+                        {inf.issuerName || "UNKNOWN"} ·{" "}
+                        {inf.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                      </span>
+                    </span>
+                    {(canDeleteAny || inf.issuerId === viewer.id) && (
+                      <form action={deleteInfractionAction}>
+                        <input type="hidden" name="infractionId" value={inf.id} />
+                        <button className="term-button term-button--danger term-button--sm">
+                          DELETE
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                  <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+                    {inf.reason}
+                  </pre>
                 </div>
-                <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-                  {inf.reason}
-                </pre>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {canFileInfractions && viewer.id !== person.id && (
-            <div className="pt-2 border-t border-[var(--term-border)]/40">
+            <>
+              <TickRule className="my-3" />
               <InfractionForm subjectId={person.id} />
-            </div>
+            </>
           )}
-        </div>
+        </HudPanel>
       )}
 
       {showNotes && (
-        <div className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-amber)]">
-            ⚑ CLASSIFIED PERSONNEL NOTES — L-5+ / STAFF ONLY
-          </h2>
-          <p className="text-xs text-[var(--term-fg-dim)]">
+        <HudPanel
+          code="04"
+          title={
+            <span className="text-[var(--term-amber)]">
+              ⚑ CLASSIFIED PERSONNEL NOTES
+            </span>
+          }
+          status="L-5+ / STAFF ONLY"
+          variant="secure"
+        >
+          <p className="text-[10px] text-[var(--term-fg-dim)] mb-2">
             THIS SUBJECT CANNOT SEE THIS SECTION.
           </p>
 
-          <div className="space-y-2">
+          <div className="hud-list">
             {notes.length === 0 && (
-              <p className="text-sm text-[var(--term-fg-dim)]">NO NOTES ON RECORD.</p>
+              <EmptyState glyph="⚑" title="No notes on record" />
             )}
             {notes.map((n) => (
               <div
                 key={n.id}
-                className="border-b border-[var(--term-border)]/30 py-2 space-y-1"
+                className="term-row py-2 space-y-1"
                 style={
-                  n.flagged ? { borderLeft: "3px solid var(--term-red)", paddingLeft: "0.5rem" } : undefined
+                  n.flagged
+                    ? { borderLeft: "3px solid var(--term-red)", paddingLeft: "0.6rem" }
+                    : undefined
                 }
               >
-                <div className="flex items-center justify-between text-xs text-[var(--term-fg-dim)]">
-                  <span>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-2 flex-wrap">
                     {n.flagged && (
-                      <span className="text-[var(--term-red)]">⚑ FLAGGED — </span>
+                      <span className="text-[var(--term-red)]">⚑ FLAGGED</span>
                     )}
-                    {n.author.displayName
-                      ? renderRedactedName(n.author.displayName, viewer)
-                      : "UNKNOWN"}{" "}
-                    —{" "}
-                    {n.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                    <span>
+                      {n.author.displayName
+                        ? renderRedactedName(n.author.displayName, viewer)
+                        : "UNKNOWN"}
+                    </span>
+                    <span className="hud-recid">
+                      {n.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                    </span>
                   </span>
                   {(canDeleteAny || n.authorId === viewer.id) && (
                     <form action={deleteMemberNoteAction}>
                       <input type="hidden" name="noteId" value={n.id} />
-                      <button
-                        className="term-button text-xs"
-                        style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
-                      >
+                      <button className="term-button term-button--danger term-button--sm">
                         DELETE
                       </button>
                     </form>
@@ -272,7 +300,8 @@ export default async function PersonnelFilePage({
             ))}
           </div>
 
-          <form action={addMemberNoteAction} className="space-y-2 pt-2 border-t border-[var(--term-border)]/40">
+          <TickRule className="my-3" />
+          <form action={addMemberNoteAction} className="space-y-2">
             <input type="hidden" name="subjectId" value={person.id} />
             <textarea
               name="body"
@@ -287,11 +316,11 @@ export default async function PersonnelFilePage({
                 <input type="checkbox" name="flagged" value="true" />
                 FLAG THIS MEMBER
               </label>
-              <button className="term-button text-xs">ADD NOTE</button>
+              <button className="term-button term-button--sm">ADD NOTE</button>
             </div>
           </form>
-        </div>
+        </HudPanel>
       )}
-    </div>
+    </>
   );
 }

@@ -14,32 +14,47 @@ export function SkeletonLine({
   return <div className="skel" style={{ width, height }} />;
 }
 
-// A panel header: title bar plus an optional action chip on the right.
+// A station header: designator + title, over the hairline rule the real
+// StationHead draws, plus optional readouts on the right.
 export function SkeletonHeader({ action = false }: { action?: boolean }) {
   return (
-    <div className="term-panel flex items-center justify-between gap-4">
-      <SkeletonLine width="14rem" height="1.1rem" />
-      {action && <SkeletonLine width="7rem" height="1.6rem" />}
+    <div className="hud-station-head">
+      <div className="space-y-1">
+        <SkeletonLine width="8rem" height="0.5rem" />
+        <SkeletonLine width="14rem" height="1.1rem" />
+      </div>
+      {action && (
+        <div className="flex gap-4">
+          <SkeletonLine width="4rem" height="1.6rem" />
+          <SkeletonLine width="7rem" height="1.6rem" />
+        </div>
+      )}
     </div>
   );
 }
 
-// A list of rows inside a panel, matching the two-column list layout used by
-// the archive, incident, and personnel registries.
+// A list of rows inside a station panel, matching the two-column list layout
+// used by the archive, incident, and personnel registries.
 export function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="term-panel space-y-3">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center justify-between gap-4 term-row"
-          // Stagger the shimmer so rows don't pulse in lockstep.
-          style={{ animationDelay: `${i * 60}ms` }}
-        >
-          <SkeletonLine width={`${45 + ((i * 7) % 30)}%`} />
-          <SkeletonLine width="8rem" />
-        </div>
-      ))}
+    <div className="term-panel">
+      <div className="hud-panel-head">
+        <SkeletonLine width="3rem" height="0.6rem" />
+        <SkeletonLine width="8rem" height="0.6rem" />
+      </div>
+      <div className="hud-list">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-4 term-row py-2"
+            // Stagger the shimmer so rows don't pulse in lockstep.
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <SkeletonLine width={`${45 + ((i * 7) % 30)}%`} />
+            <SkeletonLine width="8rem" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -56,7 +71,11 @@ export function SkeletonPage({
   label?: string;
 }) {
   return (
-    <div className="space-y-4" aria-busy="true" aria-live="polite">
+    <div
+      className="flex flex-col gap-[var(--term-gap)]"
+      aria-busy="true"
+      aria-live="polite"
+    >
       <span className="sr-only">{label}</span>
       <SkeletonHeader action={action} />
       <SkeletonRows rows={rows} />
@@ -64,17 +83,34 @@ export function SkeletonPage({
   );
 }
 
-// A document body: header, metadata line, then paragraph lines.
+// A document body: station header, a field grid, then the record's paragraphs.
 export function SkeletonDocument({ label = "Loading" }: { label?: string }) {
   return (
-    <div className="term-panel space-y-4" aria-busy="true" aria-live="polite">
+    <div
+      className="flex flex-col gap-[var(--term-gap)]"
+      aria-busy="true"
+      aria-live="polite"
+    >
       <span className="sr-only">{label}</span>
-      <SkeletonLine width="18rem" height="1.1rem" />
-      <SkeletonLine width="60%" />
-      <div className="space-y-2 pt-2">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <SkeletonLine key={i} width={`${70 + ((i * 11) % 30)}%`} />
+      <SkeletonHeader action />
+      <div className="hud-fields">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-1">
+            <SkeletonLine width="4rem" height="0.5rem" />
+            <SkeletonLine width="6rem" height="0.9rem" />
+          </div>
         ))}
+      </div>
+      <div className="term-panel">
+        <div className="hud-panel-head">
+          <SkeletonLine width="2rem" height="0.6rem" />
+          <SkeletonLine width="6rem" height="0.6rem" />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonLine key={i} width={`${70 + ((i * 11) % 30)}%`} />
+          ))}
+        </div>
       </div>
     </div>
   );

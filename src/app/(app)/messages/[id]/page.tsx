@@ -13,6 +13,7 @@ import {
   canBypassRedaction,
 } from "@/lib/redact";
 import { messageRetentionCutoff } from "@/lib/message-retention";
+import { StationHead, HudPanel, Readout } from "@/components/hud";
 
 export default async function MessageDetailPage({
   params,
@@ -75,32 +76,36 @@ export default async function MessageDetailPage({
   )}&thread=${threadKey}`;
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest break-words">
-          :: {thread[0].subject} ::
-        </h1>
-        <div className="flex items-center gap-4 shrink-0">
-          <Link href={replyHref} className="term-link text-sm">
-            [REPLY]
-          </Link>
-          <Link href="/messages" className="term-link text-sm">
-            [BACK]
-          </Link>
-        </div>
-      </div>
+    <>
+      <StationHead code="SEC-02 // THREAD" title={thread[0].subject}>
+        <Readout label="Messages" value={thread.length} small />
+        <Link href={replyHref} className="term-link text-sm">
+          [REPLY]
+        </Link>
+        <Link href="/messages" className="term-link text-sm">
+          [BACK]
+        </Link>
+      </StationHead>
 
+      <HudPanel code="01" title="TRANSCRIPT">
       <div className="space-y-3">
         {thread.map((m) => {
           const mine = m.senderId === user.id;
           return (
             <div
               key={m.id}
-              className="border border-[var(--term-border)]/40 p-3 space-y-2"
+              className="term-panel term-panel--sub space-y-2"
+              // Outbound messages get the clearance accent on their edge so a
+              // thread reads as a conversation at a glance.
+              style={
+                mine
+                  ? { borderLeft: "2px solid var(--term-clearance)" }
+                  : undefined
+              }
             >
-              <p className="text-xs text-[var(--term-fg-dim)]">
-                FROM: {renderRedactedName(m.sender.displayName ?? "", user)} → TO:{" "}
-                {renderRedactedName(m.recipient.displayName ?? "", user)} —{" "}
+              <p className="hud-recid">
+                FROM {renderRedactedName(m.sender.displayName ?? "", user)} → TO{" "}
+                {renderRedactedName(m.recipient.displayName ?? "", user)} ·{" "}
                 {m.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                 {mine && " · SENT"}
               </p>
@@ -118,6 +123,7 @@ export default async function MessageDetailPage({
           );
         })}
       </div>
-    </div>
+      </HudPanel>
+    </>
   );
 }

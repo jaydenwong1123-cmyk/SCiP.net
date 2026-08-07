@@ -38,21 +38,46 @@ function caseStatusColor(status: AnonymisedRun["caseStatus"]): string {
 function CaseBadges({ c }: { c: AnonymisedRun }) {
   return (
     <>
-      {" · "}
       <span className={resolutionColor(c.resolution)}>
         {CASE_RESOLUTION_LABELS[c.resolution]}
       </span>
-      {" · "}
+      <span className="hud-statusbar__sep" aria-hidden>
+        │
+      </span>
       <span className={caseStatusColor(c.caseStatus)}>
         {CASE_STATUS_LABELS[c.caseStatus]}
       </span>
       {c.flagged && (
-        <span className="text-[var(--term-amber)]"> · ⚑ FLAGGED</span>
+        <span className="text-[var(--term-amber)]">⚑ FLAGGED</span>
       )}
-      {c.tracedByName && (
-        <span> · TRACED BY {c.tracedByName}</span>
-      )}
+      {c.tracedByName && <span>TRACED BY {c.tracedByName}</span>}
     </>
+  );
+}
+
+// The reveal ladder as a segmented bar. Paired with the "TRACE n/m" figure
+// beside it, so the bar is a second reading of the number rather than the
+// only one.
+function TraceLadder({ level, max }: { level: number; max: number }) {
+  return (
+    <span
+      className="inline-flex gap-[2px] align-middle"
+      aria-label={`Trace ${level} of ${max}`}
+    >
+      {Array.from({ length: max }, (_, i) => (
+        <span
+          key={i}
+          className="w-2 h-2 border"
+          style={{
+            borderColor:
+              i < level
+                ? "var(--term-fg-bright)"
+                : "color-mix(in srgb, var(--term-border) 45%, transparent)",
+            background: i < level ? "var(--term-fg-bright)" : "transparent",
+          }}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -105,8 +130,8 @@ export function CaseList({
   return (
     <div className="space-y-2">
       {canDelete && cases.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          <label className="flex items-center gap-2 text-[var(--term-fg-dim)]">
+        <div className="flex flex-wrap items-center gap-3 text-xs pb-1">
+          <label className="flex items-center gap-2 hud-readout__label">
             <input
               type="checkbox"
               checked={allSelected}
@@ -115,9 +140,7 @@ export function CaseList({
             />
             SELECT ALL
           </label>
-          <span className="text-[var(--term-fg-dim)]">
-            {selected.size} SELECTED
-          </span>
+          <span className="hud-recid">{selected.size} SELECTED</span>
           {selected.size > 0 && (
             <button
               type="button"
@@ -142,7 +165,7 @@ export function CaseList({
               e.preventDefault();
             }
           }}
-          className="border border-[var(--term-red)]/50 p-2 flex flex-wrap items-center gap-2 text-sm"
+          className="term-panel term-panel--alert p-2 flex flex-wrap items-center gap-2 text-sm"
         >
           {[...selected].map((id) => (
             <input key={id} type="hidden" name="runIds" value={id} />
@@ -150,11 +173,11 @@ export function CaseList({
           <button
             type="submit"
             disabled={deletePending}
-            className="term-button hack-button--risk text-xs"
+            className="term-button term-button--danger term-button--sm"
           >
             {deletePending
               ? "DELETING..."
-              : `[ DELETE ${selected.size} SELECTED ]`}
+              : `DELETE ${selected.size} SELECTED`}
           </button>
           {deleteState?.error && (
             <p className="basis-full text-xs text-[var(--term-red)]">
@@ -169,10 +192,12 @@ export function CaseList({
         </form>
       )}
 
-      <div className="term-panel space-y-1">
+      <div className="hud-list">
         {cases.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state__glyph">◇</div>
+            <div className="empty-state__glyph" aria-hidden>
+              ◇
+            </div>
             <div className="empty-state__title">NO SIGNALS ON RECORD</div>
           </div>
         )}
@@ -189,20 +214,26 @@ export function CaseList({
             )}
             <Link
               href={`/counter-intel/${c.id}`}
-              className="term-row flex flex-1 flex-wrap items-baseline justify-between gap-2"
+              className="term-row flex flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 no-underline px-1"
             >
-              <span className="text-sm">
-                <span className="text-[var(--term-fg-bright)]">{c.code}</span>
+              <span className="flex items-center gap-2 min-w-0 text-sm">
+                <span className="hud-recid text-[var(--term-fg-bright)]">
+                  {c.code}
+                </span>
                 {c.displayName ? (
-                  <span className="text-[var(--term-red)]"> · {c.displayName}</span>
+                  <span className="text-[var(--term-red)]">{c.displayName}</span>
                 ) : (
-                  <span className="text-[var(--term-fg-dim)]"> · ORIGIN UNKNOWN</span>
+                  <span className="text-[var(--term-fg-dim)]">ORIGIN UNKNOWN</span>
                 )}
               </span>
-              <span className="text-xs text-[var(--term-fg-dim)]">
-                {c.startedAtLabel ?? "TIMESTAMP SEALED"}
-                {" · TRACE "}
-                {c.revealLevel}/{revealMax}
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--term-fg-dim)]">
+                <span className="hud-recid">
+                  {c.startedAtLabel ?? "TIMESTAMP SEALED"}
+                </span>
+                <TraceLadder level={c.revealLevel} max={revealMax} />
+                <span className="hud-recid">
+                  {c.revealLevel}/{revealMax}
+                </span>
                 <CaseBadges c={c} />
               </span>
             </Link>
@@ -211,14 +242,14 @@ export function CaseList({
       </div>
 
       {canDelete && cases.length > 0 && (
-        <div className="term-panel space-y-2">
+        <div className="term-panel term-panel--sub space-y-2 mt-2">
           {!wipeConfirming ? (
             <button
               type="button"
               onClick={() => setWipeConfirming(true)}
-              className="term-button hack-button--risk text-xs"
+              className="term-button term-button--danger term-button--sm"
             >
-              [ WIPE ALL CASE FILES ]
+              WIPE ALL CASE FILES
             </button>
           ) : (
             <form
@@ -238,11 +269,11 @@ export function CaseList({
                 <button
                   type="submit"
                   disabled={wipePending}
-                  className="term-button hack-button--risk text-xs"
+                  className="term-button term-button--danger term-button--sm"
                 >
                   {wipePending
                     ? "WIPING..."
-                    : "[ CONFIRM WIPE ALL — CANNOT BE UNDONE ]"}
+                    : "CONFIRM WIPE ALL — CANNOT BE UNDONE"}
                 </button>
                 <button
                   type="button"

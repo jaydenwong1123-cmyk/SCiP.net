@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { ComposeForm } from "./compose-form";
 import { redactNameToText } from "@/lib/redact";
+import { StationHead, HudPanel } from "@/components/hud";
 
 export default async function ComposePage({
   searchParams,
@@ -29,19 +30,20 @@ export default async function ComposePage({
   const defaultRecipientId = recipients.some((r) => r.id === to) ? to : "";
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: COMPOSE MESSAGE ::</h1>
+    <>
+      <StationHead code="SEC-02 // NEW TRANSMISSION" title="COMPOSE MESSAGE">
         <Link href="/messages" className="term-link text-sm shrink-0">
           [BACK]
         </Link>
-      </div>
+      </StationHead>
+      <HudPanel code="01" title="TRANSMISSION">
       <ComposeForm
         recipients={recipients}
         defaultRecipientId={defaultRecipientId}
         defaultSubject={subject ?? ""}
         threadId={thread ?? ""}
       />
-    </div>
+      </HudPanel>
+    </>
   );
 }

@@ -73,10 +73,20 @@ export default async function HackPage() {
   const now = Date.now();
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel alert-panel space-y-3">
+    // hack-root suppresses the facility's blueprint grid and lays down harsher
+    // red scanlines instead. The intruder's console is deliberately the inverse
+    // of the ops HUD — it should not look like facility equipment.
+    <div className="hack-root space-y-4 p-1">
+      <div className="hud-banner hud-banner--alert-red">
+        ⚠ UNSANCTIONED INTERFACE — NO CLASSIFICATION AUTHORITY ⚠
+      </div>
+
+      <div className="alert-panel space-y-3">
         <div className="alert-stripe" />
-        <h1 className="text-lg tracking-widest text-[var(--term-red)]">
+        <h1
+          className="text-lg text-[var(--term-red)]"
+          style={{ letterSpacing: "0.18em" }}
+        >
           :: UNAUTHORIZED ACCESS TERMINAL ::
         </h1>
         <div className="space-y-2 text-sm">
@@ -110,22 +120,39 @@ export default async function HackPage() {
           </p>
         </div>
 
-        <div className="hack-table-scroll">
-          <table className="text-xs w-full">
+        {/* The layer ladder as a segmented bar, so the depth/payout curve is
+            visible before the table spells it out. */}
+        <div className="hack-ladder">
+          {STAGES.map((s) => (
+            <div
+              key={s.stage}
+              className={`hack-stage${s.stage >= 3 ? " hack-stage--active" : ""}`}
+            >
+              L{s.stage}
+              <span className="block">{clearanceLabel(s.tier)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="hud-table-wrap">
+          <table className="hud-table">
             <thead>
-              <tr className="text-[var(--term-fg-dim)] text-left">
-                <th className="pr-4 pb-1">LAYER</th>
-                <th className="pr-4 pb-1">PAYS</th>
-                <th className="pr-4 pb-1">ROUNDS</th>
-                <th className="pb-1">HOLD</th>
+              <tr>
+                <th>LAYER</th>
+                <th>PAYS</th>
+                <th>ROUNDS</th>
+                <th>HOLD</th>
               </tr>
             </thead>
             <tbody>
               {STAGES.map((s) => (
-                <tr key={s.stage} className={s.stage >= 3 ? "text-[var(--term-amber)]" : ""}>
-                  <td className="pr-4">{s.stage}</td>
-                  <td className="pr-4">{clearanceLabel(s.tier)}</td>
-                  <td className="pr-4">{s.rounds}</td>
+                <tr
+                  key={s.stage}
+                  className={s.stage >= 3 ? "text-[var(--term-amber)]" : ""}
+                >
+                  <td>{s.stage}</td>
+                  <td>{clearanceLabel(s.tier)}</td>
+                  <td>{s.rounds}</td>
                   <td>{formatDuration(s.grantMs)}</td>
                 </tr>
               ))}
@@ -137,8 +164,12 @@ export default async function HackPage() {
       <StreakPanel streak={streak} />
 
       {grant && (
-        <div className="term-panel space-y-1 text-sm">
-          <h2 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
+        <div className="alert-panel space-y-1 text-sm">
+          <div className="hud-recid">SESSION STATE</div>
+          <h2
+            className="text-sm text-[var(--term-fg-bright)]"
+            style={{ letterSpacing: "0.16em" }}
+          >
             ACTIVE ILLICIT ACCESS
           </h2>
           <p>

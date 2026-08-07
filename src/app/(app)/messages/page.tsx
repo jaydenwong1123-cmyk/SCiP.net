@@ -7,6 +7,7 @@ import {
   pruneExpiredMessages,
 } from "@/lib/message-retention";
 import { renderRedactedName } from "@/lib/redact";
+import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 
 type ThreadRow = {
   threadKey: string;
@@ -66,46 +67,53 @@ export default async function MessagesPage() {
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
 
-  return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: MESSAGE TERMINAL ::</h1>
-        <Link href="/messages/compose" className="term-button text-sm">
-          [+ COMPOSE]
-        </Link>
-      </div>
+  const unreadTotal = rows.reduce((n, t) => n + t.unread, 0);
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">
-          CONVERSATIONS
-          <span className="ml-2 text-xs">
-            ({MESSAGE_RETENTION_DAYS}d retention)
-          </span>
-        </h2>
-        {rows.length === 0 && <p className="text-sm">NO MESSAGES.</p>}
-        {rows.map((t) => (
-          <Link
-            key={t.threadKey}
-            href={`/messages/${t.latestId}`}
-            className="flex flex-wrap justify-between gap-x-4 text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
-          >
-            <span className="min-w-0 break-words">
-              {t.unread > 0 && (
-                <span className="text-[var(--term-fg-bright)]">[{t.unread} NEW] </span>
-              )}
-              {t.subject}
-              <span className="text-[var(--term-fg-dim)]">
-                {" "}— {t.lastFromMe ? "to" : "from"}{" "}
-                {renderRedactedName(t.otherName ?? "", user)}
-                {t.count > 1 && ` · ${t.count} msgs`}
+  return (
+    <>
+      <StationHead code="SEC-02 // INTERNAL CORRESPONDENCE" title="MESSAGE TERMINAL">
+        <Readout label="Threads" value={rows.length} />
+        <Readout
+          label="Unread"
+          value={unreadTotal}
+          tone={unreadTotal > 0 ? "amber" : "dim"}
+        />
+        <Link href="/messages/compose" className="term-button">
+          + COMPOSE
+        </Link>
+      </StationHead>
+
+      <HudPanel
+        code="01"
+        title="CONVERSATIONS"
+        status={`${MESSAGE_RETENTION_DAYS}D RETENTION`}
+      >
+        <div className="hud-list">
+          {rows.length === 0 && <EmptyState glyph="✉" title="No messages" />}
+          {rows.map((t) => (
+            <Link
+              key={t.threadKey}
+              href={`/messages/${t.latestId}`}
+              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
+            >
+              <span className="min-w-0 break-words flex items-center gap-2 flex-wrap">
+                {t.unread > 0 && (
+                  <span className="hud-rail__badge">{t.unread} NEW</span>
+                )}
+                <span className="text-[var(--term-fg-bright)]">{t.subject}</span>
+                <span className="hud-recid">
+                  {t.lastFromMe ? "TO" : "FROM"}{" "}
+                  {renderRedactedName(t.otherName ?? "", user)}
+                  {t.count > 1 && ` · ${t.count} MSGS`}
+                </span>
               </span>
-            </span>
-            <span className="text-[var(--term-fg-dim)] shrink-0">
-              {t.createdAt.toISOString().slice(0, 16).replace("T", " ")}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
+              <span className="hud-recid shrink-0">
+                {t.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

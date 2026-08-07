@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { canEditScpFile } from "@/lib/doc-permissions";
 import { authoringClearance } from "@/lib/clearance";
 import { EditScpForm } from "./edit-scp-form";
+import { StationHead, HudPanel } from "@/components/hud";
 
 export default async function EditScpPage({
   params,
@@ -23,16 +24,17 @@ export default async function EditScpPage({
   if (!canEditScpFile(user, file)) redirect(`/scp/${id}`);
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest break-words">
-          :: AMEND {file.title.toUpperCase()} ::
-        </h1>
+    <>
+      <StationHead
+        code="SEC-03 // AMEND RECORD"
+        title={file.title.toUpperCase()}
+      >
         <Link href={`/scp/${file.id}`} className="term-link text-sm">
           [BACK TO FILE]
         </Link>
-      </div>
-      <p className="text-sm text-[var(--term-fg-dim)]">
+      </StationHead>
+      <HudPanel code="01" title="AMENDMENT" status="PRIOR VERSION ARCHIVED">
+      <p className="text-xs text-[var(--term-fg-dim)] mb-3">
         THE CURRENT VERSION IS ARCHIVED TO THE REVISION HISTORY BEFORE YOUR
         CHANGES ARE APPLIED.
       </p>
@@ -46,6 +48,7 @@ export default async function EditScpPage({
         }}
         maxClearance={authoringClearance(user)}
       />
-    </div>
+      </HudPanel>
+    </>
   );
 }

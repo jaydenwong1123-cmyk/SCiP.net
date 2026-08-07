@@ -6,6 +6,13 @@ import {
   authoringClearance,
 } from "@/lib/clearance";
 import { ClearanceRequestForm } from "./request-form";
+import {
+  StationHead,
+  HudPanel,
+  Readout,
+  Lamp,
+  EmptyState,
+} from "@/components/hud";
 
 export default async function ClearanceRequestPage() {
   const user = await requireUser();
@@ -17,16 +24,24 @@ export default async function ClearanceRequestPage() {
   const hasPending = myRequests.some((r) => r.status === "pending");
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-3">
-        <h1 className="text-lg tracking-widest">:: CLEARANCE ADJUSTMENT REQUEST ::</h1>
-        <p className="text-sm text-[var(--term-fg-dim)]">
-          {/* The member's real standing, not an effective clearance propped up
-              by a temporary intrusion grant — this page is about what they are
-              actually entitled to. */}
-          CURRENT CLEARANCE:{" "}
-          {clearanceDisplay(authoringClearance(user), user.designation)}
-        </p>
+    <>
+      <StationHead code="SEC-06 // CLEARANCE ADJUSTMENT" title="ELEVATION REQUEST">
+        {/* The member's real standing, not an effective clearance propped up
+            by a temporary intrusion grant — this page is about what they are
+            actually entitled to. */}
+        <Readout
+          label="Current Clearance"
+          value={clearanceDisplay(authoringClearance(user), user.designation)}
+        />
+        <div className="hud-readout">
+          <span className="hud-readout__label">Request</span>
+          <Lamp state={hasPending ? "warn" : "off"}>
+            {hasPending ? "PENDING REVIEW" : "NONE OPEN"}
+          </Lamp>
+        </div>
+      </StationHead>
+
+      <HudPanel code="01" title="SUBMIT REQUEST">
         {hasPending ? (
           <p className="text-sm text-[var(--term-amber)]">
             YOU HAVE A PENDING REQUEST AWAITING REVIEW.
@@ -34,41 +49,49 @@ export default async function ClearanceRequestPage() {
         ) : (
           <ClearanceRequestForm currentClearance={authoringClearance(user)} />
         )}
-      </div>
+      </HudPanel>
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">REQUEST HISTORY</h2>
-        {myRequests.length === 0 && <p className="text-sm">NO PAST REQUESTS.</p>}
-        {myRequests.map((r) => (
-          <div key={r.id} className="text-sm py-1 border-b border-[var(--term-border)]/30 space-y-0.5">
-            <div>
-              REQUESTED {clearanceLabel(r.requestedLevel)} —{" "}
-              <span
-                className={
-                  r.status === "approved"
-                    ? "text-[var(--term-fg-bright)]"
-                    : r.status === "denied"
-                    ? "text-[var(--term-red)]"
-                    : "text-[var(--term-amber)]"
-                }
-              >
-                {r.status.toUpperCase()}
-              </span>{" "}
-              — {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
-              {r.reviewedBy && (
-                <span className="text-[var(--term-fg-dim)]">
-                  {" "}· BY {r.reviewedBy.displayName}
+      <HudPanel
+        code="02"
+        title="REQUEST HISTORY"
+        status={`${myRequests.length} ON FILE`}
+      >
+        <div className="hud-list">
+          {myRequests.length === 0 && (
+            <EmptyState glyph="◇" title="No past requests" />
+          )}
+          {myRequests.map((r) => (
+            <div key={r.id} className="text-sm term-row space-y-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="hud-recid">
+                  REQ-{String(r.id).slice(0, 4).toUpperCase()}
                 </span>
+                <span>{clearanceLabel(r.requestedLevel)}</span>
+                <Lamp
+                  state={
+                    r.status === "approved"
+                      ? "on"
+                      : r.status === "denied"
+                        ? "alert"
+                        : "warn"
+                  }
+                >
+                  {r.status.toUpperCase()}
+                </Lamp>
+                <span className="hud-recid ml-auto">
+                  {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                  {r.reviewedBy && ` · BY ${r.reviewedBy.displayName}`}
+                </span>
+              </div>
+              {r.reviewNote && (
+                <div className="text-[var(--term-fg-dim)] text-xs pl-2">
+                  ▸ NOTE: {r.reviewNote}
+                </div>
               )}
             </div>
-            {r.reviewNote && (
-              <div className="text-[var(--term-fg-dim)] pl-2">
-                ▸ NOTE: {r.reviewNote}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

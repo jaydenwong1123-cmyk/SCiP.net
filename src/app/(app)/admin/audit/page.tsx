@@ -3,6 +3,13 @@ import { requireStaff } from "@/lib/session";
 import { db } from "@/lib/db";
 import { AUDIT_ACTION_LABELS } from "@/lib/audit";
 import type { Prisma } from "@prisma/client";
+import {
+  StationHead,
+  HudPanel,
+  Readout,
+  TickRule,
+  EmptyState,
+} from "@/components/hud";
 
 const PAGE_SIZE = 50;
 
@@ -53,80 +60,80 @@ export default async function AuditLogPage({
     return s ? `/admin/audit?${s}` : "/admin/audit";
   };
 
-  const chip = (active: boolean) =>
-    `text-xs px-2 py-0.5 border term-link ${
-      active
-        ? "border-[var(--term-fg-bright)] text-[var(--term-fg-bright)]"
-        : "border-[var(--term-border)]/50"
-    }`;
+  const seg = (active: boolean) => `hud-seg${active ? " hud-seg--on" : ""}`;
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: ACCESS &amp; ACTION LOG ::</h1>
+    <>
+      <StationHead code="ADM // AUDIT TRAIL" title="ACCESS &amp; ACTION LOG">
+        <Readout label="Entries" value={total} />
         <Link href="/admin" className="term-link text-sm">
           [BACK TO ADMIN]
         </Link>
-      </div>
+      </StationHead>
 
-      <div className="term-panel space-y-3 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[var(--term-fg-dim)] w-16">ACTION:</span>
-          <Link href={qs({ action: null, page: 1 })} className={chip(!activeAction)}>
-            ALL
-          </Link>
-          {Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => (
-            <Link
-              key={key}
-              href={qs({ action: key, page: 1 })}
-              className={chip(activeAction === key)}
-            >
-              {label}
+      <HudPanel code="01" title="QUERY" status="LOG FILTER">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="hud-readout__label w-14">ACTION</span>
+          <div className="hud-segmented">
+            <Link href={qs({ action: null, page: 1 })} className={seg(!activeAction)}>
+              ALL
             </Link>
-          ))}
+            {Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => (
+              <Link
+                key={key}
+                href={qs({ action: key, page: 1 })}
+                className={seg(activeAction === key)}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
         </div>
         {actors.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[var(--term-fg-dim)] w-16">ACTOR:</span>
-            <Link href={qs({ actor: null, page: 1 })} className={chip(!actor)}>
-              ALL
-            </Link>
-            {actors
-              .filter((a) => a.actorId)
-              .map((a) => (
-                <Link
-                  key={a.actorId}
-                  href={qs({ actor: a.actorId, page: 1 })}
-                  className={chip(actor === a.actorId)}
-                >
-                  {a.actorName || "UNKNOWN"}
-                </Link>
-              ))}
+            <span className="hud-readout__label w-14">ACTOR</span>
+            <div className="hud-segmented">
+              <Link href={qs({ actor: null, page: 1 })} className={seg(!actor)}>
+                ALL
+              </Link>
+              {actors
+                .filter((a) => a.actorId)
+                .map((a) => (
+                  <Link
+                    key={a.actorId}
+                    href={qs({ actor: a.actorId, page: 1 })}
+                    className={seg(actor === a.actorId)}
+                  >
+                    {a.actorName || "UNKNOWN"}
+                  </Link>
+                ))}
+            </div>
           </div>
         )}
-      </div>
+      </HudPanel>
 
-      <div className="term-panel space-y-1">
+      <HudPanel
+        code="02"
+        title="LOGGED ACTIONS"
+        status={`PAGE ${pageNum} / ${totalPages}`}
+      >
+        <div className="hud-list">
         {entries.length === 0 && (
-          <div className="empty-state">
-            <span className="empty-state__glyph" aria-hidden>
-              ▦
-            </span>
-            <p className="empty-state__title">NO ENTRIES</p>
-            <p className="text-sm">
+          <EmptyState glyph="▦" title="No entries">
+            <p className="text-xs">
               {activeAction || actor
                 ? "NO LOGGED ACTIONS MATCH THE CURRENT FILTER."
                 : "NO PRIVILEGED ACTIONS HAVE BEEN RECORDED YET."}
             </p>
-          </div>
+          </EmptyState>
         )}
         {entries.map((e) => (
           <div
             key={e.id}
-            className="term-row border-b border-[var(--term-border)]/30 text-sm flex flex-wrap gap-x-3 gap-y-1 justify-between"
+            className="term-row text-sm flex flex-wrap gap-x-3 gap-y-1 justify-between"
           >
             <span className="min-w-0 break-words">
-              <span className="text-[var(--term-fg-dim)] text-xs mr-2">
+              <span className="hud-recid mr-2">
                 {e.createdAt.toISOString().slice(0, 16).replace("T", " ")}
               </span>
               <span className="text-[var(--term-fg-bright)]">{e.actorName}</span>{" "}
@@ -145,36 +152,36 @@ export default async function AuditLogPage({
                 </span>
               )}
             </span>
-            {e.ip && (
-              <span className="text-[10px] text-[var(--term-fg-dim)] shrink-0">
-                {e.ip}
-              </span>
-            )}
+            {e.ip && <span className="hud-recid shrink-0">{e.ip}</span>}
           </div>
         ))}
-      </div>
-
-      {totalPages > 1 && (
-        <div className="term-panel flex items-center justify-between text-sm">
-          {pageNum > 1 ? (
-            <Link href={qs({ page: pageNum - 1 })} className="term-link">
-              [← NEWER]
-            </Link>
-          ) : (
-            <span className="text-[var(--term-fg-dim)]">[← NEWER]</span>
-          )}
-          <span className="text-[var(--term-fg-dim)]">
-            PAGE {pageNum} / {totalPages} — {total} ENTRIES
-          </span>
-          {pageNum < totalPages ? (
-            <Link href={qs({ page: pageNum + 1 })} className="term-link">
-              [OLDER →]
-            </Link>
-          ) : (
-            <span className="text-[var(--term-fg-dim)]">[OLDER →]</span>
-          )}
         </div>
-      )}
-    </div>
+
+        {totalPages > 1 && (
+          <>
+            <TickRule className="mt-3" />
+            <div className="flex items-center justify-between text-sm pt-2">
+              {pageNum > 1 ? (
+                <Link href={qs({ page: pageNum - 1 })} className="term-link">
+                  [← NEWER]
+                </Link>
+              ) : (
+                <span className="text-[var(--term-fg-dim)]">[← NEWER]</span>
+              )}
+              <span className="hud-recid">
+                PAGE {pageNum} / {totalPages} — {total} ENTRIES
+              </span>
+              {pageNum < totalPages ? (
+                <Link href={qs({ page: pageNum + 1 })} className="term-link">
+                  [OLDER →]
+                </Link>
+              ) : (
+                <span className="text-[var(--term-fg-dim)]">[OLDER →]</span>
+              )}
+            </div>
+          </>
+        )}
+      </HudPanel>
+    </>
   );
 }

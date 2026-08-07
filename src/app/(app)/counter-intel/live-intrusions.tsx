@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { engageDuelAction, pollDuelAction } from "./actions";
 import { DuelConsole } from "./duel-console";
 import type { DuelState, PublicDuel } from "@/lib/hack/duel";
+import { HudPanel, Lamp } from "@/components/hud";
 
 export type LiveCase = {
   runId: string;
@@ -61,45 +62,62 @@ export function LiveIntrusions({ cases }: { cases: LiveCase[] }) {
     );
   }
 
-  if (cases.length === 0) return null;
+  // The feed keeps its place on the watch floor when quiet. A panel that
+  // disappears when nothing is happening makes an idle desk indistinguishable
+  // from a broken one.
+  if (cases.length === 0) {
+    return (
+      <HudPanel code="01" title="LIVE INTRUSION FEED" status="NO CONTACTS">
+        <div className="empty-state">
+          <span className="empty-state__glyph" aria-hidden>
+            ◇
+          </span>
+          <p className="empty-state__title">PERIMETER QUIET</p>
+          <p className="text-[10px]">NO INTRUSION IN PROGRESS</p>
+        </div>
+      </HudPanel>
+    );
+  }
 
   return (
-    <div className="term-panel space-y-2">
-      <h2 className="text-sm tracking-widest text-[var(--term-amber)]">
-        LIVE INTRUSIONS
-      </h2>
-      <p className="text-xs text-[var(--term-fg-dim)]">
+    <HudPanel
+      code="01"
+      title={<span className="text-[var(--term-amber)]">LIVE INTRUSION FEED</span>}
+      status={`${cases.length} CONTACT${cases.length === 1 ? "" : "S"}`}
+      variant="alert"
+    >
+      <p className="text-[10px] text-[var(--term-fg-dim)] leading-snug mb-2">
         ENGAGING SERVES YOU AND THE OPERATOR THE SAME PUZZLE. FIRST CORRECT
         ANSWER DECIDES THE RUN — WIN AND THE BREACH IS REPELLED, LOSE AND THEY
         SEIZE LAYER 3 ACCESS AND THIS CASE LOCKS FOR THE TRACE BACKOFF.
       </p>
 
-      {error && <p className="text-sm text-[var(--term-red)]">{error}</p>}
+      {error && <p className="text-sm text-[var(--term-red)] mb-2">{error}</p>}
 
-      <ul className="space-y-1 pt-1">
+      <ul className="hud-list">
         {cases.map((item) => (
           <li
             key={item.runId}
-            className="flex flex-wrap items-center justify-between gap-2 text-xs"
+            className="term-row flex flex-wrap items-center justify-between gap-2 text-xs"
           >
-            <span>
+            <span className="flex items-center gap-2 min-w-0 flex-wrap">
+              <Lamp state="alert">LIVE</Lamp>
               <span className="text-[var(--term-fg-bright)]">{item.code}</span>
-              <span className="text-[var(--term-fg-dim)]">
-                {" "}
-                · {item.startedLabel} · {item.clearedStages} LAYER
+              <span className="hud-recid">
+                {item.startedLabel} · {item.clearedStages} LAYER
                 {item.clearedStages === 1 ? "" : "S"} BREACHED
               </span>
             </span>
 
             {item.engagement === "other" ? (
-              <span className="text-[var(--term-fg-dim)]">
+              <span className="hud-lamp hud-lamp--off">
                 ENGAGED — {item.engagedByName ?? "ANOTHER OFFICER"}
               </span>
             ) : (
               <button
                 type="button"
                 disabled={pending}
-                className="term-button hack-button--risk text-xs"
+                className="term-button term-button--danger term-button--sm"
                 onClick={() =>
                   startTransition(async () =>
                     enter(
@@ -114,13 +132,13 @@ export function LiveIntrusions({ cases }: { cases: LiveCase[] }) {
                 {pending
                   ? "..."
                   : item.engagement === "mine"
-                    ? "[ RESUME DUEL ]"
-                    : "[ ENGAGE ]"}
+                    ? "RESUME DUEL"
+                    : "ENGAGE"}
               </button>
             )}
           </li>
         ))}
       </ul>
-    </div>
+    </HudPanel>
   );
 }

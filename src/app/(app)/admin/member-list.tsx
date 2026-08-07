@@ -205,12 +205,9 @@ export function MemberList({
           <button
             type="submit"
             disabled={pending}
-            className="term-button text-xs"
-            style={
-              DESTRUCTIVE_BULK_OPS.includes(op)
-                ? { borderColor: "var(--term-red)", color: "var(--term-red)" }
-                : undefined
-            }
+            className={`term-button term-button--sm${
+              DESTRUCTIVE_BULK_OPS.includes(op) ? " term-button--danger" : ""
+            }`}
           >
             {pending ? "APPLYING..." : `APPLY TO ${selected.size}`}
           </button>

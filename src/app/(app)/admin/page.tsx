@@ -15,6 +15,13 @@ import {
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberList } from "./member-list";
 import {
+  StationHead,
+  HudPanel,
+  Readout,
+  TickRule,
+  EmptyState,
+} from "@/components/hud";
+import {
   generateInviteCodeAction,
   revokeInviteCodeAction,
   reviewClearanceRequestAction,
@@ -107,31 +114,22 @@ export default async function AdminPage() {
   const siteConfig = ownerPowers ? await getSiteConfig() : null;
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: ADMINISTRATION ::</h1>
+    <>
+      <StationHead code="ADM // RAISA CONTROL" title="ADMINISTRATION">
         <Link href="/admin/audit" className="term-link text-sm">
           [ACCESS &amp; ACTION LOG]
         </Link>
-      </div>
+      </StationHead>
 
-      <div className="term-panel space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">SITE OVERVIEW</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <HudPanel code="01" title="SITE OVERVIEW" status="FACILITY TELEMETRY">
+        <div className="hud-readout-bank">
           {stats.map((s) => (
-            <div
-              key={s.label}
-              className="border border-[var(--term-border)]/40 p-2 text-center"
-            >
-              <div className="text-2xl text-[var(--term-fg-bright)]">{s.value}</div>
-              <div className="text-[10px] text-[var(--term-fg-dim)] tracking-wider">
-                {s.label}
-              </div>
-            </div>
+            <Readout key={s.label} label={s.label} value={s.value} />
           ))}
         </div>
+        <TickRule className="my-3" />
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--term-fg-dim)]">
-          <span>CLEARANCE DISTRIBUTION:</span>
+          <span className="hud-readout__label">CLEARANCE DISTRIBUTION</span>
           {CLEARANCE_LEVELS.map((l) => (
             <Fragment key={l.rank}>
               <span>
@@ -153,13 +151,13 @@ export default async function AdminPage() {
             </Fragment>
           ))}
         </div>
-      </div>
+      </HudPanel>
 
       {ownerPowers && (
-        <div className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-fg-dim)]">
-            {viewer.isOwner ? "OWNER" : "CO-OWNER"} SELF-MANAGEMENT
-          </h2>
+        <HudPanel
+          code="02"
+          title={`${viewer.isOwner ? "OWNER" : "CO-OWNER"} SELF-MANAGEMENT`}
+        >
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <form action={setOwnDisplayNameAction} className="flex items-center gap-2">
               <input
@@ -184,17 +182,25 @@ export default async function AdminPage() {
                   </option>
                 ))}
               </select>
-              <button className="term-button text-xs">SET OWN CLEARANCE</button>
+              <button className="term-button term-button--sm">
+                SET OWN CLEARANCE
+              </button>
             </form>
           </div>
-        </div>
+        </HudPanel>
       )}
 
       {ownerPowers && siteConfig && (
-        <div className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-amber)]">
-            SITE CONTROL — MAINTENANCE LOCKDOWN
-          </h2>
+        <HudPanel
+          code="03"
+          title={
+            <span className="text-[var(--term-amber)]">
+              SITE CONTROL — MAINTENANCE LOCKDOWN
+            </span>
+          }
+          status={siteConfig.maintenanceMode ? "LOCKDOWN ACTIVE" : "OPEN"}
+          variant={siteConfig.maintenanceMode ? "alert" : "secure"}
+        >
           <p className="text-xs text-[var(--term-fg-dim)]">
             When enabled, the site shows a maintenance notice and only visitors
             with the access code can enter. A code is required to enable it. Set
@@ -278,30 +284,41 @@ export default async function AdminPage() {
               </p>
             </div>
             <button
-              className="term-button text-xs"
+              className="term-button term-button--sm"
               style={{ borderColor: "var(--term-amber)", color: "var(--term-amber)" }}
             >
               SAVE SITE CONTROL
             </button>
           </form>
-        </div>
+        </HudPanel>
       )}
 
-      <div className="term-panel space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">
-          PENDING CLEARANCE REQUESTS {pendingRequests.length > 0 && `(${pendingRequests.length})`}
-        </h2>
-        {pendingRequests.length === 0 && <p className="text-sm">NONE PENDING.</p>}
+      <HudPanel
+        code="04"
+        title="PENDING CLEARANCE REQUESTS"
+        status={`${pendingRequests.length} AWAITING REVIEW`}
+      >
+        <div className="hud-list">
+        {pendingRequests.length === 0 && (
+          <EmptyState glyph="○" title="None pending" />
+        )}
         {pendingRequests.map((r) => (
           <form
             key={r.id}
             action={reviewClearanceRequestAction}
-            className="border-b border-[var(--term-border)]/30 py-2 space-y-2"
+            className="term-row space-y-2"
           >
-            <p className="text-sm">
-              {r.user.displayName} (
-              {clearanceDisplay(r.user.clearance, r.user.designation)}) requests{" "}
-              {clearanceLabel(r.requestedLevel)}
+            <p className="text-sm flex flex-wrap items-center gap-2">
+              <span className="text-[var(--term-fg-bright)]">
+                {r.user.displayName}
+              </span>
+              <span className="clearance-chip text-[10px]">
+                {clearanceDisplay(r.user.clearance, r.user.designation)}
+              </span>
+              <span className="hud-recid">REQUESTS</span>
+              <span className="clearance-chip text-[10px]">
+                {clearanceLabel(r.requestedLevel)}
+              </span>
             </p>
             <p className="text-sm text-[var(--term-fg-dim)]">{r.reason}</p>
             <input type="hidden" name="requestId" value={r.id} />
@@ -316,26 +333,29 @@ export default async function AdminPage() {
               <button
                 name="decision"
                 value="approve"
-                className="term-button text-xs"
+                className="term-button term-button--sm"
               >
                 APPROVE
               </button>
               <button
                 name="decision"
                 value="deny"
-                className="term-button text-xs"
-                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                className="term-button term-button--danger term-button--sm"
               >
                 DENY
               </button>
             </div>
           </form>
         ))}
-      </div>
+        </div>
+      </HudPanel>
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">MEMBER MANAGEMENT</h2>
-        <p className="text-xs text-[var(--term-fg-dim)]">
+      <HudPanel
+        code="05"
+        title="MEMBER MANAGEMENT"
+        status={`${members.length} ON ROSTER`}
+      >
+        <p className="hud-readout__label mb-2">
           CLICK A MEMBER TO OPEN ACTIONS, OR TICK SEVERAL TO ACT ON THEM AT ONCE.
         </p>
         <MemberList
@@ -368,10 +388,13 @@ export default async function AdminPage() {
           canManageHelper={canManageHelper}
           hasAdminPowers={ownerPowers || viewer.isAdmin}
         />
-      </div>
+      </HudPanel>
 
-      <div className="term-panel space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">INVITE CODES</h2>
+      <HudPanel
+        code="06"
+        title="INVITE CODES"
+        status={`${inviteCodes.length} ISSUED`}
+      >
         <form
           action={generateInviteCodeAction}
           className="flex flex-wrap items-end gap-2 text-sm"
@@ -425,14 +448,14 @@ export default async function AdminPage() {
               className="term-input py-1 w-56"
             />
           </label>
-          <button className="term-button text-xs">+ GENERATE</button>
+          <button className="term-button term-button--sm">+ GENERATE</button>
         </form>
 
-        <div className="space-y-1">
+        <TickRule className="my-3" />
+
+        <div className="hud-list">
           {inviteCodes.length === 0 && (
-            <p className="text-sm text-[var(--term-fg-dim)]">
-              NO INVITE CODES HAVE BEEN GENERATED.
-            </p>
+            <EmptyState glyph="⚿" title="No invite codes generated" />
           )}
           {inviteCodes.map((c) => {
             const exhausted = c.useCount >= c.maxUses;
@@ -462,10 +485,16 @@ export default async function AdminPage() {
             return (
               <div
                 key={c.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-between text-sm term-row border-b border-[var(--term-border)]/20"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-between text-sm term-row"
               >
                 <span className="flex flex-col">
-                  <span className={dead ? "text-[var(--term-fg-dim)] line-through" : ""}>
+                  <span
+                    className={
+                      dead
+                        ? "hud-recid line-through"
+                        : "hud-recid text-[var(--term-fg-bright)]"
+                    }
+                  >
                     {c.code}
                   </span>
                   {(c.note || c.createdBy) && (
@@ -484,7 +513,9 @@ export default async function AdminPage() {
                     </span>
                   )}
                 </span>
-                <span className="text-[var(--term-fg-dim)] text-xs">{status}</span>
+                <span className={`hud-lamp hud-lamp--${dead ? "off" : "on"}`}>
+                  {status}
+                </span>
                 {c.active && !exhausted && !expired && (
                   <form
                     action={revokeInviteCodeAction}
@@ -498,14 +529,16 @@ export default async function AdminPage() {
                       placeholder="REASON (OPTIONAL)"
                       className="term-input py-0.5 text-xs w-44"
                     />
-                    <button className="term-button text-xs">REVOKE</button>
+                    <button className="term-button term-button--danger term-button--sm">
+                      REVOKE
+                    </button>
                   </form>
                 )}
               </div>
             );
           })}
         </div>
-      </div>
-    </div>
+      </HudPanel>
+    </>
   );
 }

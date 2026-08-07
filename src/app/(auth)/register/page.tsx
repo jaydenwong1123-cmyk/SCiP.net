@@ -11,11 +11,14 @@ export default function RegisterPage() {
   const [state, formAction, pending] = useActionState(registerAction, initialState);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="term-panel w-full max-w-md space-y-4">
-        <h1 className="text-lg tracking-widest">:: NEW PERSONNEL REGISTRATION ::</h1>
+    <div className="term-panel w-full space-y-4">
+        <div className="hud-panel-head">
+          <span className="hud-panel-head__code">AUTH</span>
+          <span>PERSONNEL INTAKE</span>
+          <span className="hud-panel-head__status">INVITE REQUIRED</span>
+        </div>
 
-        <div className="border-2 border-[var(--term-amber)] p-3 space-y-1">
+        <div className="term-panel term-panel--secure space-y-1">
           <p className="text-[var(--term-amber)] text-sm tracking-wide">
             ◈ REQUIRED: JOIN THE FOUNDATION DISCORD
           </p>
@@ -87,7 +90,6 @@ export default function RegisterPage() {
         <p className="text-sm text-[var(--term-fg-dim)]">
           ALREADY REGISTERED? <Link href="/login" className="term-link">LOGIN HERE</Link>
         </p>
-      </div>
     </div>
   );
 }

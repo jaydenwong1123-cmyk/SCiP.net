@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canEditBroadcast } from "@/lib/doc-permissions";
 import { EditBroadcastForm } from "./edit-broadcast-form";
+import { StationHead, HudPanel } from "@/components/hud";
 
 export default async function EditBroadcastPage({
   params,
@@ -18,22 +19,24 @@ export default async function EditBroadcastPage({
   if (!canEditBroadcast(user, broadcast)) redirect("/broadcasts");
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest break-words">
-          :: AMEND {broadcast.title.toUpperCase()} ::
-        </h1>
+    <>
+      <StationHead
+        code="SEC-05 // AMEND DIRECTIVE"
+        title={broadcast.title.toUpperCase()}
+      >
         <Link href="/broadcasts" className="term-link text-sm">
           [BACK TO BROADCASTS]
         </Link>
-      </div>
-      <EditBroadcastForm
-        broadcast={{
-          id: broadcast.id,
-          title: broadcast.title,
-          body: broadcast.body,
-        }}
-      />
-    </div>
+      </StationHead>
+      <HudPanel code="01" title="AMENDMENT" status="PRIOR VERSION ARCHIVED">
+        <EditBroadcastForm
+          broadcast={{
+            id: broadcast.id,
+            title: broadcast.title,
+            body: broadcast.body,
+          }}
+        />
+      </HudPanel>
+    </>
   );
 }

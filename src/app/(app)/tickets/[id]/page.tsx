@@ -15,6 +15,12 @@ import {
 import { renderRedactedName } from "@/lib/redact";
 import { closeTicketAction } from "../actions";
 import { ReplyForm } from "./reply-form";
+import {
+  StationHead,
+  HudPanel,
+  TickRule,
+  EmptyState,
+} from "@/components/hud";
 
 export default async function TicketDetailPage({
   params,
@@ -49,38 +55,55 @@ export default async function TicketDetailPage({
       : null;
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-lg tracking-widest break-words">
-            :: {ticket.subject.toUpperCase()} ::
-          </h1>
-          <Link href="/tickets" className="term-link text-sm">
-            [BACK TO SUPPORT]
-          </Link>
-        </div>
+    <>
+      <StationHead
+        code="SEC-07 // SUPPORT TICKET"
+        title={ticket.subject.toUpperCase()}
+      >
+        <Link href="/tickets" className="term-link text-sm">
+          [BACK TO SUPPORT]
+        </Link>
+      </StationHead>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--term-fg-dim)]">
-          <span className="flex items-center gap-2">
+      <div className="hud-fields">
+        <div>
+          <div className="hud-readout__label">Ticket #</div>
+          <div className="hud-recid mt-1 text-[var(--term-fg-bright)]">
+            TKT-{String(ticket.id).slice(0, 4).toUpperCase()}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Status</div>
+          <div className="mt-1 flex items-center gap-2 text-sm">
             <SignalDot color={statusColor(ticket.status)} />
             {ticket.status.toUpperCase()}
-          </span>
-          <span>— {TICKET_TYPE_LABELS[ticket.type]}</span>
-          <span>
-            — OPENED BY:{" "}
-            {renderRedactedName(ticket.author.displayName ?? "", user)}
-          </span>
-          {ticket.author.department && <span>({ticket.author.department})</span>}
-          <span>
-            — {ticket.createdAt.toISOString().slice(0, 16).replace("T", " ")}
-          </span>
+          </div>
         </div>
+        <div>
+          <div className="hud-readout__label">Queue</div>
+          <div className="text-sm mt-1">{TICKET_TYPE_LABELS[ticket.type]}</div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Opened By</div>
+          <div className="text-sm mt-1">
+            {renderRedactedName(ticket.author.displayName ?? "", user)}
+            {ticket.author.department && (
+              <span className="hud-recid"> ({ticket.author.department})</span>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Opened</div>
+          <div className="hud-recid mt-1">
+            {ticket.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+          </div>
+        </div>
+      </div>
 
+      <div className="term-panel space-y-4">
         {requestedFile && (
-          <div className="border border-[var(--term-border)]/40 p-2 text-sm space-y-1">
-            <div className="text-xs text-[var(--term-fg-dim)]">
-              REQUESTED FILE
-            </div>
+          <div className="term-panel term-panel--sub text-sm space-y-1">
+            <div className="hud-readout__label">REQUESTED FILE</div>
             <div>
               {requestedFile.title}{" "}
               <span className="text-[var(--term-fg-dim)]">
@@ -88,7 +111,7 @@ export default async function TicketDetailPage({
                 HOLDS {clearanceLabel(ticket.author.clearance)}
               </span>
             </div>
-            <div className="text-[var(--term-fg-dim)]">
+            <div className="hud-recid">
               DURATION REQUESTED: {ticket.requestedDays} DAY(S)
             </div>
           </div>
@@ -101,25 +124,27 @@ export default async function TicketDetailPage({
         </div>
       </div>
 
-      <div className="term-panel space-y-3">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">THREAD</h2>
-        {ticket.replies.length === 0 && (
-          <p className="text-sm">NO REPLIES YET.</p>
-        )}
-        {ticket.replies.map((r) => (
-          <div
-            key={r.id}
-            className="text-sm border-b border-[var(--term-border)]/30 py-2 space-y-1"
-          >
-            <div className="text-xs text-[var(--term-fg-dim)]">
-              {r.authorName ? renderRedactedName(r.authorName, user) : "SYSTEM"}{" "}
-              —{" "}
-              {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+      <HudPanel
+        code="01"
+        title="THREAD"
+        status={`${ticket.replies.length} REPL${ticket.replies.length === 1 ? "Y" : "IES"}`}
+      >
+        <div className="hud-list">
+          {ticket.replies.length === 0 && (
+            <EmptyState glyph="○" title="No replies yet" />
+          )}
+          {ticket.replies.map((r) => (
+            <div key={r.id} className="text-sm term-row py-2 space-y-1">
+              <div className="hud-recid">
+                {r.authorName ? renderRedactedName(r.authorName, user) : "SYSTEM"}{" "}
+                · {r.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+              </div>
+              <div className="break-words whitespace-pre-wrap">{r.body}</div>
             </div>
-            <div className="break-words whitespace-pre-wrap">{r.body}</div>
-          </div>
-        ))}
+          ))}
+        </div>
 
+        <TickRule className="my-3" />
         {isOpen ? (
           <ReplyForm ticketId={ticket.id} />
         ) : (
@@ -127,11 +152,10 @@ export default async function TicketDetailPage({
             THIS TICKET IS CLOSED — REPLIES ARE DISABLED.
           </p>
         )}
-      </div>
+      </HudPanel>
 
       {!isOpen && (
-        <div className="term-panel space-y-1 text-sm">
-          <h2 className="text-sm text-[var(--term-fg-dim)]">RESOLUTION</h2>
+        <HudPanel code="02" title="RESOLUTION" status={ticket.status.toUpperCase()}>
           <p style={{ color: statusColor(ticket.status) }}>
             {ticket.status.toUpperCase()}
             {ticket.closedBy && (
@@ -144,14 +168,17 @@ export default async function TicketDetailPage({
               ` — ${ticket.closedAt.toISOString().slice(0, 16).replace("T", " ")}`}
           </p>
           {ticket.resolution && (
-            <p className="text-[var(--term-fg-dim)]">▸ {ticket.resolution}</p>
+            <p className="text-[var(--term-fg-dim)] text-sm">▸ {ticket.resolution}</p>
           )}
-        </div>
+        </HudPanel>
       )}
 
       {canHandle && isOpen && (
         <form action={closeTicketAction} className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-fg-dim)]">CLOSE TICKET</h2>
+          <div className="hud-panel-head">
+            <span className="hud-panel-head__code">03</span>
+            <span>CLOSE TICKET</span>
+          </div>
           {requestedFile && (
             <p className="text-xs text-[var(--term-amber)]">
               APPROVING ISSUES{" "}
@@ -169,20 +196,23 @@ export default async function TicketDetailPage({
             className="term-input py-1 text-sm"
           />
           <div className="flex gap-2">
-            <button name="decision" value="approve" className="term-button text-xs">
+            <button
+              name="decision"
+              value="approve"
+              className="term-button term-button--sm"
+            >
               {requestedFile ? "APPROVE & GRANT" : "RESOLVE"}
             </button>
             <button
               name="decision"
               value="deny"
-              className="term-button text-xs"
-              style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+              className="term-button term-button--danger term-button--sm"
             >
               DENY
             </button>
           </div>
         </form>
       )}
-    </div>
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { canEditIncident } from "@/lib/doc-permissions";
 import { authoringClearance } from "@/lib/clearance";
 import { EditIncidentForm } from "./edit-incident-form";
+import { StationHead, HudPanel } from "@/components/hud";
 
 export default async function EditIncidentPage({
   params,
@@ -19,16 +20,17 @@ export default async function EditIncidentPage({
   if (!canEditIncident(user, report)) redirect(`/incidents/${id}`);
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest break-words">
-          :: AMEND {report.title.toUpperCase()} ::
-        </h1>
+    <>
+      <StationHead
+        code="SEC-04 // AMEND REPORT"
+        title={report.title.toUpperCase()}
+      >
         <Link href={`/incidents/${report.id}`} className="term-link text-sm">
           [BACK TO REPORT]
         </Link>
-      </div>
-      <p className="text-sm text-[var(--term-fg-dim)]">
+      </StationHead>
+      <HudPanel code="01" title="AMENDMENT" status="PRIOR VERSION ARCHIVED">
+      <p className="text-xs text-[var(--term-fg-dim)] mb-3">
         THE CURRENT VERSION IS ARCHIVED TO THE REVISION HISTORY BEFORE YOUR
         CHANGES ARE APPLIED.
       </p>
@@ -43,6 +45,7 @@ export default async function EditIncidentPage({
         }}
         maxClearance={authoringClearance(user)}
       />
-    </div>
+      </HudPanel>
+    </>
   );
 }

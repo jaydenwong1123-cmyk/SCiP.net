@@ -7,6 +7,7 @@ import {
   R5_DESIGNATION,
 } from "@/lib/clearance";
 import { renderRedactedName } from "@/lib/redact";
+import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 
 // Within a single clearance rank, plain designations sort ahead of the
 // alternate ones so rank 6 reads L-O5, L-E5, L-R5.
@@ -55,38 +56,60 @@ export default async function PersonnelPage() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel">
-        <h1 className="text-lg tracking-widest">:: PERSONNEL ROSTER ::</h1>
-      </div>
+    <>
+      <StationHead code="SEC-01 // PERSONNEL REGISTRY" title="PERSONNEL ROSTER">
+        <Readout label="On Record" value={personnel.length} />
+        {showFlags && (
+          <Readout
+            label="Flagged"
+            value={flaggedIds.size}
+            tone={flaggedIds.size > 0 ? "red" : "dim"}
+          />
+        )}
+      </StationHead>
 
-      <div className="term-panel space-y-2">
-        {personnel.length === 0 && <p className="text-sm">NO PERSONNEL ON RECORD.</p>}
-        {personnel.map((p) => {
-          return (
+      <HudPanel
+        code="01"
+        title="REGISTRY"
+        status={`${personnel.length} PERSONNEL`}
+      >
+        <div className="hud-list">
+          {personnel.length === 0 && (
+            <EmptyState glyph="◈" title="No personnel on record" />
+          )}
+          {personnel.map((p) => (
             <Link
               key={p.id}
               href={`/personnel/${p.id}`}
-              className="flex justify-between text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
+              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
             >
-              <span>
+              <span className="flex items-center gap-2 min-w-0">
                 {flaggedIds.has(p.id) && (
-                  <span className="text-[var(--term-red)]" title="FLAGGED">⚑ </span>
+                  <span className="text-[var(--term-red)]" title="FLAGGED">
+                    ⚑
+                  </span>
                 )}
-                {p.id === viewer.id
-                  ? p.displayName
-                  : renderRedactedName(p.displayName ?? "", viewer)}
+                <span className="hud-recid">
+                  ID-{String(p.id).slice(0, 4).toUpperCase()}
+                </span>
+                <span className="text-[var(--term-fg-bright)]">
+                  {p.id === viewer.id
+                    ? p.displayName
+                    : renderRedactedName(p.displayName ?? "", viewer)}
+                </span>
                 {p.department && (
-                  <span className="text-[var(--term-fg-dim)]"> — {p.department}</span>
+                  <span className="text-[var(--term-fg-dim)] text-xs truncate">
+                    — {p.department}
+                  </span>
                 )}
               </span>
-              <span className="text-[var(--term-fg-dim)]">
-                [{clearanceDisplay(p.clearance, p.designation)}]
+              <span className="clearance-chip text-[10px] shrink-0">
+                {clearanceDisplay(p.clearance, p.designation)}
               </span>
             </Link>
-          );
-        })}
-      </div>
-    </div>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

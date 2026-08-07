@@ -18,6 +18,13 @@ import {
 } from "../actions";
 import { AccessForm } from "./access-form";
 import { TestLogForm } from "./test-log-form";
+import {
+  StationHead,
+  HudPanel,
+  Lamp,
+  TickRule,
+  EmptyState,
+} from "@/components/hud";
 
 export default async function ScpDetailPage({
   params,
@@ -94,77 +101,104 @@ export default async function ScpDetailPage({
     : [[], []];
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest break-words">
-          :: {file.title.toUpperCase()} ::
-        </h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          {canEdit && (
-            <Link href={`/scp/${file.id}/edit`} className="term-link">
-              [AMEND]
-            </Link>
-          )}
-          {canViewHistory && (
-            <Link href={`/scp/${file.id}/history`} className="term-link">
-              [HISTORY{file.revisionCount > 0 ? ` (${file.revisionCount})` : ""}]
-            </Link>
-          )}
-          <Link href="/scp" className="term-link">
-            [BACK TO ARCHIVE]
+    <>
+      <StationHead
+        code="SEC-03 // CONTAINMENT RECORD"
+        title={file.title.toUpperCase()}
+      >
+        {canEdit && (
+          <Link href={`/scp/${file.id}/edit`} className="term-link text-sm">
+            [AMEND]
           </Link>
-        </div>
-      </div>
+        )}
+        {canViewHistory && (
+          <Link href={`/scp/${file.id}/history`} className="term-link text-sm">
+            [HISTORY{file.revisionCount > 0 ? ` (${file.revisionCount})` : ""}]
+          </Link>
+        )}
+        <Link href="/scp" className="term-link text-sm">
+          [BACK TO ARCHIVE]
+        </Link>
+      </StationHead>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--term-fg-dim)]">
-        <ClassificationBadge classification={file.classification} size="lg" />
-        <span>CLEARANCE REQUIRED: {clearanceLabel(file.clearanceRequired)}</span>
-        <span>— AUTHOR: {renderRedactedName(file.author.displayName ?? "", user)}</span>
+      {/* Containment record header: the identifying facts as a hairline field
+          grid, above the prose rather than mixed into it. */}
+      <div className="hud-fields">
+        <div>
+          <div className="hud-readout__label">Item #</div>
+          <div className="hud-recid mt-1 text-[var(--term-fg-bright)]">
+            SCP-{String(file.id).slice(0, 4).toUpperCase()}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Object Class</div>
+          <div className="mt-1">
+            <ClassificationBadge classification={file.classification} />
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Clearance Required</div>
+          <div className="clearance-chip inline-block mt-1 text-xs">
+            {clearanceLabel(file.clearanceRequired)}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Classified By</div>
+          <div className="text-sm mt-1">
+            {renderRedactedName(file.author.displayName ?? "", user)}
+          </div>
+        </div>
         {file.updatedAt && (
-          <span>
-            — REV {file.revisionCount}, AMENDED{" "}
-            {file.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
-          </span>
+          <div>
+            <div className="hud-readout__label">Revision</div>
+            <div className="hud-recid mt-1">
+              REV {file.revisionCount} ·{" "}
+              {file.updatedAt.toISOString().slice(0, 16).replace("T", " ")}
+            </div>
+          </div>
         )}
       </div>
 
       {activeGrant && (
-        <p className="text-xs" style={{ color: "var(--term-amber)" }}>
-          TEMPORARY ACCESS — EXPIRES{" "}
+        <div className="hud-banner hud-banner--alert">
+          ⧗ TEMPORARY ACCESS — EXPIRES{" "}
           {activeGrant.expiresAt.toISOString().slice(0, 16).replace("T", " ")}
-        </p>
+        </div>
       )}
 
-      <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-        {await renderBody(file.body, user)}
-      </pre>
+      <HudPanel code="01" title="FILE BODY">
+        <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+          {await renderBody(file.body, user)}
+        </pre>
+      </HudPanel>
 
-      <div className="pt-2 border-t border-[var(--term-border)]/30 space-y-3">
-        <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
-          EXPERIMENT LOGS{testLogs.length > 0 ? ` (${testLogs.length})` : ""}
-        </h2>
-
+      <HudPanel
+        code="02"
+        title="EXPERIMENT LOGS"
+        status={`${testLogs.length} LOGGED`}
+      >
         {renderedLogs.length === 0 && (
-          <p className="text-xs text-[var(--term-fg-dim)]">
-            NO EXPERIMENTS HAVE BEEN LOGGED AGAINST THIS ANOMALY.
-          </p>
+          <EmptyState glyph="○" title="No experiments logged">
+            <p className="text-xs">
+              NOTHING HAS BEEN LOGGED AGAINST THIS ANOMALY.
+            </p>
+          </EmptyState>
         )}
 
         {renderedLogs.map(({ log, procedure, result, notes }) => (
           <div
             key={log.id}
-            className="border border-[var(--term-border)]/40 p-2 space-y-1 text-sm"
+            className="term-panel term-panel--sub space-y-1 text-sm mb-2"
           >
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--term-fg-dim)]">
-              <span className="text-[var(--term-fg-bright)]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className="hud-recid text-[var(--term-fg-bright)]">
                 TEST LOG {log.sequence}
               </span>
-              <span>
+              <span className="hud-recid">
                 {log.createdAt.toISOString().slice(0, 16).replace("T", " ")}
               </span>
-              <span>
-                — RESEARCHER:{" "}
-                {renderRedactedName(log.authorName, user)}
+              <span className="hud-recid">
+                RESEARCHER: {renderRedactedName(log.authorName, user)}
               </span>
               {canDeleteScpTest(user, log) && (
                 <form action={deleteScpTestLogAction} className="ml-auto">
@@ -179,20 +213,20 @@ export default async function ScpDetailPage({
               )}
             </div>
             <div>
-              <div className="text-xs text-[var(--term-fg-dim)]">PROCEDURE:</div>
+              <div className="hud-readout__label">PROCEDURE</div>
               <pre className="whitespace-pre-wrap break-words font-mono text-sm">
                 {procedure}
               </pre>
             </div>
             <div>
-              <div className="text-xs text-[var(--term-fg-dim)]">RESULT:</div>
+              <div className="hud-readout__label">RESULT</div>
               <pre className="whitespace-pre-wrap break-words font-mono text-sm">
                 {result}
               </pre>
             </div>
             {notes && (
               <div>
-                <div className="text-xs text-[var(--term-fg-dim)]">NOTE:</div>
+                <div className="hud-readout__label">NOTE</div>
                 <pre className="whitespace-pre-wrap break-words font-mono text-sm">
                   {notes}
                 </pre>
@@ -201,16 +235,19 @@ export default async function ScpDetailPage({
           </div>
         ))}
 
-        {canAddTest && <TestLogForm scpFileId={file.id} />}
-      </div>
+        {canAddTest && (
+          <>
+            <TickRule className="my-3" />
+            <TestLogForm scpFileId={file.id} />
+          </>
+        )}
+      </HudPanel>
 
       {canManage && (
-        <div className="pt-2 border-t border-[var(--term-border)]/30 space-y-4">
+        <HudPanel code="03" title="ACCESS CONTROL" status="CUSTODIAN ONLY">
           {canGrantAccess && (
             <div className="space-y-2">
-              <h2 className="text-sm text-[var(--term-fg-dim)]">
-                GRANT TEMPORARY ACCESS
-              </h2>
+              <h3 className="hud-readout__label">GRANT TEMPORARY ACCESS</h3>
               {members.length > 0 ? (
                 <AccessForm scpFileId={file.id} members={members} />
               ) : (
@@ -222,13 +259,19 @@ export default async function ScpDetailPage({
           )}
 
           {grants.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-sm text-[var(--term-fg-dim)]">ACTIVE GRANTS</h2>
-              <ul className="space-y-1 text-xs">
+            <div className="space-y-2 pt-3">
+              <TickRule />
+              <h3 className="hud-readout__label pt-1">ACTIVE GRANTS</h3>
+              <ul className="hud-list text-xs">
                 {grants.map((g) => (
-                  <li key={g.id} className="flex items-center gap-2 flex-wrap">
-                    <span>
-                      {g.user.displayName} — EXPIRES{" "}
+                  <li
+                    key={g.id}
+                    className="term-row flex items-center gap-2 flex-wrap"
+                  >
+                    <Lamp state="warn">GRANTED</Lamp>
+                    <span>{g.user.displayName}</span>
+                    <span className="hud-recid">
+                      EXPIRES{" "}
                       {g.expiresAt.toISOString().slice(0, 16).replace("T", " ")}
                     </span>
                     <form action={revokeScpAccessAction}>
@@ -246,17 +289,15 @@ export default async function ScpDetailPage({
             </div>
           )}
 
-          <form action={deleteScpFileAction} className="pt-2">
+          <TickRule className="my-3" />
+          <form action={deleteScpFileAction}>
             <input type="hidden" name="id" value={file.id} />
-            <button
-              className="term-button text-xs"
-              style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
-            >
-              [DELETE FILE]
+            <button className="term-button term-button--danger term-button--sm">
+              DELETE FILE
             </button>
           </form>
-        </div>
+        </HudPanel>
       )}
-    </div>
+    </>
   );
 }

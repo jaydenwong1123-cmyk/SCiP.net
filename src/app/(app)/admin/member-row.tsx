@@ -115,8 +115,7 @@ export function MemberRow({
               <input type="hidden" name="userId" value={member.id} />
               <input type="hidden" name="isCoOwner" value="false" />
               <button
-                className="term-button text-xs"
-                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                className="term-button term-button--danger term-button--sm"
               >
                 REVOKE CO-OWNER
               </button>
@@ -294,8 +293,7 @@ export function MemberRow({
                 <input type="hidden" name="userId" value={member.id} />
                 <input type="hidden" name="isCoOwner" value="true" />
                 <button
-                  className="term-button text-xs"
-                  style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                  className="term-button term-button--danger term-button--sm"
                 >
                   GRANT CO-OWNER
                 </button>
@@ -348,8 +346,7 @@ export function MemberRow({
             >
               <input type="hidden" name="userId" value={member.id} />
               <button
-                className="term-button text-xs"
-                style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
+                className="term-button term-button--danger term-button--sm"
               >
                 DELETE ACCOUNT
               </button>

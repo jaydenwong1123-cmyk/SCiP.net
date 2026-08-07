@@ -24,6 +24,41 @@
   /* Accent for the current session's clearance. Set on the app shell by
      TerminalShell; falls back to the theme foreground outside the app. */
   --term-clearance: var(--term-fg);
+
+  /* -------------------------------------------------------------------------
+     Ops-console (HUD) layer
+     Every value here derives from the theme vars above, so all twelve presets
+     in lib/appearance.ts pick up the console treatment without a single
+     hardcoded hue. Changing a theme changes the whole console.
+     ------------------------------------------------------------------------- */
+
+  /* Hairlines. The console is drawn in 1px rules, not 2px borders — weight
+     comes from density and alignment, not from thickness. */
+  --hud-line: color-mix(in srgb, var(--term-border) 55%, transparent);
+  --hud-line-soft: color-mix(in srgb, var(--term-border) 25%, transparent);
+  --hud-line-hot: color-mix(in srgb, var(--term-fg) 75%, transparent);
+
+  /* Surface fills, layered lightest-to-heaviest. */
+  --hud-fill: color-mix(in srgb, var(--term-fg) 4%, transparent);
+  --hud-fill-hi: color-mix(in srgb, var(--term-fg) 9%, transparent);
+  --hud-fill-deep: color-mix(in srgb, var(--term-bg) 60%, #000);
+
+  --hud-tick: var(--term-fg);
+  --hud-grid: rgba(var(--term-glow-rgb), 0.035);
+  --hud-grid-minor: rgba(var(--term-glow-rgb), 0.018);
+
+  /* Layout metrics. */
+  --hud-rail-w: 13rem;
+  --hud-rail-w-sm: 4rem;
+  --hud-banner-h: 1.35rem;
+  --hud-tick-len: 7px;
+
+  /* Type scale. The old design had one size and tracking-widest everywhere,
+     which flattened every screen. Five steps give the console a hierarchy. */
+  --hud-t-banner: 0.625rem;
+  --hud-t-section: 1.05rem;
+  --hud-t-label: 0.6875rem;
+  --hud-t-micro: 0.5625rem;
 }
 
 * {
@@ -45,6 +80,55 @@ body {
   overflow-x: hidden;
 }
 
+/* ---------------------------------------------------------------------------
+   Screen overlays, back to front:
+     z 48  blueprint grid   (html::before)  — the plotting surface
+     z 49  vignette         (body::after)   — edge falloff
+     z 50  scanlines        (body::before)  — CRT texture
+   The grid sits underneath so the scanlines read as glass over a drawn
+   surface rather than as a texture floating on nothing.
+   --------------------------------------------------------------------------- */
+
+html::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 48;
+  background:
+    /* major grid, 32px */
+    repeating-linear-gradient(
+      to right,
+      var(--hud-grid) 0px,
+      var(--hud-grid) 1px,
+      transparent 1px,
+      transparent 32px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--hud-grid) 0px,
+      var(--hud-grid) 1px,
+      transparent 1px,
+      transparent 32px
+    ),
+    /* minor grid, 8px */
+    repeating-linear-gradient(
+      to right,
+      var(--hud-grid-minor) 0px,
+      var(--hud-grid-minor) 1px,
+      transparent 1px,
+      transparent 8px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--hud-grid-minor) 0px,
+      var(--hud-grid-minor) 1px,
+      transparent 1px,
+      transparent 8px
+    );
+}
+
+/* Scanlines, softened from 0.05 so the grid stays legible beneath them. */
 body::before {
   content: "";
   position: fixed;
@@ -52,8 +136,8 @@ body::before {
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(var(--term-glow-rgb), 0.05) 0px,
-    rgba(var(--term-glow-rgb), 0.05) 1px,
+    rgba(var(--term-glow-rgb), 0.028) 0px,
+    rgba(var(--term-glow-rgb), 0.028) 1px,
     transparent 1px,
     transparent 3px
   );
@@ -84,57 +168,82 @@ a {
   color: var(--term-fg-bright);
 }
 
+/* Focus is drawn as a bracket-style offset ring so it stays visible against
+   hairline surfaces, where a 1px outline would disappear into the border. */
+:focus-visible {
+  outline: 1px solid var(--term-fg-bright);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Panels
+   One base treatment with rank modifiers. Corner ticks are drawn with two
+   pseudo-elements carrying four gradient corner marks each — cheaper than
+   four elements and crisper than a border-image.
+   --------------------------------------------------------------------------- */
+
 .term-panel {
   position: relative;
-  border: 2px solid var(--term-border);
-  outline: 1px solid rgba(var(--term-glow-rgb), 0.18);
-  outline-offset: 3px;
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.04),
-    rgba(var(--term-glow-rgb), 0.02)
-  );
+  border: 1px solid var(--hud-line);
+  background: var(--hud-fill);
   padding: var(--term-pad);
-  box-shadow:
-    0 0 14px rgba(var(--term-glow-rgb), 0.1) inset,
-    0 0 10px rgba(var(--term-glow-rgb), 0.06);
+  box-shadow: 0 0 10px rgba(var(--term-glow-rgb), 0.05) inset;
 }
 
-/* Tighten the HUD on narrow screens so the outline offset doesn't overflow. */
-@media (max-width: 640px) {
-  .term-panel {
-    padding: var(--term-pad-sm);
-    outline-offset: 2px;
-  }
-}
-
-/* Bright bracket accents on opposite corners for a detailed HUD look. */
+/* Corner ticks. ::before draws the top pair, ::after the bottom pair, each as
+   an inset frame masked to short L-shaped runs at the corners. */
 .term-panel::before,
 .term-panel::after {
   content: "";
   position: absolute;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--term-fg);
+  left: -1px;
+  right: -1px;
+  height: var(--hud-tick-len);
   pointer-events: none;
+  background:
+    linear-gradient(var(--hud-tick), var(--hud-tick)) left / 1px 100% no-repeat,
+    linear-gradient(var(--hud-tick), var(--hud-tick)) right / 1px 100% no-repeat;
 }
 
 .term-panel::before {
-  top: -2px;
-  left: -2px;
-  border-width: 2px 0 0 2px;
+  top: -1px;
 }
 
 .term-panel::after {
-  bottom: -2px;
-  right: -2px;
-  border-width: 0 2px 2px 0;
+  bottom: -1px;
+}
+
+@media (max-width: 640px) {
+  .term-panel {
+    padding: var(--term-pad-sm);
+  }
+}
+
+/* Primary station: the lead panel on a screen. Hotter hairline, heavier fill. */
+.term-panel--primary {
+  border-color: var(--hud-line-hot);
+  background: var(--hud-fill-hi);
+}
+
+/* Nested block inside another panel. No ticks — ticks mark stations, and a
+   sub-block is not a station. */
+.term-panel--sub {
+  border-color: var(--hud-line-soft);
+  background: transparent;
+  box-shadow: none;
+  padding: var(--term-pad-sm);
+}
+
+.term-panel--sub::before,
+.term-panel--sub::after {
+  display: none;
 }
 
 .term-input {
-  background: #000;
-  border: 2px solid var(--term-border);
+  background: var(--hud-fill-deep);
+  border: 1px solid var(--hud-line);
   color: var(--term-fg);
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.7rem;
   font-family: inherit;
   width: 100%;
   outline: none;
@@ -142,20 +251,43 @@ a {
 
 .term-input:focus {
   border-color: var(--term-fg-bright);
-  box-shadow: 0 0 6px rgba(var(--term-glow-rgb), 0.4);
+  box-shadow: 0 0 6px rgba(var(--term-glow-rgb), 0.3);
+  outline: none;
+}
+
+/* A focused field gets a prompt marker on its left edge — the console is
+   telling you where input is going. */
+.term-input:focus {
+  background:
+    linear-gradient(var(--term-fg-bright), var(--term-fg-bright)) left / 2px 100%
+      no-repeat,
+    var(--hud-fill-deep);
+}
+
+.term-input::placeholder {
+  color: color-mix(in srgb, var(--term-fg-dim) 70%, transparent);
+}
+
+select.term-input option {
+  background: var(--term-bg);
+  color: var(--term-fg);
 }
 
 .term-button {
   background: transparent;
-  border: 2px solid var(--term-fg);
+  border: 1px solid var(--term-fg);
   color: var(--term-fg);
-  padding: 0.5rem 1rem;
+  padding: 0.45rem 0.9rem;
   font-family: inherit;
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.term-button:hover {
+.term-button:hover:not(:disabled) {
   background: var(--term-fg);
   color: var(--term-bg);
 }
@@ -163,6 +295,35 @@ a {
 .term-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Tertiary actions: present but not competing with the primary control. */
+.term-button--ghost {
+  border-color: var(--hud-line);
+  color: var(--term-fg-dim);
+}
+
+.term-button--ghost:hover:not(:disabled) {
+  background: var(--hud-fill-hi);
+  border-color: var(--term-fg);
+  color: var(--term-fg-bright);
+}
+
+/* Destructive / irreversible. Replaces the inline borderColor overrides that
+   were repeated across the personnel, admin and counter-intel screens. */
+.term-button--danger {
+  border-color: var(--term-red);
+  color: var(--term-red);
+}
+
+.term-button--danger:hover:not(:disabled) {
+  background: var(--term-red);
+  color: var(--term-bg);
+}
+
+.term-button--sm {
+  padding: 0.25rem 0.55rem;
+  font-size: var(--hud-t-micro);
 }
 
 .term-cursor::after {
@@ -176,20 +337,655 @@ a {
   }
 }
 
-/* Official Foundation hazard-alert panel (suspension / maintenance notices). */
-.alert-panel {
-  position: relative;
-  border: 2px solid var(--term-red);
-  outline: 1px solid rgba(255, 85, 85, 0.25);
-  outline-offset: 3px;
-  background: linear-gradient(
-    rgba(255, 85, 85, 0.06),
-    rgba(255, 85, 85, 0.02)
+/* ---------------------------------------------------------------------------
+   Classification banners
+   Every screen is bracketed top and bottom. Nothing in the console floats
+   unlabelled — that single rule does most of the thematic work.
+   --------------------------------------------------------------------------- */
+
+.hud-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: var(--hud-banner-h);
+  padding: 0.15rem 0.6rem;
+  font-size: var(--hud-t-banner);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center;
+  border-top: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  color: var(--term-fg-dim);
+  background: var(--hud-fill);
+}
+
+.hud-banner--ts {
+  color: var(--term-red);
+  background: color-mix(in srgb, var(--term-red) 8%, transparent);
+}
+
+.hud-banner--secret {
+  color: var(--term-amber);
+  background: color-mix(in srgb, var(--term-amber) 8%, transparent);
+}
+
+.hud-banner--internal {
+  color: var(--term-fg-dim);
+}
+
+/* Hazard variant for the persistent view-as / illicit-grant strips. The
+   chevrons drift to keep an active-warning read without shouting. */
+.hud-banner--alert {
+  color: var(--term-amber);
+  background:
+    repeating-linear-gradient(
+        -45deg,
+        color-mix(in srgb, var(--term-amber) 14%, transparent) 0px,
+        color-mix(in srgb, var(--term-amber) 14%, transparent) 8px,
+        transparent 8px,
+        transparent 20px
+      )
+      0 0 / 28px 100%,
+    color-mix(in srgb, var(--term-amber) 6%, transparent);
+  animation: hud-chevron 1.6s linear infinite;
+}
+
+.hud-banner--alert-red {
+  color: var(--term-red);
+  background:
+    repeating-linear-gradient(
+        -45deg,
+        color-mix(in srgb, var(--term-red) 16%, transparent) 0px,
+        color-mix(in srgb, var(--term-red) 16%, transparent) 8px,
+        transparent 8px,
+        transparent 20px
+      )
+      0 0 / 28px 100%,
+    color-mix(in srgb, var(--term-red) 7%, transparent);
+  animation: hud-chevron 1.6s linear infinite;
+}
+
+@keyframes hud-chevron {
+  to {
+    background-position: 28px 0, 0 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Panel heads, station headers, readouts
+   --------------------------------------------------------------------------- */
+
+/* Titled panel header. The designator on the left turns each panel into a
+   numbered station rather than an anonymous card. */
+.hud-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: calc(var(--term-pad) * -1) calc(var(--term-pad) * -1) var(--term-gap);
+  padding: 0.35rem var(--term-pad);
+  border-bottom: 1px solid var(--hud-line);
+  background: var(--hud-fill);
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--term-fg-bright);
+}
+
+@media (max-width: 640px) {
+  .hud-panel-head {
+    margin: calc(var(--term-pad-sm) * -1) calc(var(--term-pad-sm) * -1)
+      var(--term-gap);
+    padding: 0.35rem var(--term-pad-sm);
+  }
+}
+
+.hud-panel-head__code {
+  color: var(--term-fg-dim);
+  letter-spacing: 0.18em;
+}
+
+.hud-panel-head__status {
+  margin-left: auto;
+  color: var(--term-fg-dim);
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.16em;
+}
+
+/* Screen-level station header — section code, title, live readouts. */
+.hud-station-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--hud-line);
+}
+
+.hud-station-head__title {
+  font-size: var(--hud-t-section);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--term-fg-bright);
+  line-height: 1.2;
+}
+
+.hud-station-head__code {
+  display: block;
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.22em;
+  color: var(--term-fg-dim);
+}
+
+/* Label-over-value telemetry pair. */
+.hud-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.hud-readout__label {
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--term-fg-dim);
+  white-space: nowrap;
+}
+
+.hud-readout__value {
+  font-size: 1.1rem;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  color: var(--term-fg-bright);
+}
+
+.hud-readout__value--sm {
+  font-size: 0.85rem;
+}
+
+/* Counter bank: readouts in a row divided by hairlines. */
+.hud-readout-bank {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0;
+}
+
+.hud-readout-bank > * {
+  padding: 0.4rem 0.75rem;
+  border-left: 1px solid var(--hud-line-soft);
+}
+
+.hud-readout-bank > *:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+/* Rule with ruler ticks, for dividing a panel's internal sections. */
+.hud-tick-rule {
+  height: 5px;
+  border-top: 1px solid var(--hud-line);
+  background: repeating-linear-gradient(
+    to right,
+    var(--hud-line) 0px,
+    var(--hud-line) 1px,
+    transparent 1px,
+    transparent 12px
   );
-  padding: 1.25rem;
-  box-shadow:
-    0 0 18px rgba(255, 85, 85, 0.14) inset,
-    0 0 12px rgba(255, 85, 85, 0.08);
+  background-size: 100% 3px;
+  background-repeat: no-repeat;
+}
+
+/* Monospace record identifier (IR-0091, CASE-4471, SCP-████). */
+.hud-recid {
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.1em;
+  color: var(--term-fg-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status lamp — a filled dot plus a label, never colour alone. */
+.hud-lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--term-fg-dim);
+  white-space: nowrap;
+}
+
+.hud-lamp::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 5px currentColor;
+  flex: 0 0 auto;
+}
+
+.hud-lamp--on {
+  color: var(--term-fg);
+}
+
+.hud-lamp--warn {
+  color: var(--term-amber);
+}
+
+.hud-lamp--alert {
+  color: var(--term-red);
+}
+
+.hud-lamp--off {
+  color: var(--term-fg-dim);
+}
+
+.hud-lamp--off::before {
+  box-shadow: none;
+  opacity: 0.5;
+}
+
+/* Segmented control: replaces the bracketed [ALL] [FLAGGED] filter chips. */
+.hud-segmented {
+  display: inline-flex;
+  border: 1px solid var(--hud-line);
+  overflow: hidden;
+  flex-wrap: wrap;
+}
+
+.hud-seg {
+  padding: 0.3rem 0.7rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--term-fg-dim);
+  text-decoration: none;
+  border-left: 1px solid var(--hud-line-soft);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+
+.hud-seg:first-child {
+  border-left: none;
+}
+
+.hud-seg:hover {
+  background: var(--hud-fill);
+  color: var(--term-fg);
+}
+
+.hud-seg--on {
+  background: var(--hud-fill-hi);
+  color: var(--term-fg-bright);
+  box-shadow: inset 0 -2px 0 var(--term-clearance);
+}
+
+/* Field grid: label/value pairs for record headers (SCP item block, dossier
+   identity block, incident metadata). */
+.hud-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1px;
+  background: var(--hud-line-soft);
+  border: 1px solid var(--hud-line-soft);
+}
+
+.hud-fields > * {
+  background: var(--term-bg);
+  padding: 0.4rem 0.6rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Command rail
+   Replaces the browser-style tab strip. Every station is always on the board,
+   lit or dark — a console does not hide its sections.
+   --------------------------------------------------------------------------- */
+
+.hud-shell {
+  display: grid;
+  grid-template-columns: var(--hud-rail-w) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.hud-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.hud-content__inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--term-gap) var(--term-pad);
+  gap: var(--term-gap);
+  min-width: 0;
+}
+
+.hud-rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--hud-line);
+  background: var(--hud-fill-deep);
+  scrollbar-width: thin;
+  scrollbar-color: var(--hud-line) transparent;
+}
+
+.hud-rail::-webkit-scrollbar {
+  width: 4px;
+}
+
+.hud-rail::-webkit-scrollbar-thumb {
+  background: var(--hud-line);
+}
+
+/* Facility identity block at the head of the rail. */
+.hud-rail__brand {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--hud-line);
+  background: var(--hud-fill);
+}
+
+.hud-rail__group {
+  padding: 0.7rem 0.75rem 0.2rem;
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--term-fg-dim) 80%, transparent);
+}
+
+.hud-rail__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* 44px minimum touch target. */
+  min-height: 2.75rem;
+  padding: 0.3rem 0.75rem 0.3rem 0.9rem;
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--term-fg-dim);
+  border-left: 3px solid transparent;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.hud-rail__item:hover {
+  background: var(--hud-fill);
+  color: var(--term-fg);
+}
+
+.hud-rail__item--on {
+  background: var(--hud-fill-hi);
+  color: var(--term-fg-bright);
+  border-left-color: var(--term-clearance);
+}
+
+.hud-rail__code {
+  flex: 0 0 3.1rem;
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--term-fg-dim) 85%, transparent);
+}
+
+.hud-rail__item--on .hud-rail__code {
+  color: var(--term-clearance);
+}
+
+.hud-rail__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-rail__badge {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
+  text-align: center;
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--term-amber) 60%, transparent);
+  color: var(--term-amber);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-rail__item--amber {
+  color: color-mix(in srgb, var(--term-amber) 75%, var(--term-fg-dim));
+}
+
+.hud-rail__item--red {
+  color: color-mix(in srgb, var(--term-red) 75%, var(--term-fg-dim));
+}
+
+.hud-rail__item--amber:hover {
+  color: var(--term-amber);
+}
+
+.hud-rail__item--red:hover {
+  color: var(--term-red);
+}
+
+/* Collapsed rail: code only, full label carried by aria-label/title. */
+@media (max-width: 1023px) {
+  :root {
+    --hud-rail-w: var(--hud-rail-w-sm);
+  }
+
+  .hud-rail__label,
+  .hud-rail__group,
+  .hud-rail__brand-text {
+    display: none;
+  }
+
+  .hud-rail__item {
+    justify-content: center;
+    padding-inline: 0.25rem;
+  }
+
+  .hud-rail__code {
+    flex: 0 0 auto;
+    text-align: center;
+  }
+
+  .hud-rail__badge {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.15rem;
+    padding: 0 0.15rem;
+  }
+
+  .hud-content__inner {
+    padding-inline: var(--term-pad-sm);
+  }
+}
+
+/* Phone: the rail becomes a bottom command bar with an overflow drawer. */
+@media (max-width: 639px) {
+  .hud-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hud-rail {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    height: auto;
+    z-index: 40;
+    display: flex;
+    border-right: none;
+    border-top: 1px solid var(--hud-line);
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Sit above the iOS home indicator. */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .hud-rail__brand,
+  .hud-rail__group {
+    display: none;
+  }
+
+  .hud-rail__item {
+    flex: 1 0 auto;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.1rem;
+    border-left: none;
+    border-top: 3px solid transparent;
+    min-width: 4rem;
+  }
+
+  .hud-rail__item--on {
+    border-left-color: transparent;
+    border-top-color: var(--term-clearance);
+  }
+
+  .hud-content {
+    /* Clear the fixed bottom bar. */
+    padding-bottom: 4rem;
+  }
+}
+
+/* Full-screen station list, opened from the mobile bar's ⋯ ALL control. */
+.hud-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: color-mix(in srgb, var(--term-bg) 92%, #000);
+  overflow-y: auto;
+  padding: var(--term-pad);
+}
+
+/* Inside the drawer the stations are a full-width list again, not the
+   stacked icons the phone bar uses. */
+.hud-drawer .hud-rail__item {
+  flex-direction: row;
+  justify-content: flex-start;
+  border-top: none;
+  border-left: 3px solid transparent;
+  padding-inline: 0.5rem;
+}
+
+.hud-drawer .hud-rail__item--on {
+  border-left-color: var(--term-clearance);
+}
+
+.hud-drawer .hud-rail__group {
+  display: block;
+}
+
+.hud-drawer .hud-rail__badge {
+  position: static;
+}
+
+/* ---------------------------------------------------------------------------
+   Status bar
+   Replaces the panelled header. One dense row: identity, station breadcrumb,
+   session controls, clock.
+   --------------------------------------------------------------------------- */
+
+.hud-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+  padding: 0.4rem var(--term-pad);
+  border-bottom: 1px solid var(--hud-line);
+  background: var(--hud-fill);
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.1em;
+  color: var(--term-fg-dim);
+}
+
+.hud-statusbar__sep {
+  color: var(--hud-line);
+  user-select: none;
+}
+
+.hud-statusbar__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  flex-wrap: wrap;
+}
+
+.hud-clock {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+  color: var(--term-fg-bright);
+}
+
+@media (max-width: 640px) {
+  .hud-statusbar {
+    padding-inline: var(--term-pad-sm);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Hazard + secure surfaces
+   --------------------------------------------------------------------------- */
+
+.alert-panel,
+.term-panel--alert {
+  position: relative;
+  border: 1px solid var(--term-red);
+  background: color-mix(in srgb, var(--term-red) 6%, transparent);
+  padding: var(--term-pad);
+  box-shadow: 0 0 14px rgba(255, 85, 85, 0.1) inset;
+}
+
+.alert-panel::before,
+.alert-panel::after,
+.term-panel--alert::before,
+.term-panel--alert::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: var(--hud-tick-len);
+  pointer-events: none;
+  background:
+    linear-gradient(var(--term-red), var(--term-red)) left / 1px 100% no-repeat,
+    linear-gradient(var(--term-red), var(--term-red)) right / 1px 100% no-repeat;
+}
+
+.alert-panel::before,
+.term-panel--alert::before {
+  top: -1px;
+}
+
+.alert-panel::after,
+.term-panel--alert::after {
+  bottom: -1px;
 }
 
 /* Yellow/black hazard tape divider. */
@@ -205,12 +1001,11 @@ a {
   opacity: 0.85;
 }
 
-/* Secure L-5+ channel: a heavier, amber-accented "encrypted" panel. */
-.secure-panel {
+/* Secure L-5+ channel: amber-accented "encrypted" surface. */
+.secure-panel,
+.term-panel--secure {
   position: relative;
-  border: 2px solid var(--term-amber);
-  outline: 1px solid rgba(255, 204, 85, 0.25);
-  outline-offset: 3px;
+  border: 1px solid var(--term-amber);
   background:
     repeating-linear-gradient(
       45deg,
@@ -219,11 +1014,36 @@ a {
       transparent 10px,
       transparent 20px
     ),
-    linear-gradient(rgba(255, 204, 85, 0.05), rgba(255, 204, 85, 0.02));
-  padding: 1rem;
-  box-shadow:
-    0 0 16px rgba(255, 204, 85, 0.12) inset,
-    0 0 12px rgba(255, 204, 85, 0.08);
+    color-mix(in srgb, var(--term-amber) 5%, transparent);
+  padding: var(--term-pad);
+  box-shadow: 0 0 14px rgba(255, 204, 85, 0.1) inset;
+}
+
+.secure-panel::before,
+.secure-panel::after,
+.term-panel--secure::before,
+.term-panel--secure::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: var(--hud-tick-len);
+  pointer-events: none;
+  background:
+    linear-gradient(var(--term-amber), var(--term-amber)) left / 1px 100%
+      no-repeat,
+    linear-gradient(var(--term-amber), var(--term-amber)) right / 1px 100%
+      no-repeat;
+}
+
+.secure-panel::before,
+.term-panel--secure::before {
+  top: -1px;
+}
+
+.secure-panel::after,
+.term-panel--secure::after {
+  bottom: -1px;
 }
 
 .secure-badge {
@@ -241,9 +1061,11 @@ a {
 }
 
 @media (max-width: 640px) {
-  .secure-panel {
-    padding: 0.75rem;
-    outline-offset: 2px;
+  .secure-panel,
+  .term-panel--secure,
+  .alert-panel,
+  .term-panel--alert {
+    padding: var(--term-pad-sm);
   }
 }
 
@@ -252,7 +1074,6 @@ a {
   color: #e6e6e6;
   user-select: none;
   cursor: help;
-  border-radius: 1px;
   padding: 0 1px;
 }
 
@@ -288,206 +1109,30 @@ a {
   border-bottom-color: var(--term-fg-bright);
 }
 
-/* Browser-style tab strip.
-   The strip scrolls horizontally rather than wrapping or squashing, with
-   fade masks at both edges signalling that more tabs exist off-screen. The
-   component caps how many tabs stay open, so the scroll distance stays sane. */
-.tabbar {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  border-bottom: 2px solid var(--term-border);
-  padding: 0 2px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--term-border) transparent;
-  scroll-snap-type: x proximity;
-  /* Keep momentum scrolling from bouncing the whole page on iOS. */
-  overscroll-behavior-x: contain;
-}
+/* ---------------------------------------------------------------------------
+   Station board (main menu)
+   --------------------------------------------------------------------------- */
 
-.tabbar::-webkit-scrollbar {
-  height: 4px;
-}
-
-.tabbar::-webkit-scrollbar-thumb {
-  background: var(--term-border);
-  border-radius: 2px;
-}
-
-/* A tab is a wrapper so the close control can sit beside the link rather than
-   inside it — a button nested in an anchor is invalid and traps screen
-   readers. The wrapper carries the chrome; the link fills it. */
-.tab-wrap {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  max-width: 15rem;
-  border: 2px solid var(--term-border);
-  border-bottom: none;
-  border-radius: 5px 5px 0 0;
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.02),
-    rgba(var(--term-glow-rgb), 0.05)
-  );
-  margin-bottom: -2px;
-  scroll-snap-align: end;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.tab-wrap--active {
-  border-color: var(--term-fg);
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.06),
-    rgba(var(--term-glow-rgb), 0.02)
-  );
-  box-shadow: 0 -6px 12px rgba(var(--term-glow-rgb), 0.12) inset;
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 0 0 auto;
-  max-width: 15rem;
-  min-width: 0;
-  /* 44px minimum touch height for the tap target. */
-  min-height: 2.75rem;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  text-decoration: none;
-  color: var(--term-fg-dim);
-  border: 2px solid var(--term-border);
-  border-bottom: none;
-  border-radius: 5px 5px 0 0;
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.02),
-    rgba(var(--term-glow-rgb), 0.05)
-  );
-  margin-bottom: -2px;
-  scroll-snap-align: end;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-
-/* Inside a wrapper the link is bare — the wrapper draws the chrome. */
-.tab-wrap > .tab {
-  border: none;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-  margin-bottom: 0;
-  padding-right: 0.25rem;
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.tab:hover {
-  color: var(--term-fg);
-}
-
-.tab-wrap--active > .tab {
-  color: var(--term-fg-bright);
-}
-
-.tab--active {
-  color: var(--term-fg-bright);
-  border-color: var(--term-fg);
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.06),
-    rgba(var(--term-glow-rgb), 0.02)
-  );
-  box-shadow: 0 -6px 12px rgba(var(--term-glow-rgb), 0.12) inset;
-}
-
-.tab__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* 44px tap target: a small glyph with generous padding rather than a
-     pixel-perfect hit area. */
-  width: 2rem;
-  min-height: 2.75rem;
-  line-height: 1;
-  font-size: 0.9rem;
-  color: var(--term-fg-dim);
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  opacity: 0.7;
-  flex: 0 0 auto;
-  margin-right: 0.15rem;
-}
-
-.tab__close:hover,
-.tab__close:focus-visible {
-  opacity: 1;
-  background: var(--term-red);
-  color: var(--term-bg);
-}
-
-.tab--home,
-.tab--new {
-  color: var(--term-fg-bright);
-}
-
-.tab--new {
-  padding-inline: 0.7rem;
-  font-size: 1rem;
-}
-
-/* Overflow indicator shown when tabs were evicted past the open-tab cap. */
-.tab-overflow {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.7rem;
-  color: var(--term-fg-dim);
-  white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-  .tab-wrap,
-  .tab {
-    max-width: 10rem;
-  }
-}
-
-/* Selectable menu-screen tiles. */
 .menu-tile {
-  display: block;
+  display: flex;
+  flex-direction: column;
   text-decoration: none;
   color: var(--term-fg);
   cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.15s, background 0.15s;
+  transition: box-shadow 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .menu-tile:hover,
 .menu-tile:focus-visible {
-  outline-color: rgba(var(--term-glow-rgb), 0.5);
-  transform: translateY(-2px);
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.1),
-    rgba(var(--term-glow-rgb), 0.04)
-  );
-  box-shadow:
-    0 0 20px rgba(var(--term-glow-rgb), 0.22) inset,
-    0 0 16px rgba(var(--term-glow-rgb), 0.14);
+  background: var(--hud-fill-hi);
+  border-color: var(--hud-line-hot);
+  box-shadow: 0 0 18px rgba(var(--term-glow-rgb), 0.14) inset;
 }
 
 .menu-tile__prompt {
   opacity: 0;
   transition: opacity 0.15s;
+  margin-top: auto;
 }
 
 .menu-tile:hover .menu-tile__prompt,
@@ -500,62 +1145,62 @@ a {
 }
 
 .menu-tile--amber {
-  border-color: var(--term-amber);
+  border-color: color-mix(in srgb, var(--term-amber) 55%, transparent);
 }
 
 .menu-tile--amber:hover,
 .menu-tile--amber:focus-visible {
-  outline-color: rgba(255, 204, 85, 0.5);
-  background: linear-gradient(rgba(255, 204, 85, 0.1), rgba(255, 204, 85, 0.04));
-  box-shadow:
-    0 0 20px rgba(255, 204, 85, 0.2) inset,
-    0 0 16px rgba(255, 204, 85, 0.12);
+  border-color: var(--term-amber);
+  background: color-mix(in srgb, var(--term-amber) 9%, transparent);
+  box-shadow: 0 0 18px rgba(255, 204, 85, 0.14) inset;
+}
+
+.menu-tile--amber::before,
+.menu-tile--amber::after {
+  background:
+    linear-gradient(var(--term-amber), var(--term-amber)) left / 1px 100%
+      no-repeat,
+    linear-gradient(var(--term-amber), var(--term-amber)) right / 1px 100%
+      no-repeat;
 }
 
 .menu-tile--red {
-  border-color: var(--term-red);
+  border-color: color-mix(in srgb, var(--term-red) 55%, transparent);
 }
 
 .menu-tile--red:hover,
 .menu-tile--red:focus-visible {
-  outline-color: rgba(255, 85, 85, 0.5);
-  background: linear-gradient(rgba(255, 85, 85, 0.1), rgba(255, 85, 85, 0.04));
-  box-shadow:
-    0 0 20px rgba(255, 85, 85, 0.2) inset,
-    0 0 16px rgba(255, 85, 85, 0.12);
+  border-color: var(--term-red);
+  background: color-mix(in srgb, var(--term-red) 9%, transparent);
+  box-shadow: 0 0 18px rgba(255, 85, 85, 0.14) inset;
+}
+
+.menu-tile--red::before,
+.menu-tile--red::after {
+  background:
+    linear-gradient(var(--term-red), var(--term-red)) left / 1px 100% no-repeat,
+    linear-gradient(var(--term-red), var(--term-red)) right / 1px 100% no-repeat;
 }
 
 /* ---------------------------------------------------------------------------
    Press feedback
    Hover states alone leave touch users with no confirmation that a tap
    registered. These give every interactive surface a pressed state that
-   settles within ~100ms and never changes layout bounds (scale/opacity only,
-   so surrounding content cannot shift).
+   settles within ~100ms and never changes layout bounds.
    --------------------------------------------------------------------------- */
 
 .menu-tile,
 .term-button,
-.tab,
-.tab__close {
+.hud-rail__item,
+.hud-seg {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
 .menu-tile:active {
-  transform: scale(0.985);
+  transform: scale(0.99);
   transition-duration: 0.08s;
-  background: linear-gradient(
-    rgba(var(--term-glow-rgb), 0.16),
-    rgba(var(--term-glow-rgb), 0.07)
-  );
-}
-
-.menu-tile--amber:active {
-  background: linear-gradient(rgba(255, 204, 85, 0.16), rgba(255, 204, 85, 0.07));
-}
-
-.menu-tile--red:active {
-  background: linear-gradient(rgba(255, 85, 85, 0.16), rgba(255, 85, 85, 0.07));
+  background: var(--hud-fill-hi);
 }
 
 .term-button:active:not(:disabled) {
@@ -565,8 +1210,13 @@ a {
   transition-duration: 0.08s;
 }
 
-.tab:active {
-  background: rgba(var(--term-glow-rgb), 0.12);
+.term-button--danger:active:not(:disabled) {
+  background: var(--term-red);
+}
+
+.hud-rail__item:active,
+.hud-seg:active {
+  background: var(--hud-fill-hi);
 }
 
 /* Touch devices get no hover, so the tile's action prompt would never appear.
@@ -589,11 +1239,10 @@ a {
   align-items: center;
   gap: 0.35rem;
   padding: 0.05rem 0.45rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
+  font-size: var(--hud-t-label);
+  letter-spacing: 0.1em;
   white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--sig) 55%, transparent);
-  border-radius: 2px;
   color: var(--sig);
   background: color-mix(in srgb, var(--sig) 12%, transparent);
 }
@@ -618,6 +1267,24 @@ a {
   flex-shrink: 0;
 }
 
+/* Severity meter: a filled bar whose length encodes rank. Paired with the
+   text label, never the sole signal. */
+.sig-meter {
+  display: inline-grid;
+  grid-template-columns: repeat(4, 0.6rem);
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.sig-meter__seg {
+  height: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--sig) 45%, transparent);
+}
+
+.sig-meter__seg--on {
+  background: var(--sig);
+}
+
 /* ---------------------------------------------------------------------------
    Clearance-tinted chrome
    The shell's frame picks up the viewer's rank accent, so a privileged
@@ -626,15 +1293,18 @@ a {
 
 .shell-header {
   border-color: var(--term-clearance);
-  outline-color: color-mix(in srgb, var(--term-clearance) 22%, transparent);
 }
 
 .shell-header::before,
 .shell-header::after {
-  border-color: var(--term-clearance);
+  background:
+    linear-gradient(var(--term-clearance), var(--term-clearance)) left / 1px 100%
+      no-repeat,
+    linear-gradient(var(--term-clearance), var(--term-clearance)) right / 1px
+      100% no-repeat;
 }
 
-/* Rank stripe under the header — the primary at-a-glance signal. */
+/* Rank stripe under the status bar — the primary at-a-glance signal. */
 .clearance-stripe {
   height: 2px;
   background: linear-gradient(
@@ -648,10 +1318,54 @@ a {
 .clearance-chip {
   color: var(--term-clearance);
   border: 1px solid color-mix(in srgb, var(--term-clearance) 60%, transparent);
-  border-radius: 2px;
   padding: 0 0.35rem;
   letter-spacing: 0.08em;
   white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Tables
+   Every table in the app was a bare <table class="text-xs w-full">. This gives
+   them hairline rules, console-cased headers, and their own scroll container
+   so wide data never pushes the page sideways.
+   --------------------------------------------------------------------------- */
+
+.hud-table-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hud-line) transparent;
+}
+
+.hud-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.hud-table th {
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  font-size: var(--hud-t-micro);
+  font-weight: normal;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--term-fg-dim);
+  border-bottom: 1px solid var(--hud-line);
+  white-space: nowrap;
+}
+
+.hud-table td {
+  padding: var(--term-row-y) 0.6rem;
+  border-bottom: 1px solid var(--hud-line-soft);
+  vertical-align: top;
+}
+
+.hud-table tbody tr:hover {
+  background: var(--hud-fill);
+}
+
+.hud-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* ---------------------------------------------------------------------------
@@ -667,7 +1381,6 @@ a {
   );
   background-size: 200% 100%;
   animation: skel-sweep 1.4s ease-in-out infinite;
-  border-radius: 2px;
 }
 
 @keyframes skel-sweep {
@@ -684,6 +1397,14 @@ a {
   padding: 2rem 1rem;
   text-align: center;
   color: var(--term-fg-dim);
+  border: 1px dashed var(--hud-line-soft);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--hud-fill) 0px,
+    var(--hud-fill) 6px,
+    transparent 6px,
+    transparent 14px
+  );
 }
 
 .empty-state__glyph {
@@ -694,7 +1415,9 @@ a {
 
 .empty-state__title {
   color: var(--term-fg);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: var(--hud-t-label);
 }
 
 /* List rows honor the density scale. */
@@ -703,13 +1426,48 @@ a {
   padding-bottom: var(--term-row-y);
 }
 
+/* Hairline-ruled list. Rows carry a leading status column and a record id. */
+.hud-list > * {
+  border-bottom: 1px solid var(--hud-line-soft);
+}
+
+.hud-list > *:last-child {
+  border-bottom: none;
+}
+
+.hud-list > a:hover {
+  background: var(--hud-fill);
+}
+
 /* ---------------------------------------------------------------------------
-   Reduced motion
-   Every animation here is decorative or a state cue; none carry information
-   that is lost when stilled.
+   Terminal intrusion — the intruder's console
+   Deliberately the inverse of the ops HUD: no blueprint grid, harsher
+   scanlines, amber/red only. It should feel like equipment that does not
+   belong to the facility.
    --------------------------------------------------------------------------- */
 
-/* ── Terminal intrusion ─────────────────────────────────────────────────── */
+/* Suppress the facility grid wherever the intrusion console is mounted. */
+.hack-root {
+  position: relative;
+  isolation: isolate;
+}
+
+.hack-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 85, 85, 0.05) 0px,
+      rgba(255, 85, 85, 0.05) 1px,
+      transparent 1px,
+      transparent 2px
+    ),
+    var(--term-bg);
+}
 
 /* Inner surface for a puzzle body: recessed against the enclosing term-panel
    so the playfield reads as a separate thing from the console chrome. */
@@ -825,6 +1583,7 @@ a {
   font-size: 1.5rem;
   letter-spacing: 0.1em;
   color: var(--term-fg-bright);
+  font-variant-numeric: tabular-nums;
 }
 
 /* The pulse is the only new animation, and it is paired with a colour change
@@ -840,9 +1599,21 @@ a {
   }
 }
 
+/* Breach ladder: the five stages as a segmented bar. */
+.hack-ladder {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
 .hack-stage {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.45rem;
+  flex: 1 1 0;
+  min-width: 4.5rem;
+  text-align: center;
+  font-size: var(--hud-t-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.4rem;
   border: 1px solid color-mix(in srgb, var(--term-border) 45%, transparent);
   color: var(--term-fg-dim);
 }
@@ -850,11 +1621,13 @@ a {
 .hack-stage--done {
   border-color: var(--term-fg-bright);
   color: var(--term-fg-bright);
+  background: color-mix(in srgb, var(--term-fg) 10%, transparent);
 }
 
 .hack-stage--active {
   border-color: var(--term-amber);
   color: var(--term-amber);
+  background: color-mix(in srgb, var(--term-amber) 14%, transparent);
 }
 
 /* Destructive / irreversible controls: extraction gambles, aborts, severing
@@ -922,8 +1695,17 @@ a {
   background: color-mix(in srgb, var(--term-red) 16%, transparent);
 }
 
+/* ---------------------------------------------------------------------------
+   Reduced motion
+   Every animation here is decorative or a state cue; none carry information
+   that is lost when stilled.
+   --------------------------------------------------------------------------- */
+
 @media (prefers-reduced-motion: reduce) {
-  .hack-timer--critical {
+  .hack-timer--critical,
+  .hud-banner--alert,
+  .hud-banner--alert-red,
+  .secure-badge {
     animation: none;
   }
 
@@ -934,11 +1716,6 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .menu-tile:hover,
-  .menu-tile:focus-visible {
-    transform: none;
   }
 
   .menu-tile:active {

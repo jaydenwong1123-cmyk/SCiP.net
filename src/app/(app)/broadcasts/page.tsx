@@ -12,6 +12,13 @@ import {
 } from "@/lib/broadcast-schedule";
 import { BroadcastForm } from "./broadcast-form";
 import { deleteBroadcastAction, setBroadcastScheduleAction } from "./actions";
+import {
+  StationHead,
+  HudPanel,
+  Readout,
+  Lamp,
+  EmptyState,
+} from "@/components/hud";
 
 export default async function BroadcastsPage() {
   const user = await requireUser();
@@ -47,34 +54,39 @@ export default async function BroadcastsPage() {
     )
   );
 
+  const liveCount = visible.filter((b) => scheduleState(b, now) === "live").length;
+
   return (
-    <div className="space-y-4">
-      <div className="term-panel">
-        <h1 className="text-lg tracking-widest">:: FOUNDATION BROADCASTS ::</h1>
-      </div>
+    <>
+      <StationHead code="SEC-05 // SITE DIRECTIVES" title="FOUNDATION BROADCASTS">
+        <Readout label="Standing" value={liveCount} />
+        {visible.length !== liveCount && (
+          <Readout
+            label="Pending / Lapsed"
+            value={visible.length - liveCount}
+            tone="dim"
+            small
+          />
+        )}
+      </StationHead>
 
       {canPostBroadcast(authoringClearance(user)) && (
-        <div className="term-panel space-y-3">
-          <h2 className="text-sm text-[var(--term-fg-dim)]">POST NEW ANNOUNCEMENT</h2>
+        <HudPanel code="01" title="ISSUE DIRECTIVE" status="SITE-WIDE">
           <BroadcastForm />
-        </div>
+        </HudPanel>
       )}
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-[var(--term-gap)]">
         {visible.length === 0 && (
-          <div className="term-panel">
-            <div className="empty-state">
-              <span className="empty-state__glyph" aria-hidden>
-                ✇
-              </span>
-              <p className="empty-state__title">NO BROADCASTS YET</p>
-              <p className="text-sm">
+          <HudPanel code="02" title="DIRECTIVE LOG">
+            <EmptyState glyph="✇" title="No broadcasts yet">
+              <p className="text-xs">
                 SITE-WIDE DIRECTIVES WILL APPEAR HERE ONCE ISSUED.
               </p>
-            </div>
-          </div>
+            </EmptyState>
+          </HudPanel>
         )}
-        {visible.map((b) => {
+        {visible.map((b, i) => {
           const state = scheduleState(b, now);
           return (
           <div
@@ -84,9 +96,28 @@ export default async function BroadcastsPage() {
             // don't read as current standing orders.
             style={state === "live" ? undefined : { opacity: 0.65 }}
           >
-            <div className="flex flex-wrap justify-between gap-x-3 text-sm text-[var(--term-fg-dim)]">
-              <span>{b.author.displayName}</span>
-              <span>
+            <div className="hud-panel-head">
+              <span className="hud-panel-head__code">
+                DIR-{String(i + 1).padStart(3, "0")}
+              </span>
+              <span>{b.title}</span>
+              <span className="hud-panel-head__status">
+                <Lamp
+                  state={
+                    state === "live" ? "on" : state === "scheduled" ? "warn" : "off"
+                  }
+                >
+                  {state === "live"
+                    ? "STANDING"
+                    : state === "scheduled"
+                      ? "SCHEDULED"
+                      : "STOOD DOWN"}
+                </Lamp>
+              </span>
+            </div>
+            <div className="flex flex-wrap justify-between gap-x-3 text-xs">
+              <span className="hud-recid">{b.author.displayName}</span>
+              <span className="hud-recid">
                 {b.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                 {b.updatedAt && ` — AMENDED (REV ${b.revisionCount})`}
               </span>
@@ -111,8 +142,7 @@ export default async function BroadcastsPage() {
                 ⧗ STANDS DOWN {formatStamp(b.expiresAt)} UTC
               </p>
             )}
-            <p className="font-bold">{b.title}</p>
-            <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+            <pre className="whitespace-pre-wrap break-words font-mono text-sm pt-1">
               {bodies.get(b.id)}
             </pre>
             <div className="flex flex-wrap items-center gap-3 pt-2 text-sm">
@@ -129,11 +159,8 @@ export default async function BroadcastsPage() {
               {canManage && (
                 <form action={deleteBroadcastAction}>
                   <input type="hidden" name="id" value={b.id} />
-                  <button
-                    className="term-button text-xs"
-                    style={{ borderColor: "var(--term-red)", color: "var(--term-red)" }}
-                  >
-                    [DELETE BROADCAST]
+                  <button className="term-button term-button--danger term-button--sm">
+                    DELETE BROADCAST
                   </button>
                 </form>
               )}
@@ -142,7 +169,7 @@ export default async function BroadcastsPage() {
             {canEditBroadcast(user, b) && (
               <form
                 action={setBroadcastScheduleAction}
-                className="flex flex-wrap items-end gap-2 pt-2 border-t border-[var(--term-border)]/30 text-xs"
+                className="flex flex-wrap items-end gap-2 pt-2 border-t border-[var(--hud-line-soft)] text-xs"
               >
                 <input type="hidden" name="id" value={b.id} />
                 <label className="flex flex-col gap-1">
@@ -163,13 +190,13 @@ export default async function BroadcastsPage() {
                     className="term-input py-0.5 text-xs"
                   />
                 </label>
-                <button className="term-button text-xs">SET SCHEDULE</button>
+                <button className="term-button term-button--sm">SET SCHEDULE</button>
               </form>
             )}
           </div>
           );
         })}
       </div>
-    </div>
+    </>
   );
 }

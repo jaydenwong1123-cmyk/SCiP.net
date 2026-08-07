@@ -9,6 +9,7 @@ import {
   statusColor,
 } from "@/lib/tickets";
 import { renderRedactedName } from "@/lib/redact";
+import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 
 type Viewer = Parameters<typeof renderRedactedName>[1];
 
@@ -31,17 +32,18 @@ function TicketRow({
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="flex flex-wrap justify-between gap-x-4 text-sm term-row border-b border-[var(--term-border)]/30 term-link"
+      className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
     >
       <span className="flex items-center gap-2 min-w-0 break-words">
         <SignalDot color={statusColor(ticket.status)} />
-        {ticket.subject}
-      </span>
-      <span className="text-[var(--term-fg-dim)] shrink-0 flex items-center gap-2">
-        <span className="text-[10px] tracking-wider">
-          {TICKET_TYPE_LABELS[ticket.type]}
+        <span className="hud-recid">
+          TKT-{String(ticket.id).slice(0, 4).toUpperCase()}
         </span>
-        <span>
+        <span className="text-[var(--term-fg-bright)]">{ticket.subject}</span>
+      </span>
+      <span className="shrink-0 flex items-center gap-2">
+        <span className="hud-recid">{TICKET_TYPE_LABELS[ticket.type]}</span>
+        <span className="hud-recid">
           [{ticket.status.toUpperCase()}]
           {showAuthor && (
             <>
@@ -49,8 +51,7 @@ function TicketRow({
               {renderRedactedName(ticket.author.displayName ?? "", viewer)}
             </>
           )}{" "}
-          —{" "}
-          {ticket.createdAt.toISOString().slice(0, 10)}
+          — {ticket.createdAt.toISOString().slice(0, 10)}
         </span>
       </span>
     </Link>
@@ -86,63 +87,74 @@ export default async function TicketsPage() {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: IT SUPPORT ::</h1>
-        <Link href="/tickets/new" className="term-button text-sm">
-          [+ OPEN A TICKET]
+    <>
+      <StationHead code="SEC-07 // SUPPORT DESK" title="IT SUPPORT">
+        {queues.length > 0 && (
+          <Readout
+            label="Queue Open"
+            value={openQueue.length}
+            tone={openQueue.length > 0 ? "amber" : "dim"}
+          />
+        )}
+        <Readout label="Your Tickets" value={myTickets.length} />
+        <Link href="/tickets/new" className="term-button">
+          + OPEN A TICKET
         </Link>
-      </div>
+      </StationHead>
 
       {queues.length > 0 && (
-        <div className="term-panel space-y-2">
-          <h2 className="text-sm text-[var(--term-fg-dim)]">
-            SUPPORT QUEUE {openQueue.length > 0 && `(${openQueue.length} OPEN)`}
-          </h2>
-          <p className="text-xs text-[var(--term-fg-dim)]">
+        <HudPanel
+          code="01"
+          title="SUPPORT QUEUE"
+          status={`${openQueue.length} OPEN`}
+        >
+          <p className="hud-readout__label mb-2">
             YOU HANDLE: {queues.map((t) => TICKET_TYPE_LABELS[t]).join(", ")}
           </p>
-          {openQueue.length === 0 && (
-            <p className="text-sm">NO OPEN TICKETS IN YOUR QUEUE.</p>
-          )}
-          {openQueue.map((t) => (
-            <TicketRow key={t.id} ticket={t} showAuthor viewer={user} />
-          ))}
+          <div className="hud-list">
+            {openQueue.length === 0 && (
+              <EmptyState glyph="○" title="No open tickets in your queue" />
+            )}
+            {openQueue.map((t) => (
+              <TicketRow key={t.id} ticket={t} showAuthor viewer={user} />
+            ))}
+          </div>
           {closedQueue.length > 0 && (
             <details className="pt-2">
-              <summary className="text-xs text-[var(--term-fg-dim)] cursor-pointer term-link">
+              <summary className="hud-readout__label cursor-pointer term-link">
                 CLOSED ({closedQueue.length})
               </summary>
-              <div className="pt-2">
+              <div className="hud-list pt-2">
                 {closedQueue.map((t) => (
                   <TicketRow key={t.id} ticket={t} showAuthor viewer={user} />
                 ))}
               </div>
             </details>
           )}
-        </div>
+        </HudPanel>
       )}
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">YOUR TICKETS</h2>
-        {myTickets.length === 0 && (
-          <div className="empty-state">
-            <span className="empty-state__glyph" aria-hidden>
-              ✉
-            </span>
-            <p className="empty-state__title">NO TICKETS OPENED</p>
-            <p className="text-sm">
-              NEED A HAND? OPEN A TICKET AND SUPPORT WILL PICK IT UP.
-            </p>
-            <Link href="/tickets/new" className="term-button text-xs mt-1">
-              OPEN A TICKET
-            </Link>
-          </div>
-        )}
-        {myTickets.map((t) => (
-          <TicketRow key={t.id} ticket={t} showAuthor={false} viewer={user} />
-        ))}
-      </div>
-    </div>
+      <HudPanel
+        code={queues.length > 0 ? "02" : "01"}
+        title="YOUR TICKETS"
+        status={`${myTickets.length} FILED`}
+      >
+        <div className="hud-list">
+          {myTickets.length === 0 && (
+            <EmptyState glyph="✉" title="No tickets opened">
+              <p className="text-xs">
+                NEED A HAND? OPEN A TICKET AND SUPPORT WILL PICK IT UP.
+              </p>
+              <Link href="/tickets/new" className="term-button term-button--sm mt-1">
+                OPEN A TICKET
+              </Link>
+            </EmptyState>
+          )}
+          {myTickets.map((t) => (
+            <TicketRow key={t.id} ticket={t} showAuthor={false} viewer={user} />
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

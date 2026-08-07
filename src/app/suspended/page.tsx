@@ -9,10 +9,18 @@ export default async function SuspendedPage() {
   if (!user.suspended) redirect("/personnel");
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col">
+      <div className="hud-banner hud-banner--alert-red">
+        ⚠ CREDENTIAL REVOCATION NOTICE ⚠
+      </div>
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="alert-panel w-full max-w-md space-y-4 text-center">
         <div className="alert-stripe" aria-hidden />
-        <h1 className="text-lg tracking-widest text-[var(--term-red)]">
+        <div className="hud-recid">SCiP-220 // SECURITY ACTION</div>
+        <h1
+          className="text-lg text-[var(--term-red)]"
+          style={{ letterSpacing: "0.18em" }}
+        >
           ⚠ ACCESS SUSPENDED ⚠
         </h1>
         <p className="text-sm">
@@ -32,6 +40,10 @@ export default async function SuspendedPage() {
         <div className="pt-1">
           <LogoutButton />
         </div>
+      </div>
+      </div>
+      <div className="hud-banner hud-banner--ts">
+        UNAUTHORIZED ACCESS ATTEMPTS ARE LOGGED AND TRACED
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
 } from "@/lib/departments";
 import { ProfileForm } from "./profile-form";
 import { updateDepartmentAction } from "./actions";
+import { StationHead, HudPanel } from "@/components/hud";
 
 export default async function ProfilePage() {
   const user = await requireUser();
@@ -32,19 +33,35 @@ export default async function ProfilePage() {
             : "PERSONNEL";
 
   return (
-    <div className="term-panel space-y-4">
-      <h1 className="text-lg tracking-widest">:: MY PROFILE ::</h1>
-      <p className="text-sm text-[var(--term-fg-dim)]">
-        NAME: {user.displayName} — CLEARANCE:{" "}
-        {clearanceDisplay(user.clearance, user.designation)} — LOGIN:{" "}
-        {user.email}
-      </p>
-      <p className="text-sm text-[var(--term-fg-dim)]">
-        ROLE: <span className="text-[var(--term-fg)]">{roleLabel}</span>
-      </p>
+    <>
+      <StationHead code="USR // PERSONNEL DOSSIER" title="MY PROFILE" />
 
-      <div className="space-y-2">
-        <p className="text-sm text-[var(--term-fg-dim)]">DEPARTMENT:</p>
+      <div className="hud-fields">
+        <div>
+          <div className="hud-readout__label">Name</div>
+          <div className="text-sm mt-1 text-[var(--term-fg-bright)]">
+            {user.displayName}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Clearance</div>
+          <div className="clearance-chip inline-block mt-1 text-xs">
+            {clearanceDisplay(user.clearance, user.designation)}
+          </div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Role</div>
+          <div className="text-sm mt-1">{roleLabel}</div>
+        </div>
+        <div>
+          <div className="hud-readout__label">Login</div>
+          <div className="hud-recid mt-1">{user.email}</div>
+        </div>
+      </div>
+
+      <HudPanel code="01" title="ASSIGNMENT">
+        <div className="space-y-2">
+          <p className="hud-readout__label">DEPARTMENT</p>
         {restrictedLocked ? (
           <p className="text-sm">
             <span className="text-[var(--term-amber)]">{user.department}</span>{" "}
@@ -66,15 +83,19 @@ export default async function ProfilePage() {
                 </option>
               ))}
             </select>
-            <button className="term-button text-xs">SET DEPARTMENT</button>
+            <button className="term-button term-button--sm">SET DEPARTMENT</button>
           </form>
         )}
-      </div>
+        </div>
+      </HudPanel>
 
-      <p className="text-sm text-[var(--term-fg-dim)]">
-        PERSONAL FILE (visible to all personnel via the roster):
-      </p>
-      <ProfileForm initialContent={user.personalFile} />
-    </div>
+      <HudPanel
+        code="02"
+        title="PERSONAL FILE"
+        status="VISIBLE TO ALL PERSONNEL"
+      >
+        <ProfileForm initialContent={user.personalFile} />
+      </HudPanel>
+    </>
   );
 }

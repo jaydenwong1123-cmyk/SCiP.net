@@ -8,6 +8,7 @@ import {
   canAccessMessageLogs,
   logRetentionCutoff,
 } from "@/lib/message-logs";
+import { StationHead, HudPanel, HudBanner, Readout } from "@/components/hud";
 
 function stamp(date: Date): string {
   return date.toISOString().slice(0, 16).replace("T", " ");
@@ -58,39 +59,42 @@ export default async function MessageLogThreadPage({
   });
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-lg tracking-widest break-words">
-            :: {messages[0]!.subject} ::
-          </h1>
-          <Link href="/message-logs" className="term-link text-sm">
-            [← LOGS]
-          </Link>
-        </div>
-        <p className="text-xs text-[var(--term-fg-dim)]">
-          {"// RAISA OVERSIGHT — READ-ONLY TRANSCRIPT"} · RETENTION{" "}
-          {MESSAGE_LOG_RETENTION_DAYS}D
-        </p>
-      </div>
+    <>
+      <HudBanner level="secret">
+        SECRET // RAISA OVERSIGHT // READ-ONLY TRANSCRIPT
+      </HudBanner>
 
-      <div className="term-panel space-y-4">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className="border-b border-[var(--term-border)]/30 pb-3 last:border-0 last:pb-0"
-          >
-            <div className="flex flex-wrap justify-between gap-x-4 text-xs text-[var(--term-fg-dim)]">
-              <span>
-                {m.sender.displayName ?? "UNKNOWN"} →{" "}
-                {m.recipient.displayName ?? "UNKNOWN"}
-              </span>
-              <span>{stamp(m.createdAt)}</span>
+      <StationHead code="R5 // TRANSCRIPT" title={messages[0]!.subject}>
+        <Readout label="Messages" value={messages.length} small />
+        <Readout
+          label="Retention"
+          value={`${MESSAGE_LOG_RETENTION_DAYS}D`}
+          tone="amber"
+          small
+        />
+        <Link href="/message-logs" className="term-link text-sm">
+          [← LOGS]
+        </Link>
+      </StationHead>
+
+      <HudPanel code="01" title="INTERCEPT LOG" status="READ-ONLY">
+        <div className="hud-list">
+          {messages.map((m) => (
+            <div key={m.id} className="term-row py-2">
+              <div className="flex flex-wrap justify-between gap-x-4">
+                <span className="hud-recid">
+                  {m.sender.displayName ?? "UNKNOWN"} →{" "}
+                  {m.recipient.displayName ?? "UNKNOWN"}
+                </span>
+                <span className="hud-recid">{stamp(m.createdAt)}</span>
+              </div>
+              <p className="mt-1 text-sm whitespace-pre-wrap break-words">
+                {m.body}
+              </p>
             </div>
-            <p className="mt-1 text-sm whitespace-pre-wrap break-words">{m.body}</p>
-          </div>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

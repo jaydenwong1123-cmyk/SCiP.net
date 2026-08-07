@@ -4,6 +4,7 @@ import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { listRevisions, REVISION_ENTITIES } from "@/lib/revisions";
 import { RevisionHistory } from "@/components/revision-history";
+import { StationHead, HudPanel, Readout } from "@/components/hud";
 
 export default async function BroadcastHistoryPage({
   params,
@@ -23,24 +24,23 @@ export default async function BroadcastHistoryPage({
   const revisions = await listRevisions(REVISION_ENTITIES.broadcast, id);
 
   return (
-    <div className="term-panel space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest break-words">
-          :: REVISION HISTORY — {broadcast.title.toUpperCase()} ::
-        </h1>
+    <>
+      <StationHead
+        code="SEC-05 // REVISION HISTORY"
+        title={broadcast.title.toUpperCase()}
+      >
+        <Readout label="Archived" value={revisions.length} />
         <Link href="/broadcasts" className="term-link text-sm">
           [BACK TO BROADCASTS]
         </Link>
-      </div>
-      <p className="text-sm text-[var(--term-fg-dim)]">
-        {revisions.length} ARCHIVED{" "}
-        {revisions.length === 1 ? "VERSION" : "VERSIONS"} — NEWEST FIRST.
-      </p>
-      <RevisionHistory
-        revisions={revisions}
-        current={{ title: broadcast.title, body: broadcast.body }}
-        viewer={user}
-      />
-    </div>
+      </StationHead>
+      <HudPanel code="01" title="ARCHIVED VERSIONS" status="NEWEST FIRST">
+        <RevisionHistory
+          revisions={revisions}
+          current={{ title: broadcast.title, body: broadcast.body }}
+          viewer={user}
+        />
+      </HudPanel>
+    </>
   );
 }

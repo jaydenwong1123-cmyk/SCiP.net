@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import { CLASSIFICATIONS, classificationColor } from "@/lib/classification";
 import { ClassificationBadge, SignalDot } from "@/components/signal-badge";
+import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 
 export default async function ScpListPage({
   searchParams,
@@ -56,99 +57,108 @@ export default async function ScpListPage({
     return s ? `/scp?${s}` : "/scp";
   };
 
-  const chip = (active: boolean) =>
-    `text-xs px-2 py-0.5 border term-link ${
-      active
-        ? "border-[var(--term-fg-bright)] text-[var(--term-fg-bright)]"
-        : "border-[var(--term-border)]/50"
-    }`;
+  const seg = (active: boolean) => `hud-seg${active ? " hud-seg--on" : ""}`;
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: SCP FILE ARCHIVE ::</h1>
+    <>
+      <StationHead code="SEC-03 // ANOMALY ARCHIVE" title="SCP FILE ARCHIVE">
+        <Readout label="Readable" value={files.length} />
+        <Readout
+          label="Max Clearance"
+          value={clearanceLabel(user.clearance)}
+          small
+        />
         {canCreateScpFile(user) && (
-          <Link href="/scp/new" className="term-button text-sm">
-            [+ NEW FILE]
+          <Link href="/scp/new" className="term-button">
+            + NEW FILE
           </Link>
         )}
-      </div>
+      </StationHead>
 
-      <div className="term-panel space-y-3 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[var(--term-fg-dim)] w-16">CLASS:</span>
-          <Link href={qs({ class: null })} className={chip(!activeClass)}>
-            ALL
-          </Link>
-          {CLASSIFICATIONS.map((c) => (
-            <Link
-              key={c.name}
-              href={qs({ class: c.name })}
-              className={chip(activeClass === c.name)}
-              style={{ color: activeClass === c.name ? c.color : undefined }}
-            >
-              {c.name.toUpperCase()}
+      <HudPanel code="01" title="QUERY" status="ARCHIVE FILTER">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="hud-readout__label w-14">CLASS</span>
+          <div className="hud-segmented">
+            <Link href={qs({ class: null })} className={seg(!activeClass)}>
+              ALL
             </Link>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[var(--term-fg-dim)] w-16">LEVEL:</span>
-          <Link href={qs({ level: null })} className={chip(!activeLevel)}>
-            ALL
-          </Link>
-          {readableLevels.map((l) => (
-            <Link
-              key={l.rank}
-              href={qs({ level: l.rank.toString() })}
-              className={chip(activeLevel === l.rank)}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      <div className="term-panel space-y-2">
-        {files.length === 0 && (
-          <div className="empty-state">
-            <span className="empty-state__glyph" aria-hidden>
-              ▤
-            </span>
-            <p className="empty-state__title">NO FILES MATCH</p>
-            <p className="text-sm">
-              {activeClass || activeLevel
-                ? "NO DOCUMENTS MATCH THE CURRENT FILTER."
-                : "NO DOCUMENTS ARE READABLE AT YOUR CLEARANCE."}
-            </p>
-            {(activeClass || activeLevel) && (
-              <Link href="/scp" className="term-button text-xs mt-1">
-                CLEAR FILTERS
+            {CLASSIFICATIONS.map((c) => (
+              <Link
+                key={c.name}
+                href={qs({ class: c.name })}
+                className={seg(activeClass === c.name)}
+                style={{ color: activeClass === c.name ? c.color : undefined }}
+              >
+                {c.name.toUpperCase()}
               </Link>
-            )}
+            ))}
           </div>
-        )}
-        {files.map((f) => (
-          <Link
-            key={f.id}
-            href={`/scp/${f.id}`}
-            className="flex flex-wrap justify-between gap-x-4 text-sm term-row border-b border-[var(--term-border)]/30 term-link"
-          >
-            <span className="flex items-center gap-2 min-w-0 break-words">
-              <SignalDot color={classificationColor(f.classification)} />
-              {f.title}
-              {f.revisionCount > 0 && (
-                <span className="text-[10px] text-[var(--term-fg-dim)]">
-                  REV {f.revisionCount}
-                </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="hud-readout__label w-14">LEVEL</span>
+          <div className="hud-segmented">
+            <Link href={qs({ level: null })} className={seg(!activeLevel)}>
+              ALL
+            </Link>
+            {readableLevels.map((l) => (
+              <Link
+                key={l.rank}
+                href={qs({ level: l.rank.toString() })}
+                className={seg(activeLevel === l.rank)}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </HudPanel>
+
+      <HudPanel
+        code="02"
+        title="REGISTRY"
+        status={`${files.length} RECORD${files.length === 1 ? "" : "S"}`}
+      >
+        <div className="hud-list">
+          {files.length === 0 && (
+            <EmptyState title="No files match">
+              <p className="text-xs">
+                {activeClass || activeLevel
+                  ? "NO DOCUMENTS MATCH THE CURRENT FILTER."
+                  : "NO DOCUMENTS ARE READABLE AT YOUR CLEARANCE."}
+              </p>
+              {(activeClass || activeLevel) && (
+                <Link href="/scp" className="term-button term-button--sm mt-1">
+                  CLEAR FILTERS
+                </Link>
               )}
-            </span>
-            <span className="text-[var(--term-fg-dim)] shrink-0 flex items-center gap-2">
-              <ClassificationBadge classification={f.classification} />
-              <span>[{clearanceLabel(f.clearanceRequired)}]</span>
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
+            </EmptyState>
+          )}
+          {files.map((f) => (
+            <Link
+              key={f.id}
+              href={`/scp/${f.id}`}
+              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
+            >
+              <span className="flex items-center gap-2 min-w-0 break-words">
+                <SignalDot color={classificationColor(f.classification)} />
+                <span className="hud-recid">
+                  SCP-{String(f.id).slice(0, 4).toUpperCase()}
+                </span>
+                <span className="text-[var(--term-fg-bright)]">{f.title}</span>
+                {f.revisionCount > 0 && (
+                  <span className="hud-recid">REV {f.revisionCount}</span>
+                )}
+              </span>
+              <span className="shrink-0 flex items-center gap-2">
+                <ClassificationBadge classification={f.classification} />
+                <span className="hud-recid">
+                  [{clearanceLabel(f.clearanceRequired)}]
+                </span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

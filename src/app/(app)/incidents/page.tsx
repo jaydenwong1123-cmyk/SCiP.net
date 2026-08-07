@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { clearanceLabel } from "@/lib/clearance";
 import { severityColor } from "@/lib/incident";
 import { SeverityBadge, SignalDot } from "@/components/signal-badge";
+import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 
 export default async function IncidentsPage() {
   const user = await requireUser();
@@ -16,57 +17,69 @@ export default async function IncidentsPage() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: INCIDENT REPORTS ::</h1>
+    <>
+      <StationHead code="SEC-04 // BREACH & INCIDENT LOG" title="INCIDENT REPORTS">
+        <Readout label="On File" value={reports.length} />
         {canCreateIncident(user) && (
-          <Link href="/incidents/new" className="term-button text-sm">
-            [+ FILE REPORT]
+          <Link href="/incidents/new" className="term-button">
+            + FILE REPORT
           </Link>
         )}
-      </div>
+      </StationHead>
 
-      <div className="term-panel space-y-2">
-        {reports.length === 0 && (
-          <div className="empty-state">
-            <span className="empty-state__glyph" aria-hidden>
-              ⚠
-            </span>
-            <p className="empty-state__title">NO REPORTS ON FILE</p>
-            <p className="text-sm">
-              NOTHING HAS BEEN FILED AT OR BELOW YOUR CLEARANCE.
-            </p>
-            {canCreateIncident(user) && (
-              <Link href="/incidents/new" className="term-button text-xs mt-1">
-                FILE THE FIRST REPORT
-              </Link>
-            )}
-          </div>
-        )}
-        {reports.map((r) => (
-          <Link
-            key={r.id}
-            href={`/incidents/${r.id}`}
-            className="flex flex-wrap justify-between gap-x-4 text-sm term-row border-b border-[var(--term-border)]/30 term-link"
-          >
-            <span className="flex items-center gap-2 min-w-0 break-words">
-              <SignalDot color={severityColor(r.severity)} />
-              {r.title}
-              {r.revisionCount > 0 && (
-                <span className="text-[10px] text-[var(--term-fg-dim)]">
-                  REV {r.revisionCount}
-                </span>
+      <HudPanel
+        code="01"
+        title="REPORT REGISTRY"
+        status={`${reports.length} RECORD${reports.length === 1 ? "" : "S"}`}
+      >
+        <div className="hud-list">
+          {reports.length === 0 && (
+            <EmptyState glyph="⚠" title="No reports on file">
+              <p className="text-xs">
+                NOTHING HAS BEEN FILED AT OR BELOW YOUR CLEARANCE.
+              </p>
+              {canCreateIncident(user) && (
+                <Link
+                  href="/incidents/new"
+                  className="term-button term-button--sm mt-1"
+                >
+                  FILE THE FIRST REPORT
+                </Link>
               )}
-            </span>
-            <span className="text-[var(--term-fg-dim)] shrink-0 flex items-center gap-2">
-              <SeverityBadge severity={r.severity} />
-              <span>
-                [{clearanceLabel(r.clearanceRequired)}] — {r.author.displayName}
+            </EmptyState>
+          )}
+          {reports.map((r) => (
+            <Link
+              key={r.id}
+              href={`/incidents/${r.id}`}
+              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
+              // Severity as a left edge bar: the whole row carries the signal,
+              // not just the badge at its far end.
+              style={{
+                borderLeft: `3px solid ${severityColor(r.severity)}`,
+                paddingLeft: "0.6rem",
+              }}
+            >
+              <span className="flex items-center gap-2 min-w-0 break-words">
+                <SignalDot color={severityColor(r.severity)} />
+                <span className="hud-recid">
+                  IR-{String(r.id).slice(0, 4).toUpperCase()}
+                </span>
+                <span className="text-[var(--term-fg-bright)]">{r.title}</span>
+                {r.revisionCount > 0 && (
+                  <span className="hud-recid">REV {r.revisionCount}</span>
+                )}
               </span>
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
+              <span className="shrink-0 flex items-center gap-2">
+                <SeverityBadge severity={r.severity} />
+                <span className="hud-recid">
+                  [{clearanceLabel(r.clearanceRequired)}] — {r.author.displayName}
+                </span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

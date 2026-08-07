@@ -7,6 +7,13 @@ import {
   canAccessMessageLogs,
   logRetentionCutoff,
 } from "@/lib/message-logs";
+import {
+  StationHead,
+  HudPanel,
+  HudBanner,
+  Readout,
+  EmptyState,
+} from "@/components/hud";
 
 type ThreadRow = {
   threadKey: string;
@@ -82,68 +89,78 @@ export default async function MessageLogsPage({
   const rows = [...threads.values()];
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-1">
-        <h1 className="text-lg tracking-widest">:: MESSAGE LOGS ::</h1>
-        <p className="text-xs text-[var(--term-fg-dim)]">
-          {"// RAISA OVERSIGHT — MEMBER CORRESPONDENCE"}
-        </p>
-        <p className="text-xs text-[var(--term-amber)]">
-          RETENTION {MESSAGE_LOG_RETENTION_DAYS}D — ENTRIES BEFORE{" "}
-          {stamp(cutoff)} HAVE BEEN PURGED FROM THIS LOG.
-        </p>
-      </div>
+    <>
+      <HudBanner level="secret">
+        SECRET // RAISA OVERSIGHT // MEMBER CORRESPONDENCE
+      </HudBanner>
 
-      <form className="term-panel flex flex-wrap items-center gap-2" action="">
-        <label htmlFor="q" className="text-sm text-[var(--term-fg-dim)]">
-          SEARCH
-        </label>
-        <input
-          id="q"
-          name="q"
-          defaultValue={query}
-          placeholder="subject or personnel name"
-          className="term-input flex-1 min-w-[12rem] text-sm"
+      <StationHead code="R5 // CORRESPONDENCE OVERSIGHT" title="MESSAGE LOGS">
+        <Readout label="Threads" value={rows.length} />
+        <Readout
+          label="Retention"
+          value={`${MESSAGE_LOG_RETENTION_DAYS}D`}
+          tone="amber"
+          small
         />
-        <button type="submit" className="term-button text-sm">
-          [QUERY]
-        </button>
-        {query && (
-          <Link href="/message-logs" className="term-link text-sm">
-            [CLEAR]
-          </Link>
-        )}
-      </form>
+      </StationHead>
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm text-[var(--term-fg-dim)]">
-          LOGGED CONVERSATIONS ({rows.length})
-        </h2>
-        {rows.length === 0 && (
-          <p className="text-sm">
-            {query ? "NO MATCHING ENTRIES." : "NO ENTRIES WITHIN RETENTION WINDOW."}
-          </p>
-        )}
-        {rows.map((t) => (
-          <Link
-            key={t.threadKey}
-            href={`/message-logs/${t.threadKey}`}
-            className="flex flex-wrap justify-between gap-x-4 text-sm py-1 border-b border-[var(--term-border)]/30 term-link"
-          >
-            <span className="min-w-0 break-words">
-              {t.subject}
-              <span className="text-[var(--term-fg-dim)]">
-                {" "}
-                — {t.participants}
-                {t.count > 1 && ` · ${t.count} msgs`}
+      <p className="text-[10px] text-[var(--term-amber)]">
+        ENTRIES BEFORE {stamp(cutoff)} HAVE BEEN PURGED FROM THIS LOG.
+      </p>
+
+      <HudPanel code="01" title="QUERY">
+        <form className="flex flex-wrap items-center gap-2" action="">
+          <label htmlFor="q" className="hud-readout__label">
+            SEARCH
+          </label>
+          <input
+            id="q"
+            name="q"
+            defaultValue={query}
+            placeholder="subject or personnel name"
+            className="term-input flex-1 min-w-[12rem] text-sm"
+          />
+          <button type="submit" className="term-button">
+            QUERY
+          </button>
+          {query && (
+            <Link href="/message-logs" className="term-link text-sm">
+              [CLEAR]
+            </Link>
+          )}
+        </form>
+      </HudPanel>
+
+      <HudPanel
+        code="02"
+        title="LOGGED CONVERSATIONS"
+        status={`${rows.length} THREAD${rows.length === 1 ? "" : "S"}`}
+      >
+        <div className="hud-list">
+          {rows.length === 0 && (
+            <EmptyState
+              glyph="✉"
+              title={query ? "No matching entries" : "No entries in window"}
+            />
+          )}
+          {rows.map((t) => (
+            <Link
+              key={t.threadKey}
+              href={`/message-logs/${t.threadKey}`}
+              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
+            >
+              <span className="min-w-0 break-words flex items-center gap-2 flex-wrap">
+                <span className="text-[var(--term-fg-bright)]">{t.subject}</span>
+                <span className="hud-recid">
+                  {t.participants}
+                  {t.count > 1 && ` · ${t.count} MSGS`}
+                </span>
               </span>
-            </span>
-            <span className="text-[var(--term-fg-dim)] shrink-0">
-              {stamp(t.latest)}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
+              <span className="hud-recid shrink-0">{stamp(t.latest)}</span>
+            </Link>
+          ))}
+        </div>
+      </HudPanel>
+    </>
   );
 }

@@ -51,9 +51,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="term-panel w-full max-w-md space-y-4">
-        <h1 className="text-lg tracking-widest">:: SCiP.NET SECURE LOGIN ::</h1>
+    <div className="term-panel w-full space-y-4">
+        <div className="hud-panel-head">
+          <span className="hud-panel-head__code">AUTH</span>
+          <span>SECURE LOGIN</span>
+          <span className="hud-panel-head__status">SCiP-220</span>
+        </div>
         <form action={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-sm mb-1" htmlFor="username">
@@ -89,7 +92,6 @@ export default function LoginPage() {
         <p className="text-sm text-[var(--term-fg-dim)]">
           NO ACCOUNT? <Link href="/register" className="term-link">REGISTER WITH INVITE CODE</Link>
         </p>
-      </div>
     </div>
   );
 }

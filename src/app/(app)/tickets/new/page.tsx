@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { canRequestScpAccess } from "@/lib/tickets";
 import { authoringClearance } from "@/lib/clearance";
 import { NewTicketForm } from "./new-ticket-form";
+import { StationHead, HudPanel } from "@/components/hud";
 
 export default async function NewTicketPage() {
   const user = await requireUser();
@@ -20,20 +21,19 @@ export default async function NewTicketPage() {
     : [];
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg tracking-widest">:: OPEN A TICKET ::</h1>
+    <>
+      <StationHead code="SEC-07 // NEW SUPPORT REQUEST" title="OPEN A TICKET">
         <Link href="/tickets" className="term-link text-sm">
           [BACK TO SUPPORT]
         </Link>
-      </div>
+      </StationHead>
 
-      <div className="term-panel">
+      <HudPanel code="01" title="REQUEST DETAILS">
         <NewTicketForm
           canRequestScp={mayRequestScp}
           scpFiles={requestableFiles}
         />
-      </div>
-    </div>
+      </HudPanel>
+    </>
   );
 }

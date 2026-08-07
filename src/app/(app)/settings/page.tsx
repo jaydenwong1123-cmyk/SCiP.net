@@ -5,6 +5,7 @@ import { getNotificationPreferences } from "@/lib/notifications";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
 import { canViewAs, getViewAsClearance, viewAsOptions } from "@/lib/view-as";
 import { setViewAsAction } from "./view-as-actions";
+import { StationHead, HudPanel, Readout, Lamp } from "@/components/hud";
 
 export default async function SettingsPage() {
   await requireUser();
@@ -15,22 +16,39 @@ export default async function SettingsPage() {
   const notificationPreferences = await getNotificationPreferences(real.id);
 
   return (
-    <div className="term-panel space-y-4">
-      <h1 className="text-lg tracking-widest">:: DISPLAY SETTINGS ::</h1>
-      <p className="text-sm text-[var(--term-fg-dim)]">
-        CUSTOMIZE THE TERMINAL APPEARANCE FOR YOUR SESSION.
-      </p>
-      <SettingsForm />
+    <>
+      <StationHead code="CFG // TERMINAL CONFIGURATION" title="SETTINGS">
+        <Readout
+          label="Session"
+          value={clearanceDisplay(real.clearance, real.designation)}
+          small
+        />
+        {canViewAs(real) && (
+          <div className="hud-readout">
+            <span className="hud-readout__label">Simulation</span>
+            <Lamp state={viewAs !== null ? "warn" : "off"}>
+              {viewAs !== null ? `AS ${clearanceLabel(viewAs)}` : "INACTIVE"}
+            </Lamp>
+          </div>
+        )}
+      </StationHead>
 
-      <div className="space-y-3 border-t border-[var(--term-border)] pt-4">
-        <h2 className="text-sm tracking-widest">:: NOTIFICATION PREFERENCES ::</h2>
+      <HudPanel code="01" title="DISPLAY" status="THIS BROWSER ONLY">
+        <SettingsForm />
+      </HudPanel>
+
+      <HudPanel code="02" title="NOTIFICATION PREFERENCES">
         <NotificationPreferencesForm preferences={notificationPreferences} />
-      </div>
+      </HudPanel>
 
       {canViewAs(real) && (
-        <div className="space-y-2 border-t border-[var(--term-border)] pt-4">
-          <h2 className="text-sm tracking-widest">:: CLEARANCE SIMULATION ::</h2>
-          <p className="text-xs text-[var(--term-fg-dim)]">
+        <HudPanel
+          code="03"
+          title="CLEARANCE SIMULATION"
+          status={viewAs !== null ? "ACTIVE" : "INACTIVE"}
+          variant={viewAs !== null ? "alert" : undefined}
+        >
+          <p className="text-xs text-[var(--term-fg-dim)] mb-2">
             BROWSE THE SITE AS LOWER-CLEARANCE PERSONNEL WOULD SEE IT. WHILE
             ACTIVE, YOUR ELEVATED ROLES AND REDACTION BYPASS ARE SUSPENDED. YOUR
             ACTUAL CLEARANCE IS{" "}
@@ -49,16 +67,18 @@ export default async function SettingsPage() {
                 </option>
               ))}
             </select>
-            <button className="term-button text-xs">APPLY</button>
+            <button className="term-button term-button--sm">APPLY</button>
           </form>
           {viewAs !== null && (
-            <form action={setViewAsAction}>
+            <form action={setViewAsAction} className="pt-2">
               <input type="hidden" name="clearance" value="" />
-              <button className="term-button text-xs">END SIMULATION</button>
+              <button className="term-button term-button--danger term-button--sm">
+                END SIMULATION
+              </button>
             </form>
           )}
-        </div>
+        </HudPanel>
       )}
-    </div>
+    </>
   );
 }

@@ -1,201 +1,158 @@
 import Link from "next/link";
-import { requireUser, hasStaffPowers } from "@/lib/session";
-import { db } from "@/lib/db";
-import { canAccessSecureChannel, clearanceDisplay } from "@/lib/clearance";
-import { TICKET_STATUSES, handleableTicketTypes } from "@/lib/tickets";
-import {
-  MESSAGE_LOG_RETENTION_DAYS,
-  canAccessMessageLogs,
-} from "@/lib/message-logs";
-import { messageRetentionCutoff } from "@/lib/message-retention";
-import { canAccessCounterIntel, REVEAL_MAX } from "@/lib/counter-intel";
+import { requireUser } from "@/lib/session";
+import { clearanceDisplay } from "@/lib/clearance";
 import { getActiveHackGrant } from "@/lib/hack/grant";
-
-type Tile = {
-  href: string;
-  label: string;
-  code: string;
-  desc: string;
-  accent?: "amber" | "red";
-  // Count surfaced as a badge on the tile. Omitted or 0 renders nothing.
-  badge?: number;
-  badgeLabel?: string;
-};
+import { resolveGates } from "@/lib/sections-access";
+import { getStationCounts } from "@/lib/station-counts";
+import {
+  GROUP_LABELS,
+  GROUP_ORDER,
+  badgeCount,
+  visibleSections,
+  type Section,
+} from "@/lib/sections";
+import { StationHead, Readout, Lamp, HudBanner } from "@/components/hud";
 
 export default async function MenuPage() {
   const user = await requireUser();
-  const staff = hasStaffPowers(user);
+  const gates = resolveGates(user);
 
-  // Counts backing the tile badges. Fetched together so the menu still costs
-  // a single round trip.
-  const ticketQueues = handleableTicketTypes(user);
-
-  const raisa = canAccessCounterIntel(user);
-
-  const [unreadMessages, pendingRequests, openTickets, activeGrant, openCases] =
-    await Promise.all([
-    db.message.count({
-      where: {
-        recipientId: user.id,
-        read: false,
-        createdAt: { gte: messageRetentionCutoff() },
-      },
-    }),
-    staff
-      ? db.clearanceRequest.count({ where: { status: "pending" } })
-      : Promise.resolve(0),
-    // Badge counts only what this member is expected to act on: tickets in a
-    // queue they handle, excluding their own.
-    ticketQueues.length > 0
-      ? db.ticket.count({
-          where: {
-            type: { in: ticketQueues },
-            status: TICKET_STATUSES.open,
-            authorId: { not: user.id },
-          },
-        })
-      : Promise.resolve(0),
+  // getStationCounts is request-cached and was already resolved by the app
+  // layout for the command rail, so this costs nothing.
+  const [counts, activeGrant] = await Promise.all([
+    getStationCounts(user),
     getActiveHackGrant(user.id),
-    raisa
-      ? db.hackRun.count({ where: { revealLevel: { lt: REVEAL_MAX } } })
-      : Promise.resolve(0),
   ]);
 
-  const tiles: Tile[] = [
-    { href: "/personnel", label: "PERSONNEL", code: "SEC-01", desc: "Personnel registry & clearance records" },
-    {
-      href: "/messages",
-      label: "MESSAGES",
-      code: "SEC-02",
-      desc: "Encrypted internal correspondence",
-      badge: unreadMessages,
-      badgeLabel: "unread",
-    },
-    { href: "/scp", label: "SCP FILES", code: "SEC-03", desc: "Anomaly containment documentation" },
-    { href: "/incidents", label: "INCIDENTS", code: "SEC-04", desc: "Breach & incident reports" },
-    { href: "/broadcasts", label: "BROADCASTS", code: "SEC-05", desc: "Site-wide directives & bulletins" },
-    { href: "/clearance-request", label: "CLEARANCE", code: "SEC-06", desc: "Request clearance elevation" },
-    {
-      href: "/tickets",
-      label: "IT SUPPORT",
-      code: "SEC-07",
-      desc: "Assistance, bug reports & file access requests",
-      badge: openTickets,
-      badgeLabel: "open tickets in your queue",
-    },
-  ];
-
-  if (canAccessSecureChannel(user.clearance)) {
-    tiles.push({
-      href: "/secure-channel",
-      label: "⚿ SECURE CHANNEL",
-      code: "L-5+",
-      desc: "Encrypted high-clearance channel",
-      accent: "amber",
-    });
-  }
-
-  if (canAccessMessageLogs(user)) {
-    tiles.push({
-      href: "/message-logs",
-      label: "MESSAGE LOGS",
-      code: "R5",
-      desc: `Member correspondence oversight (${MESSAGE_LOG_RETENTION_DAYS}d retention)`,
-      accent: "amber",
-    });
-  }
-
-  // Shown to everyone, unlabelled as to what it actually is. Finding out is
-  // the point; the warning screen behind it does the explaining.
-  tiles.push({
-    href: "/hack",
-    label: "⚠ UNKNOWN TERMINAL",
-    code: "???",
-    desc: activeGrant
-      ? `ILLICIT ${clearanceDisplay(activeGrant.tier, null)} ACCESS ACTIVE`
-      : "Unlisted access node — origin unverified",
-    accent: "amber",
-  });
-
-  if (canAccessCounterIntel(user)) {
-    tiles.push({
-      href: "/counter-intel",
-      label: "COUNTER-INTEL",
-      code: "RAISA",
-      desc: "Intrusion signals awaiting trace",
-      accent: "red",
-      badge: openCases,
-      badgeLabel: "untraced intrusion signals",
-    });
-  }
-
-  if (staff) {
-    tiles.push({
-      href: "/admin",
-      label: "ADMIN",
-      code: "ADM",
-      desc: "RAISA Control",
-      accent: "red",
-      badge: pendingRequests,
-      badgeLabel: "pending clearance requests",
-    });
-  }
-
-  tiles.push({ href: "/profile", label: "PROFILE", code: "USR", desc: "Your personnel dossier" });
-  tiles.push({ href: "/settings", label: "SETTINGS", code: "CFG", desc: "Terminal appearance & preferences" });
+  const sections = visibleSections(gates);
+  const alerts =
+    (counts.pendingRequests ?? 0) +
+    (counts.openTickets ?? 0) +
+    (counts.openCases ?? 0);
 
   return (
-    <div className="flex-1 flex flex-col justify-center gap-4 sm:gap-6 py-4">
-      <div className="text-center">
-        <div className="text-lg sm:text-2xl tracking-widest text-[var(--term-fg-bright)]">
-          MAIN MENU
+    <>
+      <StationHead code="SCiP-220 // STATION BOARD" title="MAIN MENU">
+        <Readout
+          label="Clearance"
+          value={clearanceDisplay(user.clearance, user.designation)}
+        />
+        <Readout label="Stations" value={sections.length} />
+        <Readout
+          label="Action Items"
+          value={alerts}
+          tone={alerts > 0 ? "amber" : "dim"}
+        />
+        <div className="hud-readout">
+          <span className="hud-readout__label">Link</span>
+          <Lamp state={activeGrant ? "alert" : "on"}>
+            {activeGrant ? "COMPROMISED" : "SECURE"}
+          </Lamp>
         </div>
-        <div className="text-xs sm:text-sm text-[var(--term-fg-dim)] mt-1">
-          {"// SELECT A MODULE TO CONTINUE"} — CLEARANCE{" "}
-          {clearanceDisplay(user.clearance, user.designation)}
-        </div>
+      </StationHead>
+
+      <p className="text-[var(--term-fg-dim)] text-xs">
+        {"// SELECT A STATION TO CONTINUE"}
+      </p>
+
+      {GROUP_ORDER.map((group) => {
+        const inGroup = sections.filter((s) => s.group === group);
+        if (inGroup.length === 0) return null;
+        return (
+          <section key={group} className="flex flex-col gap-2">
+            <HudBanner level="internal">▸ {GROUP_LABELS[group]}</HudBanner>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              {inGroup.map((s) => (
+                <StationTile
+                  key={s.base}
+                  section={s}
+                  count={badgeCount(s, counts)}
+                  // The unknown terminal is the one tile whose description
+                  // changes with session state — an active illicit grant is
+                  // exactly the thing its owner needs to see.
+                  desc={
+                    s.base === "/hack" && activeGrant
+                      ? `ILLICIT ${clearanceDisplay(activeGrant.tier, null)} ACCESS ACTIVE`
+                      : s.desc
+                  }
+                  {...stationState(s, !!activeGrant)}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+// A station's lamp and its label, kept together so the colour and the word can
+// never disagree — an "UNVERIFIED" node must not show a green light.
+function stationState(
+  section: Section,
+  grantActive: boolean
+): { lamp: "on" | "warn" | "alert" | "off"; lampText: string } {
+  if (section.base === "/hack") {
+    return grantActive
+      ? { lamp: "alert", lampText: "ACTIVE" }
+      : { lamp: "warn", lampText: "UNVERIFIED" };
+  }
+  if (section.accent === "red") return { lamp: "warn", lampText: "RESTRICTED" };
+  if (section.gate) return { lamp: "warn", lampText: "RESTRICTED" };
+  return { lamp: "on", lampText: "ONLINE" };
+}
+
+function StationTile({
+  section,
+  count,
+  desc,
+  lamp,
+  lampText,
+}: {
+  section: Section;
+  count: number;
+  desc: string;
+  lamp: "on" | "warn" | "alert" | "off";
+  lampText: string;
+}) {
+  const accent =
+    section.accent === "amber"
+      ? " menu-tile--amber"
+      : section.accent === "red"
+        ? " menu-tile--red"
+        : "";
+
+  return (
+    <Link href={section.base} className={`menu-tile term-panel${accent}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="hud-recid">[{section.code}]</span>
+        <Lamp state={lamp}>{lampText}</Lamp>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        {tiles.map((tile) => (
-          <Link
-            key={tile.href}
-            href={tile.href}
-            className={`menu-tile term-panel${
-              tile.accent === "amber"
-                ? " menu-tile--amber"
-                : tile.accent === "red"
-                  ? " menu-tile--red"
-                  : ""
-            }`}
+      <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+        <span
+          className="text-sm sm:text-base text-[var(--term-fg-bright)]"
+          style={{ letterSpacing: "0.12em" }}
+        >
+          {section.label}
+        </span>
+        {count > 0 && (
+          <span
+            className="clearance-chip text-[10px]"
+            // The count is meaningless to a screen reader without the noun, so
+            // the accessible name carries both.
+            aria-label={`${count} ${section.badgeLabel ?? "new"}`}
           >
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm sm:text-base tracking-wider text-[var(--term-fg-bright)]">
-                {tile.label}
-                {!!tile.badge && tile.badge > 0 && (
-                  <span
-                    className="clearance-chip ml-2 text-[10px] align-middle"
-                    // The count is meaningless to a screen reader without the
-                    // noun, so the accessible name carries both.
-                    aria-label={`${tile.badge} ${tile.badgeLabel ?? "new"}`}
-                  >
-                    {tile.badge > 99 ? "99+" : tile.badge}
-                  </span>
-                )}
-              </span>
-              <span className="text-[10px] sm:text-xs text-[var(--term-fg-dim)]">
-                [{tile.code}]
-              </span>
-            </div>
-            <p className="mt-2 text-xs sm:text-sm text-[var(--term-fg-dim)] leading-snug">
-              {tile.desc}
-            </p>
-            <div className="mt-3 text-xs text-[var(--term-fg-dim)] menu-tile__prompt">
-              {"> ACCESS"} <span className="menu-tile__caret">_</span>
-            </div>
-          </Link>
-        ))}
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
       </div>
-    </div>
+
+      <p className="mt-1 text-xs text-[var(--term-fg-dim)] leading-snug">{desc}</p>
+
+      <div className="mt-3 text-xs text-[var(--term-fg-dim)] menu-tile__prompt">
+        {"> ACCESS"} <span className="menu-tile__caret">_</span>
+      </div>
+    </Link>
   );
 }

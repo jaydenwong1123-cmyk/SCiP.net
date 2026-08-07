@@ -18,6 +18,7 @@ import { RUN_STATUS } from "@/lib/hack/config";
 import { duelsForRuns } from "@/lib/hack/duel";
 import { CaseList } from "./case-list";
 import { LiveIntrusions, type LiveCase } from "./live-intrusions";
+import { StationHead, HudPanel, HudBanner, Readout, TickRule } from "@/components/hud";
 
 const PAGE_SIZE = 40;
 // How many live breaches the duel panel offers at once. There is never
@@ -137,98 +138,153 @@ export default async function CounterIntelPage({
 
   const flaggedCount = resolutionRows.filter((run) => run.flagged).length;
 
-  const chip = (active: boolean) =>
-    `term-link text-xs${active ? " text-[var(--term-fg-bright)]" : ""}`;
+  const seg = (active: boolean) => `hud-seg${active ? " hud-seg--on" : ""}`;
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-2">
-        <h1 className="text-lg tracking-widest">:: COUNTER-INTRUSION DESK ::</h1>
-        <p className="text-xs text-[var(--term-fg-dim)]">
-          RAISA EYES ONLY. EACH SIGNAL IS ANONYMOUS UNTIL TRACED. COMPLETE A
-          TRACE TO UNCOVER ONE FURTHER FIELD.
-        </p>
-        <p className="text-xs text-[var(--term-fg-dim)]">
-          RETENTION {COUNTER_INTEL_RETENTION_DAYS}D — CASE FILES PURGE
-          AUTOMATICALLY. L-R5 MAY DELETE CASES EARLY, INDIVIDUALLY OR IN
-          BULK, OR WIPE THE ENTIRE DESK.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Link href="/counter-intel" className={chip(scope === "all")}>
-            [ALL]
-          </Link>
-          <Link
-            href="/counter-intel?filter=inProgress"
-            className={chip(scope === "inProgress")}
+    <>
+      <StationHead code="RAISA // COUNTER-INTRUSION DESK" title="WATCH FLOOR">
+        <Readout label="Cases" value={total} />
+        <Readout
+          label="Live"
+          value={liveCases.length}
+          tone={liveCases.length > 0 ? "red" : "dim"}
+        />
+        <Readout
+          label="Flagged"
+          value={flaggedCount}
+          tone={flaggedCount > 0 ? "amber" : "dim"}
+        />
+        <Readout label="Retention" value={`${COUNTER_INTEL_RETENTION_DAYS}D`} small />
+      </StationHead>
+
+      <HudBanner level="secret">
+        RAISA EYES ONLY — SIGNALS ANONYMOUS UNTIL TRACED
+      </HudBanner>
+
+      {/* Watch floor: the live feed sits beside the standing counters so an
+          officer sees what is happening now and what has accumulated in one
+          glance, rather than scrolling between them. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-[var(--term-gap)] items-start">
+        <div className="flex flex-col gap-[var(--term-gap)] min-w-0">
+          <LiveIntrusions cases={liveCases} />
+
+          <HudPanel
+            code="02"
+            title="CASE QUEUE"
+            status={`PAGE ${pageNum} / ${pages}`}
           >
-            [IN PROGRESS]
-          </Link>
-          <Link
-            href="/counter-intel?filter=flagged"
-            className={chip(scope === "flagged")}
-          >
-            [FLAGGED]
-          </Link>
+            <div className="hud-segmented mb-3">
+              <Link href="/counter-intel" className={seg(scope === "all")}>
+                ALL
+              </Link>
+              <Link
+                href="/counter-intel?filter=inProgress"
+                className={seg(scope === "inProgress")}
+              >
+                IN PROGRESS
+              </Link>
+              <Link
+                href="/counter-intel?filter=flagged"
+                className={seg(scope === "flagged")}
+              >
+                FLAGGED
+              </Link>
+            </div>
+
+            <CaseList cases={cases} revealMax={REVEAL_MAX} canDelete={canDelete} />
+
+            {pages > 1 && (
+              <>
+                <TickRule className="mt-3" />
+                <div className="flex justify-between items-center text-xs pt-2">
+                  {pageNum > 1 ? (
+                    <Link
+                      href={`/counter-intel?filter=${scope}&page=${pageNum - 1}`}
+                      className="term-link"
+                    >
+                      [← NEWER]
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="hud-recid">
+                    PAGE {pageNum} / {pages}
+                  </span>
+                  {pageNum < pages ? (
+                    <Link
+                      href={`/counter-intel?filter=${scope}&page=${pageNum + 1}`}
+                      className="term-link"
+                    >
+                      [OLDER →]
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                </div>
+              </>
+            )}
+          </HudPanel>
         </div>
+
+        <HudPanel
+          code="03"
+          title="RESOLUTION LOG"
+          status="DESK-WIDE"
+          className="xl:sticky xl:top-3"
+        >
+          <div className="grid grid-cols-2 xl:grid-cols-1 gap-x-4">
+            <div className="py-1">
+              <Readout
+                label="Intrusions Active"
+                value={resolutionCounts[CASE_RESOLUTIONS.active] ?? 0}
+                tone="amber"
+              />
+            </div>
+            <div className="py-1">
+              <Readout
+                label="Live Access"
+                value={resolutionCounts[CASE_RESOLUTIONS.accessLive] ?? 0}
+                tone="red"
+              />
+            </div>
+            <TickRule className="col-span-2 xl:col-span-1 my-1" />
+            <div className="py-1">
+              <Readout
+                label="Revoked"
+                value={resolutionCounts[CASE_RESOLUTIONS.accessRevoked] ?? 0}
+                tone="dim"
+                small
+              />
+            </div>
+            <div className="py-1">
+              <Readout
+                label="Expired"
+                value={resolutionCounts[CASE_RESOLUTIONS.accessExpired] ?? 0}
+                tone="dim"
+                small
+              />
+            </div>
+            <div className="py-1">
+              <Readout
+                label="Repelled"
+                value={resolutionCounts[CASE_RESOLUTIONS.repelled] ?? 0}
+                tone="dim"
+                small
+              />
+            </div>
+            <div className="py-1">
+              <Readout label="Flagged" value={flaggedCount} tone="amber" small />
+            </div>
+          </div>
+
+          <TickRule className="my-2" />
+          <p className="text-[10px] text-[var(--term-fg-dim)] leading-snug">
+            CASE FILES PURGE AUTOMATICALLY AFTER{" "}
+            {COUNTER_INTEL_RETENTION_DAYS}D. L-R5 MAY DELETE CASES EARLY,
+            INDIVIDUALLY OR IN BULK, OR WIPE THE ENTIRE DESK.
+          </p>
+        </HudPanel>
       </div>
-
-      <LiveIntrusions cases={liveCases} />
-
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
-          RESOLUTION LOG
-        </h2>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
-          <span className="text-[var(--term-amber)]">
-            INTRUSIONS ACTIVE {resolutionCounts[CASE_RESOLUTIONS.active] ?? 0}
-          </span>
-          <span className="text-[var(--term-red)]">
-            LIVE ACCESS {resolutionCounts[CASE_RESOLUTIONS.accessLive] ?? 0}
-          </span>
-          <span className="text-[var(--term-fg-dim)]">
-            REVOKED {resolutionCounts[CASE_RESOLUTIONS.accessRevoked] ?? 0}
-          </span>
-          <span className="text-[var(--term-fg-dim)]">
-            EXPIRED {resolutionCounts[CASE_RESOLUTIONS.accessExpired] ?? 0}
-          </span>
-          <span className="text-[var(--term-fg-dim)]">
-            REPELLED {resolutionCounts[CASE_RESOLUTIONS.repelled] ?? 0}
-          </span>
-          <span className="text-[var(--term-amber)]">
-            FLAGGED {flaggedCount}
-          </span>
-        </div>
-      </div>
-
-      <CaseList cases={cases} revealMax={REVEAL_MAX} canDelete={canDelete} />
-
-      {pages > 1 && (
-        <div className="term-panel flex justify-between text-xs">
-          {pageNum > 1 ? (
-            <Link
-              href={`/counter-intel?filter=${scope}&page=${pageNum - 1}`}
-              className="term-link"
-            >
-              [← NEWER]
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="text-[var(--term-fg-dim)]">
-            PAGE {pageNum} / {pages}
-          </span>
-          {pageNum < pages ? (
-            <Link
-              href={`/counter-intel?filter=${scope}&page=${pageNum + 1}`}
-              className="term-link"
-            >
-              [OLDER →]
-            </Link>
-          ) : (
-            <span />
-          )}
-        </div>
-      )}
-    </div>
+    </>
   );
 }

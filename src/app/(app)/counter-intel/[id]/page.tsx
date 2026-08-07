@@ -17,6 +17,7 @@ import { TraceConsole } from "../trace-console";
 import { RevokeForm } from "./revoke-form";
 import { DeleteForm } from "./delete-form";
 import { CaseStatusForm } from "./case-status-form";
+import { StationHead, HudPanel, Readout, Lamp } from "@/components/hud";
 
 export default async function CounterIntelCasePage({
   params,
@@ -51,42 +52,54 @@ export default async function CounterIntelCasePage({
   const grantLive = c.grant && !c.grant.revoked && c.grant.expiresAtMs > now;
 
   return (
-    <div className="space-y-4">
-      <div className="term-panel space-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-lg tracking-widest">{c.code}</h1>
-          <Link href="/counter-intel" className="term-link text-xs">
-            [← ALL SIGNALS]
-          </Link>
+    <>
+      <StationHead code="RAISA // CASE FILE" title={c.code}>
+        <Readout label="Trace" value={`${c.revealLevel}/${REVEAL_MAX}`} />
+        <Readout label="Run Status" value={c.status.toUpperCase()} small />
+        <div className="hud-readout">
+          <span className="hud-readout__label">Case</span>
+          <Lamp
+            state={
+              c.caseStatus === "RESOLVED"
+                ? "off"
+                : c.caseStatus === "IN_PROGRESS"
+                  ? "warn"
+                  : "alert"
+            }
+          >
+            {CASE_STATUS_LABELS[c.caseStatus]}
+          </Lamp>
         </div>
-        <p className="text-xs text-[var(--term-fg-dim)]">
-          TRACE PROGRESS {c.revealLevel}/{REVEAL_MAX} · STATUS {c.status.toUpperCase()}
-          {c.tracedByName ? ` · TRACED BY ${c.tracedByName}` : ""}
-        </p>
-        {canDeleteCounterIntelLog(user) && (
-          <div className="pt-1">
-            <DeleteForm runId={c.id} />
-          </div>
-        )}
-      </div>
+        <Link href="/counter-intel" className="term-link text-xs">
+          [← ALL SIGNALS]
+        </Link>
+      </StationHead>
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
-          CASE WORKFLOW — {CASE_STATUS_LABELS[c.caseStatus]}
-        </h2>
+      <HudPanel
+        code="01"
+        title="CASE WORKFLOW"
+        status={c.tracedByName ? `TRACED BY ${c.tracedByName}` : "UNTRACED"}
+      >
         <CaseStatusForm
           runId={c.id}
           current={c.caseStatus}
           flagged={c.flagged}
           canResolve={canResolveCounterIntelCase(user)}
         />
-      </div>
+        {canDeleteCounterIntelLog(user) && (
+          <div className="pt-3">
+            <DeleteForm runId={c.id} />
+          </div>
+        )}
+      </HudPanel>
 
       {c.duel && (
-        <div className="term-panel space-y-1">
-          <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
-            COUNTER-INTRUSION RECORD
-          </h2>
+        <HudPanel
+          code="02"
+          title="COUNTER-INTRUSION RECORD"
+          status={`ENGAGED BY ${c.duel.defenderName ?? "UNKNOWN OFFICER"}`}
+          variant={c.duel.outcome === "LOST" ? "alert" : undefined}
+        >
           <p className="text-sm">
             {c.duel.outcome === "LIVE" ? (
               <span className="text-[var(--term-amber)]">
@@ -102,27 +115,26 @@ export default async function CounterIntelCasePage({
               </span>
             )}
           </p>
-          <p className="text-xs text-[var(--term-fg-dim)]">
-            ENGAGED BY {c.duel.defenderName ?? "UNKNOWN OFFICER"}
-          </p>
-        </div>
+        </HudPanel>
       )}
 
-      <div className="term-panel space-y-2">
-        <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
-          RECOVERED INTELLIGENCE
-        </h2>
-
+      <HudPanel
+        code="03"
+        title="RECOVERED INTELLIGENCE"
+        status={`${c.revealLevel} OF ${REVEAL_MAX} FIELDS UNSEALED`}
+      >
         {REVEAL_LABELS.map((label, i) => {
           const unlocked = c.revealLevel > i;
           return (
-            <div
-              key={label}
-              className="border-b border-[var(--term-border)]/30 py-2 space-y-1"
-            >
-              <div className="text-xs text-[var(--term-fg-dim)]">
-                {unlocked ? "▸" : "▪"} {label}
-              </div>
+            <div key={label} className="hud-list">
+              <div className="term-row space-y-1 py-2">
+                <div className="hud-readout__label flex items-center gap-2">
+                  <span aria-hidden>{unlocked ? "▸" : "▪"}</span>
+                  {label}
+                  <span className="hud-recid ml-auto">
+                    {unlocked ? "UNSEALED" : "SEALED"}
+                  </span>
+                </div>
               {!unlocked ? (
                 <div className="redacted text-sm">SEALED PENDING TRACE</div>
               ) : (
@@ -160,15 +172,13 @@ export default async function CounterIntelCasePage({
                   )}
                 </div>
               )}
+              </div>
             </div>
           );
         })}
-      </div>
+      </HudPanel>
 
-      <div className="term-panel space-y-3">
-        <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
-          TRACE CONSOLE
-        </h2>
+      <HudPanel code="04" title="TRACE CONSOLE">
         <TraceConsole
           runId={c.id}
           revealLevel={c.revealLevel}
@@ -181,13 +191,15 @@ export default async function CounterIntelCasePage({
               : null
           }
         />
-      </div>
+      </HudPanel>
 
       {c.grant && (
-        <div className="term-panel space-y-2">
-          <h2 className="text-sm tracking-widest text-[var(--term-fg-dim)]">
-            ILLICIT ACCESS
-          </h2>
+        <HudPanel
+          code="05"
+          title="ILLICIT ACCESS"
+          variant={grantLive ? "alert" : undefined}
+          status={grantLive ? "LIVE" : c.grant.revoked ? "REVOKED" : "EXPIRED"}
+        >
           <p className="text-sm">
             {clearanceLabel(c.grant.tier)} READ ACCESS —{" "}
             {c.grant.revoked ? (
@@ -201,13 +213,15 @@ export default async function CounterIntelCasePage({
             )}
           </p>
           {grantLive && (
-            <RevokeForm
-              runId={c.id}
-              identified={c.revealLevel >= REVEAL_MAX}
-            />
+            <div className="pt-2">
+              <RevokeForm
+                runId={c.id}
+                identified={c.revealLevel >= REVEAL_MAX}
+              />
+            </div>
           )}
-        </div>
+        </HudPanel>
       )}
-    </div>
+    </>
   );
 }

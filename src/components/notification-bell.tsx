@@ -63,7 +63,7 @@ export function NotificationBell({
         ALERTS
         {localUnreadCount > 0 && (
           <span
-            className="absolute -top-2 -right-2 rounded-full bg-[var(--term-amber)] text-[var(--term-bg)] text-[10px] leading-none min-w-[14px] h-[14px] px-[3px] flex items-center justify-center"
+            className="absolute -top-2 -right-2 bg-[var(--term-amber)] text-[var(--term-bg)] text-[10px] leading-none min-w-[14px] h-[14px] px-[3px] flex items-center justify-center"
             aria-hidden
           >
             {localUnreadCount > 99 ? "99+" : localUnreadCount}
@@ -71,22 +71,30 @@ export function NotificationBell({
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 term-panel z-50 max-h-80 overflow-y-auto text-xs">
+        <div className="absolute right-0 top-full mt-2 w-72 term-panel z-50 max-h-80 overflow-y-auto text-xs bg-[var(--term-bg)]">
+          <div className="hud-panel-head">
+            <span className="hud-panel-head__code">ALERTS</span>
+            <span className="hud-panel-head__status">
+              {unreadCount > 0 ? `${unreadCount} UNREAD` : "ALL READ"}
+            </span>
+          </div>
           {visibleNotifications.length === 0 && (
             <p className="text-[var(--term-fg-dim)] p-2">NO NOTIFICATIONS.</p>
           )}
-          {visibleNotifications.map((n) => (
-            <Link
-              key={n.id}
-              href={n.link}
-              onClick={() => handleNotificationClick(n)}
-              className="block border-b border-[var(--term-border)]/30 py-2 px-2 term-link"
-              style={!n.read ? { color: "var(--term-fg-bright)" } : undefined}
-            >
-              <div className="break-words">{n.body}</div>
-              <div className="text-[var(--term-fg-dim)] mt-1">{n.createdAt}</div>
-            </Link>
-          ))}
+          <div className="hud-list">
+            {visibleNotifications.map((n) => (
+              <Link
+                key={n.id}
+                href={n.link}
+                onClick={() => handleNotificationClick(n)}
+                className="block py-2 px-2 no-underline"
+                style={!n.read ? { color: "var(--term-fg-bright)" } : undefined}
+              >
+                <div className="break-words">{n.body}</div>
+                <div className="hud-recid mt-1">{n.createdAt}</div>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>
