@@ -10,6 +10,10 @@ import {
 } from "@/lib/clearance";
 import { getViewAsClearance } from "@/lib/view-as";
 import { getActiveHackGrant } from "@/lib/hack/grant";
+import { needsSentinel } from "@/lib/sentinel";
+// One-way edge: site-config reaches back into this module with a lazy import
+// inside enforceShutdown, precisely so this one can stay static.
+import { enforceShutdown } from "@/lib/site-config";
 
 // Personnel who may flag/annotate members: L-5 and above, plus staff/admin/owner.
 //
@@ -130,9 +134,34 @@ export const getCurrentUser = cache(async () => {
   };
 });
 
+// Gate for the authenticated layout: the root owner answers the SENTINEL
+// challenge before any page renders.
+//
+// Resolved against the *real* row, not the possibly-downgraded persona from
+// getCurrentUser. A "view as" simulation strips isOwner, so checking the
+// persona would let anyone holding the owner's session set the view-as cookie
+// and browse straight past the challenge.
+export async function enforceSentinel(): Promise<void> {
+  const user = await getRealUser();
+  if (!user) return;
+  if (await needsSentinel(user)) redirect("/sentinel");
+}
+
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // The owner's challenge comes before anything else this function would
+  // otherwise let through.
+  //
+  // It has to live here and not only in the layout: a layout that redirects
+  // does not stop its sibling page from rendering in the same pass, so the
+  // page's content is still serialized into the response the browser is about
+  // to navigate away from. Gating at the page's own entry point is what keeps
+  // that data from being produced at all.
+  await enforceSentinel();
+  // Likewise for a terminated network, and for the same reason: the layout
+  // gate alone would still let each page build and serialize its content.
+  await enforceShutdown();
   // A member suspended mid-session loses access immediately.
   if (user.suspended) redirect("/suspended");
   if (!user.displayName) redirect("/set-name");
@@ -197,10 +226,18 @@ export async function requireOwner() {
   return user;
 }
 
-// Strictly the seeded owner — appointing/removing the co-owner only.
+// Strictly the seeded owner — co-owner appointment, and the OMEGA AUTHORITY
+// controls.
+//
+// Also the enforcement point for the SENTINEL challenge. Layouts alone are not
+// enough: a server action runs its own request and never renders the layout, so
+// without the check here a session sitting on the challenge screen could still
+// POST straight into an owner-only action. Everything that trusts "this is the
+// root owner" comes through this function, so the gate belongs here.
 export async function requireRootOwner() {
   const user = await requireUser();
   if (!user.isOwner) redirect("/");
+  if (await needsSentinel(user)) redirect("/sentinel");
   return user;
 }
 

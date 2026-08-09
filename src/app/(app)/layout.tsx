@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { requireUser, enforceSentinel } from "@/lib/session";
 import { clearanceLabel } from "@/lib/clearance";
 import { formatDuration } from "@/lib/hack/config";
-import { enforceMaintenance } from "@/lib/site-config";
+import { enforceMaintenance, enforceShutdown } from "@/lib/site-config";
 import { TerminalShell } from "@/components/terminal-shell";
 import { db } from "@/lib/db";
 import { getRecentNotifications, getUnreadNotificationCount } from "@/lib/notifications";
@@ -13,8 +13,15 @@ import { getStationCounts } from "@/lib/station-counts";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Independent gates — run concurrently instead of one after the other so the
-  // layout waits on a single round trip, not two stacked ones.
-  const [, user] = await Promise.all([enforceMaintenance(), requireUser()]);
+  // layout waits on a single round trip, not two stacked ones. Each of these
+  // redirects rather than returning, so ordering between them only decides
+  // which notice a member meets first, not whether they are stopped.
+  const [, , , user] = await Promise.all([
+    enforceMaintenance(),
+    enforceShutdown(),
+    enforceSentinel(),
+    requireUser(),
+  ]);
 
   const gates = resolveGates(user);
 

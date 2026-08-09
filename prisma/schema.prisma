@@ -619,6 +619,22 @@ model SiteConfig {
   // — no job required, the gate simply re-reads the clock on each request. Null
   // means the lockdown stays up until an owner turns it off by hand.
   lockdownUntil      DateTime?
+
+  // --- OMEGA AUTHORITY ------------------------------------------------------
+  // A harder gate than maintenanceMode, and deliberately a separate flag rather
+  // than a mode of it: there is no bypass code, and it darkens /login too, so
+  // the two must never be confusable. Only the seeded root owner can set or
+  // clear it, and only they can still reach the site while it is up.
+  shutdownMode       Boolean @default(false)
+  shutdownMessage    String  @default("")
+  shutdownAt         DateTime?
+
+  // Two-phase arming for the destructive controls. Held here rather than in a
+  // cookie or client state so the mandatory delay is enforced by the server: a
+  // crafted request cannot skip a countdown it never saw.
+  omegaArmedOp       String?
+  omegaArmedAt       DateTime?
+  omegaArmedBy       String?
 }
 
 model IncidentReport {

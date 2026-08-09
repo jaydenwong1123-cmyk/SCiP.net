@@ -119,6 +119,19 @@ export default async function AdminPage() {
         <Link href="/admin/audit" className="term-link text-sm">
           [ACCESS &amp; ACTION LOG]
         </Link>
+        {/* The only affordance pointing at OMEGA AUTHORITY anywhere in the UI,
+            and it renders for the seeded owner alone — a co-owner passes
+            hasOwnerPowers but not this. The route enforces the same check
+            itself; this is signposting, not the boundary. */}
+        {viewer.isOwner && (
+          <Link
+            href="/admin/omega"
+            className="term-link text-sm"
+            style={{ color: "var(--term-red)" }}
+          >
+            [OMEGA]
+          </Link>
+        )}
       </StationHead>
 
       <HudPanel code="01" title="SITE OVERVIEW" status="FACILITY TELEMETRY">

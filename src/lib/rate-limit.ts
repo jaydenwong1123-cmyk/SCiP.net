@@ -29,6 +29,16 @@ export const HACK_RULE: RateLimitRule = { limit: 40, windowMs: 5 * 60 * 1000 };
 // so a duel cannot be starved by a bucket the intruder already spent on the
 // ladder: being engaged mid-run must never be unwinnable for that reason.
 export const DUEL_RULE: RateLimitRule = { limit: 20, windowMs: 5 * 60 * 1000 };
+// The owner's post-login SENTINEL challenge. Tight, because the answer is a
+// fixed phrase the owner knows outright — repeated failures are guessing, and
+// exhausting the bucket terminates the session rather than merely pausing it.
+export const SENTINEL_RULE: RateLimitRule = { limit: 5, windowMs: 15 * 60 * 1000 };
+// The OMEGA gate on site termination and data purge. Deliberately brutal: a
+// legitimate use is a handful of attempts in the site's lifetime, so anything
+// beyond that is an attack on the kill switch itself. Unlike every other rule
+// here, its caller treats a throttling *outage* as blocked rather than open —
+// see verifyOmega in lib/omega.ts.
+export const OMEGA_RULE: RateLimitRule = { limit: 5, windowMs: 60 * 60 * 1000 };
 
 export type RateLimitStatus = {
   blocked: boolean;

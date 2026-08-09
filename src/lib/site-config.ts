@@ -14,6 +14,13 @@ export type SiteConfig = {
   // When set, the lockdown lifts on its own once this instant passes. Null =
   // stays locked until an owner disables it manually.
   lockdownUntil: Date | null;
+  // OMEGA AUTHORITY — see enforceShutdown() below and lib/omega.ts.
+  shutdownMode: boolean;
+  shutdownMessage: string;
+  shutdownAt: Date | null;
+  omegaArmedOp: string | null;
+  omegaArmedAt: Date | null;
+  omegaArmedBy: string | null;
 };
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -22,6 +29,12 @@ const DEFAULT_CONFIG: SiteConfig = {
   bypassCode: "",
   maintenanceMessage: "",
   lockdownUntil: null,
+  shutdownMode: false,
+  shutdownMessage: "",
+  shutdownAt: null,
+  omegaArmedOp: null,
+  omegaArmedAt: null,
+  omegaArmedBy: null,
 };
 
 // Read-only fetch of the singleton config. Returns an in-memory default if the
@@ -68,4 +81,27 @@ export async function enforceMaintenance(): Promise<void> {
   if (!isLockedNow(cfg)) return;
   if (await hasBypass(cfg)) return;
   redirect("/maintenance");
+}
+
+// The OMEGA shutdown gate. Three things make it harder than maintenance:
+//
+//   1. No bypass code exists. There is nothing to share, leak, or guess.
+//   2. It runs on the unauthenticated layout too, so /login goes dark as well.
+//   3. The only way through is being the seeded root owner — checked against
+//      the stored row, so a "view as" simulation cannot be used to slip past.
+//
+// The owner is let through so the panel that lifted the site remains reachable
+// to restore it. That is the whole reversibility guarantee, so it must not be
+// narrowed to a cookie or a session that could be lost.
+export async function enforceShutdown(): Promise<void> {
+  const cfg = await getSiteConfig();
+  if (!cfg.shutdownMode) return;
+
+  // Imported lazily: lib/session imports this module for enforceMaintenance,
+  // and a static import here would close the cycle.
+  const { getRealUser } = await import("@/lib/session");
+  const user = await getRealUser();
+  if (user?.isOwner) return;
+
+  redirect("/terminated");
 }

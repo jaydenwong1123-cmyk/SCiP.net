@@ -58,6 +58,19 @@ export const AUDIT_ACTIONS = {
   hackDuelEngaged: "hack.duel.engage",
   hackDuelResolved: "hack.duel.resolve",
   bulkMemberAction: "user.bulk",
+  // OMEGA AUTHORITY. The rejection verbs matter as much as the success ones:
+  // a sentinel failure or a refused OMEGA attempt is the tripwire telling the
+  // owner that somebody reached their account, so both are logged even though
+  // nothing happened.
+  sentinelPassed: "owner.sentinel.pass",
+  sentinelFailed: "owner.sentinel.fail",
+  sentinelLocked: "owner.sentinel.lockout",
+  omegaArmed: "omega.arm",
+  omegaAborted: "omega.abort",
+  omegaRejected: "omega.reject",
+  siteTerminated: "site.terminate",
+  siteRestored: "site.restore",
+  sitePurged: "site.purge",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -108,6 +121,15 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.hackDuelEngaged]: "COUNTER-INTRUSION ENGAGED",
   [AUDIT_ACTIONS.hackDuelResolved]: "COUNTER-INTRUSION RESOLVED",
   [AUDIT_ACTIONS.bulkMemberAction]: "BULK MEMBER ACTION",
+  [AUDIT_ACTIONS.sentinelPassed]: "SENTINEL CLEARED",
+  [AUDIT_ACTIONS.sentinelFailed]: "SENTINEL FAILED",
+  [AUDIT_ACTIONS.sentinelLocked]: "SENTINEL LOCKOUT",
+  [AUDIT_ACTIONS.omegaArmed]: "OMEGA ARMED",
+  [AUDIT_ACTIONS.omegaAborted]: "OMEGA ABORTED",
+  [AUDIT_ACTIONS.omegaRejected]: "OMEGA REJECTED",
+  [AUDIT_ACTIONS.siteTerminated]: "SITE TERMINATED",
+  [AUDIT_ACTIONS.siteRestored]: "SITE RESTORED",
+  [AUDIT_ACTIONS.sitePurged]: "DATA PURGED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };
