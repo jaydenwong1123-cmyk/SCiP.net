@@ -6,6 +6,8 @@ import { GameSurface, useRoundInput } from "../hack/games";
 import { Countdown } from "../hack/countdown";
 import { pollDuelAction, submitDuelAnswerAction } from "./actions";
 import type { DuelState, PublicDuel } from "@/lib/hack/duel";
+import { useRoundTelemetry } from "@/lib/hack/telemetry";
+import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
 type Phase =
   | { kind: "live"; duel: PublicDuel; feedback?: string }
@@ -38,6 +40,7 @@ export function DuelConsole({
 
   const duel = phase.kind === "live" ? phase.duel : null;
   const [answer, setAnswer] = useRoundInput(duel?.nonce ?? "");
+  const telemetry = useRoundTelemetry(duel?.nonce ?? "");
 
   const apply = useCallback(
     (state: DuelState) => {
@@ -91,8 +94,9 @@ export function DuelConsole({
     form.set("nonce", duel.nonce);
     form.set("answer", answer);
     form.set("runId", runId);
+    form.set("signals", telemetry.snapshot());
     startTransition(async () => apply(await submitDuelAnswerAction(null, form)));
-  }, [duel, answer, pending, runId, apply]);
+  }, [duel, answer, pending, runId, apply, telemetry]);
 
   if (phase.kind === "won") {
     return (
@@ -153,12 +157,15 @@ export function DuelConsole({
         RUN.
       </p>
 
+      <OffTerminalNotice ms={telemetry.offTerminalMs} />
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
         className="space-y-3"
+        {...telemetry.guardProps}
       >
         <div>
           <h4 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
@@ -175,6 +182,7 @@ export function DuelConsole({
           value={answer}
           onChange={setAnswer}
           disabled={pending}
+          signals={telemetry.signals}
         />
 
         {phase.feedback && (

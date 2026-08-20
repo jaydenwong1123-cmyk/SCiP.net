@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { requireStaff, hasOwnerPowers } from "@/lib/session";
+import { requireStaff, hasOwnerPowers, hasAdminPowers } from "@/lib/session";
 import { MAX_CO_OWNERS } from "@/lib/roles";
 import { db } from "@/lib/db";
 import {
@@ -119,6 +119,14 @@ export default async function AdminPage() {
         <Link href="/admin/audit" className="term-link text-sm">
           [ACCESS &amp; ACTION LOG]
         </Link>
+        {/* Admin+ only, and not merely as signposting: the conduct log names
+            intruders whose identity RAISA has not traced yet, so Staff must
+            not see the link OR the page. The route enforces it too. */}
+        {hasAdminPowers(viewer) && (
+          <Link href="/admin/conduct" className="term-link text-sm">
+            [CONDUCT LOG]
+          </Link>
+        )}
         {/* The only affordance pointing at OMEGA AUTHORITY anywhere in the UI,
             and it renders for the seeded owner alone — a co-owner passes
             hasOwnerPowers but not this. The route enforces the same check

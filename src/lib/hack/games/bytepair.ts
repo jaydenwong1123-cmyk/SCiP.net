@@ -31,6 +31,8 @@ export const bytepairGame: HackGame = {
   minBand: 2,
   maxBand: 5,
   timeFactor: 1.0,
+  // Scanning a grid for unpaired bytes is quick once seen, but the grid has to be read first.
+  minHumanMs: 10000,
 
   generate(band, rng) {
     const size = band <= 2 ? 6 : band <= 4 ? 8 : 10;

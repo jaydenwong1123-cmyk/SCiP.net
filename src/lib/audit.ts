@@ -55,6 +55,11 @@ export const AUDIT_ACTIONS = {
   hackRunDeleted: "hack.run.delete",
   hackCaseStatusSet: "hack.case_status.set",
   hackCaseFlagToggled: "hack.case_flag.toggle",
+  // A run crossed the conduct threshold. NULL actor, like the other
+  // intruder-side verbs: the whole point of the reveal ladder is that
+  // /admin/audit must not name the intruder before RAISA has earned it. The
+  // evidence itself lives in ConductRecord, which is Admin+ only.
+  hackConductFlagged: "hack.conduct.flag",
   hackDuelEngaged: "hack.duel.engage",
   hackDuelResolved: "hack.duel.resolve",
   bulkMemberAction: "user.bulk",

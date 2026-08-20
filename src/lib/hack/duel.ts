@@ -23,6 +23,7 @@ import {
   type DuelWinner,
 } from "@/lib/hack/config";
 import { issueGrant } from "@/lib/hack/grant";
+import { recordConduct, CONDUCT_SURFACES } from "@/lib/hack/conduct";
 import { CASE_STATUSES, caseCode } from "@/lib/counter-intel";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
@@ -307,7 +308,10 @@ export async function readDuel(
 export async function submitDuelAnswer(
   userId: string,
   nonce: string,
-  answer: string
+  answer: string,
+  // Client-reported conduct telemetry, from whichever seat submitted. Filed,
+  // never consulted by anything that decides the duel.
+  rawSignals = ""
 ): Promise<DuelOutcome> {
   const duel = await db.hackDuel.findFirst({
     where: { OR: [{ attackerNonce: nonce }, { defenderNonce: nonce }] },
@@ -354,6 +358,31 @@ export async function submitDuelAnswer(
   }
 
   const result = gradeAnswer(duel.game, JSON.parse(duel.solution), answer);
+
+  // File conduct evidence for this seat.
+  //
+  // Both seats are scored, and that is the point: an officer who solves a
+  // band-3 puzzle in two seconds is cheating just as much as an intruder who
+  // does, and their prize is somebody's identity. Each seat's clock starts at
+  // a different, server-owned moment — the attacker's when their poll
+  // DELIVERED the puzzle, the defender's at ENGAGE — so elapsed is measured
+  // from whichever applies rather than from a shared start that would flatter
+  // one side and slander the other.
+  const seatStart = attacker
+    ? (duel.deliveredAt ?? duel.startedAt)
+    : duel.startedAt;
+  await recordConduct({
+    userId,
+    surface: attacker
+      ? CONDUCT_SURFACES.duelAttacker
+      : CONDUCT_SURFACES.duelDefender,
+    runId: duel.runId,
+    game: duel.game,
+    elapsedMs: Date.now() - seatStart.getTime(),
+    answer,
+    correct: result.correct,
+    rawSignals,
+  });
 
   if (result.correct) {
     const winner = attacker ? DUEL_WINNERS.attacker : DUEL_WINNERS.defender;

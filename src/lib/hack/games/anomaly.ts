@@ -37,6 +37,8 @@ export const anomalyGame: HackGame = {
   minBand: 2,
   maxBand: 4,
   timeFactor: 1.2,
+  // Ten records against three rules: reading the table alone is most of this.
+  minHumanMs: 18000,
 
   generate(band, rng) {
     const recordCount = band === 2 ? 6 : band === 3 ? 9 : 12;

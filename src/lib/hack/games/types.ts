@@ -29,6 +29,17 @@ export type HackGame = {
   // slower to read (daemon, packetfilter) gets more than 1.0; a snap judgement
   // (waveform) gets less.
   timeFactor: number;
+  // The fastest a HUMAN could plausibly clear this game from a cold start:
+  // read the brief, take in the payload, decide, type it. A correct answer
+  // that beats this is the one anti-cheat signal nothing client-side can fake,
+  // because both ends of the measurement are the server's own timestamps.
+  //
+  // Set it GENEROUSLY — comfortably below the fastest real player you can
+  // imagine, not near the average. It is scored as evidence for a human to
+  // read (see lib/hack/suspicion.ts), never as an automatic failure, so the
+  // cost of it being a touch loose is nothing at all, while the cost of it
+  // being tight is a real member appearing in a conduct log for being good.
+  minHumanMs: number;
   generate(band: number, rng: Rng): GameGeneration;
   grade(solution: unknown, answer: string): GradeResult;
 };

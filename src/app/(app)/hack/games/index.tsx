@@ -13,6 +13,8 @@ import type { AnomalyPayload } from "@/lib/hack/games/anomaly";
 import type { SignaturePayload } from "@/lib/hack/games/signature";
 import type { DaemonPayload } from "@/lib/hack/games/daemon";
 import type { MinesweeperPayload } from "@/lib/hack/games/minesweeper";
+import { Glyphs } from "./obfuscate";
+import type { RoundSignals } from "@/lib/hack/telemetry";
 
 // The twelve puzzle renderers.
 //
@@ -31,6 +33,10 @@ export type GameProps = {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  // Conduct telemetry, threaded down from whichever console is hosting the
+  // puzzle. Optional so a renderer can be mounted without one — the surfaces
+  // that grade for real all pass it.
+  signals?: RoundSignals;
 };
 
 const PANEL = "hack-surface";
@@ -43,16 +49,24 @@ function Hint({ children }: { children: React.ReactNode }) {
 
 // A plain answer box, used by every game whose answer is typed rather than
 // assembled by clicking.
+//
+// Paste is refused. A human composing an answer types it or clicks it out; the
+// only thing a paste buys is delivering a long machine-produced answer — a
+// full anomaly ID list, a daemon coordinate chain — in one motion. Refusing it
+// costs a legitimate player nothing and makes the transcription step of an
+// AI-assisted solve as slow as doing it by hand.
 function AnswerLine({
   value,
   onChange,
   disabled,
   placeholder,
+  signals,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled: boolean;
   placeholder: string;
+  signals?: RoundSignals;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   // Focus on mount and whenever a new round swaps the component in, so a run
@@ -66,6 +80,11 @@ function AnswerLine({
       name="answer"
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onKeyDown={() => signals?.key()}
+      onPaste={(e) => {
+        e.preventDefault();
+        signals?.blockedPaste();
+      }}
       disabled={disabled}
       autoComplete="off"
       autoCapitalize="characters"
@@ -77,11 +96,13 @@ function AnswerLine({
   );
 }
 
-function CipherGame({ payload, value, onChange, disabled }: GameProps) {
+function CipherGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as CipherPayload;
   return (
     <div className="space-y-3">
-      <div className={`${PANEL} hack-mono`}>{p.ciphertext}</div>
+      <div className={`${PANEL} hack-mono`}>
+        <Glyphs text={p.ciphertext} />
+      </div>
       {p.shift !== null && <Hint>CAESAR SHIFT: +{p.shift}</Hint>}
       {p.table && (
         <div className="hack-table-scroll">
@@ -90,25 +111,27 @@ function CipherGame({ payload, value, onChange, disabled }: GameProps) {
               <tr>
                 <th className="pr-2 text-left text-[var(--term-fg-dim)]">CIPHER</th>
                 {p.table.map(([c], i) => (
-                  <td key={i} className="px-1">{c}</td>
+                  <td key={i} className="px-1"><Glyphs text={c} /></td>
                 ))}
               </tr>
               <tr>
                 <th className="pr-2 text-left text-[var(--term-fg-dim)]">PLAIN</th>
                 {p.table.map(([, plain], i) => (
-                  <td key={i} className="px-1 text-[var(--term-fg-bright)]">{plain}</td>
+                  <td key={i} className="px-1 text-[var(--term-fg-bright)]">
+                    <Glyphs text={plain} />
+                  </td>
                 ))}
               </tr>
             </tbody>
           </table>
         </div>
       )}
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="PLAINTEXT" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="PLAINTEXT" />
     </div>
   );
 }
 
-function IcebreakerGame({ payload, value, onChange, disabled }: GameProps) {
+function IcebreakerGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as IcebreakerPayload;
   return (
     <div className="space-y-3">
@@ -116,25 +139,32 @@ function IcebreakerGame({ payload, value, onChange, disabled }: GameProps) {
         {p.lines.map((line) => (
           <div key={line.address} className="whitespace-pre">
             <span className="text-[var(--term-fg-dim)]">{line.address}  </span>
-            <span className="text-[var(--term-fg-dim)]">{line.junk}</span>
+            <span className="text-[var(--term-fg-dim)]">
+              <Glyphs text={line.junk} />
+            </span>
             <button
               type="button"
               disabled={disabled}
-              onClick={() => onChange(line.word)}
+              onClick={() => {
+                signals?.pointer();
+                onChange(line.word);
+              }}
               className="hack-pick"
             >
-              {line.word}
+              <Glyphs text={line.word} />
             </button>
-            <span className="text-[var(--term-fg-dim)]">{line.tail}</span>
+            <span className="text-[var(--term-fg-dim)]">
+              <Glyphs text={line.tail} />
+            </span>
           </div>
         ))}
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder={`${p.wordLength}-CHARACTER KEY`} />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder={`${p.wordLength}-CHARACTER KEY`} />
     </div>
   );
 }
 
-function WaveformGame({ payload, value, onChange, disabled }: GameProps) {
+function WaveformGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as WaveformPayload;
   return (
     <div className="space-y-3">
@@ -149,7 +179,10 @@ function WaveformGame({ payload, value, onChange, disabled }: GameProps) {
             <button
               type="button"
               disabled={disabled}
-              onClick={() => onChange(c.id)}
+              onClick={() => {
+                signals?.pointer();
+                onChange(c.id);
+              }}
               className="hack-pick"
             >
               {c.id}
@@ -158,16 +191,17 @@ function WaveformGame({ payload, value, onChange, disabled }: GameProps) {
           </div>
         ))}
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="TRACE ID" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="TRACE ID" />
     </div>
   );
 }
 
-function BytepairGame({ payload, value, onChange, disabled }: GameProps) {
+function BytepairGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as BytepairPayload;
   const picked = value.split(/[\s,]+/).filter(Boolean);
 
   const toggle = (byte: string) => {
+    signals?.pointer();
     const next = picked.includes(byte)
       ? picked.filter((b) => b !== byte)
       : [...picked, byte];
@@ -198,12 +232,12 @@ function BytepairGame({ payload, value, onChange, disabled }: GameProps) {
           )}
         </div>
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="UNPAIRED BYTES" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="UNPAIRED BYTES" />
     </div>
   );
 }
 
-function NodetraceGame({ payload, value, onChange, disabled }: GameProps) {
+function NodetraceGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as NodetracePayload;
   const chain = value.split(/[\s,>-]+/).filter(Boolean);
   return (
@@ -227,30 +261,36 @@ function NodetraceGame({ payload, value, onChange, disabled }: GameProps) {
             key={n}
             type="button"
             disabled={disabled}
-            onClick={() => onChange([...chain, n].join(" "))}
+            onClick={() => {
+              signals?.pointer();
+              onChange([...chain, n].join(" "));
+            }}
             className="hack-chip"
           >
             {n}
           </button>
         ))}
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="HOP SEQUENCE" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="HOP SEQUENCE" />
     </div>
   );
 }
 
-function KeypadGame({ payload, value, onChange, disabled }: GameProps) {
+function KeypadGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as KeypadPayload;
   return (
     <div className="space-y-3">
+      {/* Here the clues ARE the puzzle — the whole game is the constraint set —
+          so unlike ANOMALY's rules these do get obfuscated. */}
       <ul className={`${PANEL} text-xs space-y-1`}>
         {p.clues.map((clue, i) => (
           <li key={i}>
-            <span className="text-[var(--term-fg-dim)]">{">"}</span> {clue}
+            <span className="text-[var(--term-fg-dim)]">{">"}</span>{" "}
+            <Glyphs text={clue} />
           </li>
         ))}
       </ul>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder={`${p.length}-DIGIT CODE`} />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder={`${p.length}-DIGIT CODE`} />
     </div>
   );
 }
@@ -274,7 +314,7 @@ function mineNeighbors(r: number, c: number, size: number): [number, number][] {
   return out;
 }
 
-function MinesweeperGame({ payload, value, onChange, disabled }: GameProps) {
+function MinesweeperGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as MinesweeperPayload;
   const flagged = value.split(/[\s,]+/).filter(Boolean);
 
@@ -298,6 +338,7 @@ function MinesweeperGame({ payload, value, onChange, disabled }: GameProps) {
   const cleared = revealed.size >= totalSafe && flagged.length === p.mineCount;
 
   const toggleFlag = (r: number, c: number) => {
+    signals?.pointer();
     const key = `${r}-${c}`;
     if (revealed.has(key)) return;
     const coord = `R${r + 1}C${c + 1}`;
@@ -308,6 +349,7 @@ function MinesweeperGame({ payload, value, onChange, disabled }: GameProps) {
   };
 
   const reveal = (r: number, c: number) => {
+    signals?.pointer();
     const key = `${r}-${c}`;
     if (revealed.has(key) || flagged.includes(`R${r + 1}C${c + 1}`)) return;
 
@@ -420,15 +462,19 @@ function MinesweeperGame({ payload, value, onChange, disabled }: GameProps) {
           FIELD CLEARED — TRANSMIT TO CONFIRM.
         </p>
       )}
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="MINE COORDINATES" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="MINE COORDINATES" />
     </div>
   );
 }
 
-function AnomalyGame({ payload, value, onChange, disabled }: GameProps) {
+function AnomalyGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as AnomalyPayload;
   return (
     <div className="space-y-3">
+      {/* The rules stay plain text on purpose: they are the same handful of
+          templates every round, so obfuscating them protects nothing, and a
+          player rereading a rule mid-round should be able to select it. The
+          RECORDS are the puzzle, and those are obfuscated. */}
       <ul className="text-xs space-y-1">
         {p.rules.map((rule, i) => (
           <li key={i}>
@@ -442,17 +488,22 @@ function AnomalyGame({ payload, value, onChange, disabled }: GameProps) {
         </div>
         {p.records.map((r) => (
           <div key={r.id} className="whitespace-pre">
-            {r.id.padEnd(10, " ")}{r.class.padEnd(8, " ")}{r.state.padEnd(11, " ")}
-            {String(r.mass).padStart(4, " ")}  {String(r.temp).padStart(4, " ")}
+            <Glyphs
+              text={
+                `${r.id.padEnd(10, " ")}${r.class.padEnd(8, " ")}` +
+                `${r.state.padEnd(11, " ")}${String(r.mass).padStart(4, " ")}  ` +
+                `${String(r.temp).padStart(4, " ")}`
+              }
+            />
           </div>
         ))}
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="VIOLATING IDS, OR NONE" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="VIOLATING IDS, OR NONE" />
     </div>
   );
 }
 
-function SignatureGame({ payload, value, onChange, disabled }: GameProps) {
+function SignatureGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as SignaturePayload;
   return (
     <div className="space-y-3">
@@ -469,7 +520,10 @@ function SignatureGame({ payload, value, onChange, disabled }: GameProps) {
             key={`${f}-${i}`}
             type="button"
             disabled={disabled}
-            onClick={() => onChange(value + f)}
+            onClick={() => {
+              signals?.pointer();
+              onChange(value + f);
+            }}
             className="hack-chip"
           >
             {f}
@@ -489,12 +543,12 @@ function SignatureGame({ payload, value, onChange, disabled }: GameProps) {
           {value.replace(/[^A-Z0-9]/gi, "").length} / {p.tokenLength}
         </span>
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="ASSEMBLED TOKEN" />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="ASSEMBLED TOKEN" />
     </div>
   );
 }
 
-function DaemonGame({ payload, value, onChange, disabled }: GameProps) {
+function DaemonGame({ payload, value, onChange, disabled, signals }: GameProps) {
   const p = payload as DaemonPayload;
   const picks = value.split(/[\s,]+/).filter(Boolean);
   return (
@@ -512,7 +566,10 @@ function DaemonGame({ payload, value, onChange, disabled }: GameProps) {
                   key={coord}
                   type="button"
                   disabled={disabled}
-                  onClick={() => onChange([...picks, coord].join(" "))}
+                  onClick={() => {
+                    signals?.pointer();
+                    onChange([...picks, coord].join(" "));
+                  }}
                   className={`hack-cell${picks.includes(coord) ? " hack-cell--picked" : ""}`}
                   aria-label={`${coord} value ${byte}`}
                 >
@@ -536,7 +593,7 @@ function DaemonGame({ payload, value, onChange, disabled }: GameProps) {
           {picks.length} / {p.bufferSize} PICKS
         </span>
       </div>
-      <AnswerLine value={value} onChange={onChange} disabled={disabled} placeholder="R1C2 R3C2 ..." />
+      <AnswerLine value={value} onChange={onChange} disabled={disabled} signals={signals} placeholder="R1C2 R3C2 ..." />
     </div>
   );
 }
@@ -567,6 +624,7 @@ export function GameSurface({ game, ...props }: GameProps & { game: string }) {
           value={props.value}
           onChange={props.onChange}
           disabled={props.disabled}
+          signals={props.signals}
           placeholder="ANSWER"
         />
       </div>

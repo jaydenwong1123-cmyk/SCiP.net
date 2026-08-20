@@ -35,6 +35,8 @@ export const daemonGame: HackGame = {
   minBand: 3,
   maxBand: 5,
   timeFactor: 1.4,
+  // Find a path through the matrix, then click it out cell by cell.
+  minHumanMs: 12000,
 
   generate(band, rng) {
     const size = band === 3 ? 5 : band === 4 ? 6 : 7;

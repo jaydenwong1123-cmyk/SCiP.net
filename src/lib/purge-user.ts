@@ -104,6 +104,10 @@ export async function purgeUser(userId: string): Promise<void> {
   // longer exists. The run it decided keeps its status either way; that is the
   // part of the record that mattered.
   await db.hackDuel.deleteMany({ where: { defenderId: userId } });
+  // Conduct evidence is about the member, not about RAISA's work — it names
+  // them and nothing else, so it goes with the account on both sides: rounds
+  // they played as the intruder AND rounds they played from the desk.
+  await db.conductRecord.deleteMany({ where: { userId } });
   // Traces and revocations they performed against OTHER members' runs stay —
   // that is RAISA's work product, and it outlives the officer who did it.
   await db.hackRun.updateMany({

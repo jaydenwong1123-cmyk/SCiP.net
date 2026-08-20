@@ -1469,12 +1469,58 @@ select.term-input option {
     var(--term-bg);
 }
 
+/* Puzzle bodies are not selectable.
+
+   This is friction, not security — a screenshot into a vision model defeats it
+   and always will. What it buys is that the laziest cheat (drag, Ctrl+C, paste
+   into a chat window) stops working, which is the one most people actually
+   use. NEVER applied to .term-input: the answer box has to stay editable. */
+.hack-noselect {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Junk glyphs interleaved into obfuscated puzzle text (see games/obfuscate.tsx).
+   Absolutely positioned and transparent rather than display:none ON PURPOSE —
+   a hidden element is excluded from innerText, whereas this one is included,
+   so a devtools or extension scrape reads the decoys while the render does
+   not show them. Zero-size so it never disturbs layout. */
+.hack-decoy {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Container for obfuscated text: the spans inside are emitted in scrambled DOM
+   order and put back in reading order by `order`, so the visual result is
+   identical while a textContent scrape is not. */
+.hack-glyphs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  position: relative;
+  vertical-align: top;
+}
+
+/* Each glyph is its own flex item, so a space has to keep its width or a
+   padEnd-aligned table would collapse. Monospace means every item is the same
+   advance, and column alignment survives the split. */
+.hack-glyphs > span {
+  white-space: pre;
+}
+
 /* Inner surface for a puzzle body: recessed against the enclosing term-panel
    so the playfield reads as a separate thing from the console chrome. */
 .hack-surface {
   border: 1px solid color-mix(in srgb, var(--term-border) 40%, transparent);
   background: color-mix(in srgb, var(--term-fg) 4%, transparent);
   padding: var(--term-pad-sm);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .hack-mono {
@@ -1512,6 +1558,8 @@ select.term-input option {
   color: var(--term-fg);
   background: transparent;
   transition: background-color 120ms ease, color 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hack-cell:hover:not(:disabled),
@@ -1536,6 +1584,8 @@ select.term-input option {
   border: none;
   font: inherit;
   padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hack-pick:hover:not(:disabled),
@@ -1551,6 +1601,8 @@ select.term-input option {
   border: 1px solid color-mix(in srgb, var(--term-border) 50%, transparent);
   color: var(--term-fg);
   background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hack-chip:hover:not(:disabled),
@@ -1669,6 +1721,8 @@ select.term-input option {
   color: var(--term-fg);
   background: transparent;
   transition: background-color 120ms ease, color 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hack-mine-cell:hover:not(:disabled),

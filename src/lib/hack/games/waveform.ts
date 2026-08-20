@@ -29,6 +29,8 @@ export const waveformGame: HackGame = {
   minBand: 1,
   maxBand: 3,
   timeFactor: 0.9,
+  // A snap visual comparison against one reference - by design the quickest game here.
+  minHumanMs: 3500,
 
   generate(band, rng) {
     const width = band === 1 ? 24 : band === 2 ? 32 : 40;

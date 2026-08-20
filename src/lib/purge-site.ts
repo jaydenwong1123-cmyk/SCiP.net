@@ -30,6 +30,7 @@ export async function purgeSite(
     () => db.hackDuel.deleteMany({}),
     () => db.hackGrant.deleteMany({}),
     () => db.hackRun.deleteMany({}),
+    () => db.conductRecord.deleteMany({}),
     // Anomaly files and everything hanging off them
     () => db.scpTestLog.deleteMany({}),
     () => db.scpAccessGrant.deleteMany({}),

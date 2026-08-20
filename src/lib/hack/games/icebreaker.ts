@@ -30,6 +30,8 @@ export const icebreakerGame: HackGame = {
   minBand: 1,
   maxBand: 5,
   timeFactor: 1.0,
+  // The candidate words are on screen and clickable, so a lucky first pick is legitimately quick.
+  minHumanMs: 6000,
 
   generate(band, rng) {
     // Longer words and a wider field as the bands climb, with the attempt

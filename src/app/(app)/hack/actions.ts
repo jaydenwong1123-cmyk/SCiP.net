@@ -171,9 +171,13 @@ export async function submitHackAnswerAction(
 
   const nonce = String(formData.get("nonce") ?? "");
   const answer = String(formData.get("answer") ?? "").slice(0, 400);
+  // Conduct telemetry from the console. Never validated beyond a length cap —
+  // it is evidence to be filed, not input to be trusted, and every consumer
+  // downstream treats it that way.
+  const signals = String(formData.get("signals") ?? "").slice(0, 400);
   if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
 
-  const outcome = await submitIntrusionAnswer(user.id, nonce, answer);
+  const outcome = await submitIntrusionAnswer(user.id, nonce, answer, signals);
 
   switch (outcome.kind) {
     case "stale":
@@ -319,9 +323,12 @@ export async function submitDuelAnswerAction(
 
   const nonce = String(formData.get("nonce") ?? "");
   const answer = String(formData.get("answer") ?? "").slice(0, 400);
+  const signals = String(formData.get("signals") ?? "").slice(0, 400);
   if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
 
-  return duelActionState(await submitDuelAnswer(user.id, nonce, answer));
+  return duelActionState(
+    await submitDuelAnswer(user.id, nonce, answer, signals)
+  );
 }
 
 async function logHackFailure(reason: string) {

@@ -29,6 +29,8 @@ export const nodetraceGame: HackGame = {
   minBand: 2,
   maxBand: 5,
   timeFactor: 1.2,
+  // The edge list has to be read before a route can be assembled.
+  minHumanMs: 12000,
 
   generate(band, rng) {
     const depth = band === 2 ? 3 : band === 3 ? 4 : band === 4 ? 4 : 5;

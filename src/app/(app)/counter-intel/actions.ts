@@ -38,6 +38,7 @@ import {
   type DuelState,
 } from "@/lib/hack/duel";
 import { gradeAnswer } from "@/lib/hack/games";
+import { recordConduct, CONDUCT_SURFACES } from "@/lib/hack/conduct";
 import { revokeGrant } from "@/lib/hack/grant";
 import { checkRateLimit, recordAttempt, DUEL_RULE } from "@/lib/rate-limit";
 
@@ -102,6 +103,9 @@ export async function submitTraceAnswerAction(
 
   const nonce = String(formData.get("nonce") ?? "");
   const answer = String(formData.get("answer") ?? "").slice(0, 400);
+  // Conduct telemetry from the trace console. Filed, never trusted — and the
+  // desk is scored on exactly the same terms as the people it investigates.
+  const signals = String(formData.get("signals") ?? "").slice(0, 400);
   if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
 
   const challenge = await db.hackChallenge.findUnique({
@@ -129,6 +133,22 @@ export async function submitTraceAnswerAction(
   const result = expired
     ? { correct: false, feedback: "TRACE WINDOW CLOSED" }
     : gradeAnswer(challenge.game, JSON.parse(challenge.solution), answer);
+
+  // File the officer's conduct for this round. An expired trace is not scored
+  // as conduct — it was never graded, so there is nothing to say about how it
+  // was solved.
+  if (!expired) {
+    await recordConduct({
+      userId: user.id,
+      surface: CONDUCT_SURFACES.trace,
+      runId: run.id,
+      game: challenge.game,
+      elapsedMs: Date.now() - challenge.issuedAt.getTime(),
+      answer,
+      correct: result.correct,
+      rawSignals: signals,
+    });
+  }
 
   // A guess-carrying game (e.g. icebreaker) burns an attempt rather than the
   // trace itself, same as the intrusion side — a wrong guess must not cost a
@@ -335,7 +355,11 @@ export async function submitDuelAnswerAction(
   const answer = String(formData.get("answer") ?? "").slice(0, 400);
   if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
 
-  const state = duelState(await submitDuelAnswer(user.id, nonce, answer));
+  const signals = String(formData.get("signals") ?? "").slice(0, 400);
+
+  const state = duelState(
+    await submitDuelAnswer(user.id, nonce, answer, signals)
+  );
   if (state.ok && (state.kind === "won" || state.kind === "lost")) {
     revalidatePath("/counter-intel");
     revalidatePath(`/counter-intel/${String(formData.get("runId") ?? "")}`);

@@ -191,6 +191,26 @@ export type AnonymisedRun = {
   displayName: string | null;
   // Grant state, shown from reveal 1 so RAISA knows whether it is still live.
   grant: { id: string; tier: number; expiresAtMs: number; revoked: boolean } | null;
+  // Conduct evidence for this case. ADMIN+ ONLY, and enforced by ABSENCE:
+  // the page fetches the records only when hasAdminPowers() holds and passes
+  // them in, so for an ordinary RAISA officer this is null and nothing about
+  // it reaches the RSC payload at all. Gating it as conditional JSX over a
+  // fetched array would ship the evidence to every officer's browser, which
+  // is the exact mistake the header of this function warns about.
+  //
+  // Note this is not a reveal-ladder field: conduct is behaviour, not
+  // identity, so it is not gated on revealLevel. It is gated on ROLE.
+  conduct: {
+    totalScore: number;
+    rounds: {
+      game: string;
+      elapsedMs: number;
+      correct: boolean;
+      score: number;
+      reasons: string[];
+      atLabel: string;
+    }[];
+  } | null;
 };
 
 type RunWithExtras = HackRun & {
@@ -208,6 +228,17 @@ type RunWithExtras = HackRun & {
     winner: string | null;
     defender?: { displayName: string | null; email: string } | null;
   } | null;
+  // Supplied by the caller ONLY when the viewer holds admin powers. Absent
+  // means "not authorized", which is why the default is to project null
+  // rather than to project an empty list.
+  conductRecords?: {
+    game: string;
+    elapsedMs: number;
+    correct: boolean;
+    score: number;
+    reasons: string;
+    createdAt: Date;
+  }[];
 };
 
 // Field-by-field projection, gated on revealLevel.
@@ -285,5 +316,30 @@ export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
         : null,
 
     grant: level >= 1 ? grant : null,
+
+    conduct: run.conductRecords
+      ? {
+          totalScore: run.suspicionScore,
+          rounds: run.conductRecords.map((r) => ({
+            game: r.game,
+            elapsedMs: r.elapsedMs,
+            correct: r.correct,
+            score: r.score,
+            reasons: parseReasons(r.reasons),
+            atLabel: r.createdAt.toISOString().slice(11, 19),
+          })),
+        }
+      : null,
   };
+}
+
+// Reasons are stored as a JSON array. A malformed column must degrade to "no
+// reasons listed" rather than take the case file down with it.
+function parseReasons(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw || "[]");
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
 }

@@ -38,17 +38,29 @@ const MIN = 60 * 1000;
 
 // The ladder.
 //
-// Stages 3-5 are meant to be brutal — that is the brief. Difficulty now comes
-// entirely from round count, game band, and reward rather than a shrinking
-// clock: every stage gets the same per-round budget.
+// Stages 3-5 are meant to be brutal — that is the brief. Most of that comes
+// from round count, game band and reward. The clock tapers at the deep end for
+// one specific reason: TIME PRESSURE IS THE ONLY ANTI-AI MEASURE IN THIS
+// FEATURE THAT CANNOT BE ROUTED AROUND.
+//
+// A solve that goes through a language model costs a round trip — read the
+// screen or capture it, prompt, wait, read the answer, transcribe it. That is
+// 15-40 seconds on top of the puzzle itself. A 60-second round absorbs it
+// comfortably; a 40-second one does not, while still leaving a person who is
+// actually playing roughly twice the per-game human floor in lib/hack/games.
+// Nothing about the puzzles changes — the deep stages simply stop paying for
+// the detour.
+//
+// If a deep stage starts reading as unwinnable rather than merely hard, THESE
+// are the numbers to move, not the floors in the games.
 const STAGE_ROUND_MS = 60_000;
 
 export const STAGES: StageSpec[] = [
   { stage: 1, tier: 2, rounds: 1, band: 1, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 30 * MIN },
   { stage: 2, tier: 3, rounds: 1, band: 2, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 60 * MIN },
   { stage: 3, tier: 4, rounds: 2, band: 3, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 120 * MIN },
-  { stage: 4, tier: 5, rounds: 3, band: 4, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 240 * MIN },
-  { stage: 5, tier: HACK_MAX_TIER, rounds: 4, band: 5, baseRoundMs: STAGE_ROUND_MS, stageCapMs: null, grantMs: 360 * MIN },
+  { stage: 4, tier: 5, rounds: 3, band: 4, baseRoundMs: 50_000, stageCapMs: null, grantMs: 240 * MIN },
+  { stage: 5, tier: HACK_MAX_TIER, rounds: 4, band: 5, baseRoundMs: 40_000, stageCapMs: null, grantMs: 360 * MIN },
 ];
 
 export const MAX_STAGE = STAGES.length;
@@ -92,6 +104,20 @@ export const MAX_RUN_MS = EASY ? 60 * MIN : 20 * MIN;
 // beyond the forfeited tiers.
 export const COOLDOWN_MS = EASY ? 60 * 1000 : 24 * 60 * MIN;
 export const FAILED_COOLDOWN_MS = EASY ? 60 * 1000 : 48 * 60 * MIN;
+
+// Conduct scoring: at what total a run is marked for review.
+//
+// Weighted so that NO amount of client-reported evidence reaches it on its
+// own — see lib/hack/suspicion.ts, where the unforgeable timing signals are
+// worth 40-60 apiece and every browser-reported one is worth 10-15. That is
+// deliberate: the browser half can be faked by anyone willing to write a
+// script, so it may corroborate a marking but must never cause one.
+export const SUSPICION_FLAG_SCORE = 60;
+
+// Conduct records keep their raw client telemetry blob for this long. The
+// score and the reasons are the durable record; the blob is bulky, untrusted,
+// and only useful while someone might still be reading the case.
+export const CONDUCT_SIGNAL_RETENTION_MS = 30 * 24 * 60 * MIN;
 
 export const RUN_STATUS = {
   active: "active",

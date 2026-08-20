@@ -10,6 +10,8 @@ import {
   type TraceState,
 } from "./actions";
 import type { PublicChallenge } from "@/lib/hack/engine";
+import { useRoundTelemetry } from "@/lib/hack/telemetry";
+import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
 // RAISA's trace console.
 //
@@ -38,6 +40,11 @@ export function TraceConsole({
   const [answer, setAnswer] = useRoundInput(challenge?.nonce ?? "");
   const [checkPending, startCheckTransition] = useTransition();
   const [checkFeedback, setCheckFeedback] = useState<string | null>(null);
+  // The desk is held to the same conduct standard as the people it
+  // investigates. An officer who solves a trace faster than it can be read is
+  // buying somebody's identity with a language model, and that belongs in the
+  // conduct log exactly as an intruder doing it does.
+  const telemetry = useRoundTelemetry(challenge?.nonce ?? "");
 
   const apply = useCallback(
     (state: TraceState) => {
@@ -102,11 +109,13 @@ export function TraceConsole({
             const form = new FormData();
             form.set("nonce", challenge.nonce);
             form.set("answer", answer);
+            form.set("signals", telemetry.snapshot());
             startTransition(async () =>
               apply(await submitTraceAnswerAction(null, form))
             );
           }}
           className="space-y-3"
+          {...telemetry.guardProps}
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
@@ -119,6 +128,7 @@ export function TraceConsole({
           <p className="text-xs text-[var(--term-fg-dim)] leading-snug">
             {challenge.brief}
           </p>
+          <OffTerminalNotice ms={telemetry.offTerminalMs} />
           <GameSurface
             game={challenge.game}
             payload={challenge.payload}
@@ -128,6 +138,7 @@ export function TraceConsole({
               setAnswer(v);
             }}
             disabled={pending}
+            signals={telemetry.signals}
           />
           {checkFeedback && (
             <p className="text-sm text-[var(--term-fg-bright)]">{checkFeedback}</p>

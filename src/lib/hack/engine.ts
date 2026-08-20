@@ -11,6 +11,11 @@ import {
 } from "@/lib/hack/games";
 import { liveDuelFor, sweepDuel } from "@/lib/hack/duel";
 import {
+  accumulateRunSuspicion,
+  recordConduct,
+  CONDUCT_SURFACES,
+} from "@/lib/hack/conduct";
+import {
   CHALLENGE_KINDS,
   DEADLINE_GRACE_MS,
   MAX_RUN_MS,
@@ -278,7 +283,11 @@ export type SubmitOutcome =
 export async function submitIntrusionAnswer(
   userId: string,
   nonce: string,
-  answer: string
+  answer: string,
+  // Client-reported conduct telemetry. UNTRUSTED, and never consulted by any
+  // branch below that decides an outcome — it is scored and filed, nothing
+  // more. See lib/hack/suspicion.ts.
+  rawSignals = ""
 ): Promise<SubmitOutcome> {
   const challenge = await db.hackChallenge.findUnique({
     where: { nonce },
@@ -323,6 +332,22 @@ export async function submitIntrusionAnswer(
     JSON.parse(challenge.solution),
     answer
   );
+
+  // File the conduct evidence for this round. Deliberately AFTER grading and
+  // before any branch acts on the result, so it happens exactly once whatever
+  // the outcome — and deliberately awaited, so a run that ends on this round
+  // still has its last round on file.
+  const conductScore = await recordConduct({
+    userId,
+    surface: CONDUCT_SURFACES.intrusion,
+    runId: run.id,
+    game: challenge.game,
+    elapsedMs: now - challenge.issuedAt.getTime(),
+    answer,
+    correct: result.correct,
+    rawSignals,
+  });
+  await accumulateRunSuspicion(run.id, run.flagged, conductScore);
 
   if (!result.correct) {
     // A guess-carrying game burns an attempt instead of the round. The

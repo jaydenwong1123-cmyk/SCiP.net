@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasAdminPowers } from "@/lib/session";
 import {
   anonymiseRun,
   canAccessCounterIntel,
@@ -44,9 +44,30 @@ export default async function CounterIntelCasePage({
   });
   if (!run) notFound();
 
+  // Conduct evidence is Admin+ only, and the gate is this fetch: for anyone
+  // else the records are never read, so they cannot appear in the projection
+  // and cannot ride along in the RSC payload. Deliberately not a conditional
+  // render further down — see the header of anonymiseRun().
+  const adminPowers = hasAdminPowers(user);
+  const conductRecords = adminPowers
+    ? await db.conductRecord.findMany({
+        where: { runId: id, surface: { in: ["intrusion", "duel_attacker"] } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          game: true,
+          elapsedMs: true,
+          correct: true,
+          score: true,
+          reasons: true,
+          createdAt: true,
+        },
+        take: 40,
+      })
+    : undefined;
+
   // Everything below renders from `c` and never from `run`. The raw row holds
   // the intruder's name; only the projection is safe to put in JSX.
-  const c = anonymiseRun(run);
+  const c = anonymiseRun({ ...run, conductRecords });
   // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
   const now = Date.now();
   const grantLive = c.grant && !c.grant.revoked && c.grant.expiresAtMs > now;
@@ -193,9 +214,59 @@ export default async function CounterIntelCasePage({
         />
       </HudPanel>
 
-      {c.grant && (
+      {c.conduct && (
         <HudPanel
           code="05"
+          title="CONDUCT ANALYSIS"
+          status={`ADMIN EYES ONLY · SCORE ${c.conduct.totalScore}`}
+          variant={c.flagged ? "alert" : undefined}
+        >
+          <p className="text-xs text-[var(--term-fg-dim)] leading-snug">
+            EACH ROUND TIMED AGAINST A PER-GAME HUMAN FLOOR. ADVISORY ONLY — NO
+            ROUND HERE WAS FAILED ON THESE GROUNDS.{" "}
+            <Link href="/admin/conduct" className="term-link">
+              [FULL CONDUCT LOG]
+            </Link>
+          </p>
+          {c.conduct.rounds.length === 0 ? (
+            <p className="text-sm pt-2">NO GRADED ROUNDS ON FILE.</p>
+          ) : (
+            <div className="hud-list pt-2">
+              {c.conduct.rounds.map((r, i) => (
+                <div key={i} className="term-row text-sm space-y-1 py-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span>
+                      <span className="hud-recid mr-2">{r.atLabel}</span>
+                      {r.game.toUpperCase()}{" "}
+                      <span className="text-[var(--term-fg-dim)]">
+                        · {(r.elapsedMs / 1000).toFixed(1)}S ·{" "}
+                        {r.correct ? "CLEARED" : "FAILED"}
+                      </span>
+                    </span>
+                    <span
+                      className={`hud-recid ${
+                        r.score > 0 ? "text-[var(--term-amber)]" : ""
+                      }`}
+                    >
+                      SCORE {r.score}
+                    </span>
+                  </div>
+                  {r.reasons.map((reason, j) => (
+                    <p key={j} className="text-xs text-[var(--term-amber)]">
+                      <span className="text-[var(--term-fg-dim)]">{">"}</span>{" "}
+                      {reason}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </HudPanel>
+      )}
+
+      {c.grant && (
+        <HudPanel
+          code="06"
           title="ILLICIT ACCESS"
           variant={grantLive ? "alert" : undefined}
           status={grantLive ? "LIVE" : c.grant.revoked ? "REVOKED" : "EXPIRED"}

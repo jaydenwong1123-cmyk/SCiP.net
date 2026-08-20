@@ -79,6 +79,7 @@ model User {
   hackGrants        HackGrant[] @relation("HackGrantUser")
   hackGrantsRevoked HackGrant[] @relation("HackGrantRevoker")
   hackDuelsDefended HackDuel[]  @relation("HackDuelDefender")
+  conductRecords    ConductRecord[] @relation("ConductSubject")
 }
 
 // An IT support ticket. One table backs all three kinds because they share
@@ -385,6 +386,11 @@ model HackRun {
   // Every new case starts at NEEDS_ACTION — RAISA has not looked at it yet.
   // Any RAISA member may move it, except into RESOLVED — see
   // canResolveCounterIntelCase() for why that step is L-R5 only.
+  // Accumulated conduct suspicion across this run's intrusion rounds. Crossing
+  // SUSPICION_FLAG_SCORE sets `flagged` below. Never fails a run on its own —
+  // see lib/hack/suspicion.ts for why the evidence is advisory, not a verdict.
+  suspicionScore Int @default(0)
+
   caseStatus String  @default("NEEDS_ACTION")
   // Anyone on the desk may flag a case for attention — independent of
   // caseStatus, so a case already IN_PROGRESS can still be flagged without
@@ -526,6 +532,49 @@ model HackChallenge {
   // Makes double-issue impossible at the DB level even under a two-tab race.
   @@unique([runId, kind, cursor])
   @@index([deadlineAt])
+}
+
+// One graded round's conduct evidence, from any of the three puzzle consoles.
+//
+// One table rather than columns bolted onto HackChallenge and HackDuel: the
+// intrusion ladder, RAISA's trace ladder and both duel seats all produce the
+// same shape of evidence, and the whole point is to be able to read it in one
+// place — /admin/conduct — rather than joining three models to ask "who has
+// been solving band-5 ciphers in four seconds".
+//
+// ANONYMITY: this row is keyed by userId, which is exactly the identity the
+// counter-intel reveal ladder exists to protect. It is therefore readable ONLY
+// by hasAdminPowers() — the tier that already deletes accounts and grants
+// L-OMNI, and so learns nothing here it could not already learn. A RAISA
+// officer never sees this table; what they see is HackRun.flagged, which
+// carries a marker and no identity.
+model ConductRecord {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("ConductSubject", fields: [userId], references: [id])
+  // "intrusion" | "trace" | "duel_attacker" | "duel_defender"
+  surface String
+  game    String
+  // The case this round belonged to. Nullable so a record outlives the case
+  // being deleted from the desk rather than blocking that delete.
+  runId   String?
+  // Measured from the server's own issue/delivery stamp. Unforgeable, and the
+  // heaviest-weighted signal in the score.
+  elapsedMs Int
+  correct   Boolean
+  score     Int
+  // JSON array of human-readable reasons, e.g. ["SOLVED IN 3.1S (FLOOR 12.0S)"].
+  reasons   String @default("")
+  // The raw client-reported telemetry blob. UNTRUSTED — a scripted client can
+  // write whatever it likes here. Kept for a human to read, dropped after 30
+  // days by pruneConductSignals().
+  signals   String @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([score, createdAt])
+  @@index([runId])
+  @@index([createdAt])
 }
 
 model Broadcast {

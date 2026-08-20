@@ -35,8 +35,13 @@ export const cipherGame: HackGame = {
   label: "SUBSTITUTION BREAK",
   brief: "DECODE THE INTERCEPT. SUBMIT PLAINTEXT.",
   minBand: 1,
-  maxBand: 4,
+  // Pulled back from band 4: the ciphertext is the single most directly
+  // promptable payload in the registry, so it no longer appears at the depths
+  // worth cheating for. See the band-skew note in games/index.ts.
+  maxBand: 3,
   timeFactor: 1.1,
+  // Even with the shift handed over, the plaintext still has to be read off and typed.
+  minHumanMs: 10000,
 
   generate(band, rng) {
     const plaintext = rng.pick(CIPHER_PHRASES);

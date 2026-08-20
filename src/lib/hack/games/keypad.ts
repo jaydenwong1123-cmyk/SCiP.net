@@ -28,8 +28,12 @@ export const keypadGame: HackGame = {
   brief:
     "SOME STATEMENTS ARE FALSE AND CONTRADICT THEIR PAIR — THOSE CANCEL OUT. EVERY OTHER STATEMENT IS TRUE. ENTER THE CODE THEY PIN DOWN.",
   minBand: 2,
-  maxBand: 5,
+  // Pure text, and the clue list IS the puzzle — kept out of band 5 for the
+  // same reason cipher is kept out of band 4.
+  maxBand: 4,
   timeFactor: 1.25,
+  // Four or five constraints have to be intersected before there is a code to type.
+  minHumanMs: 14000,
 
   generate(band, rng) {
     const length = 4;

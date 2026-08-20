@@ -5,6 +5,8 @@ import { GameSurface, useRoundInput } from "./games";
 import { Countdown } from "./countdown";
 import { pollDuelAction, submitDuelAnswerAction, type HackActionState } from "./actions";
 import type { PublicDuel } from "@/lib/hack/duel";
+import { useRoundTelemetry } from "@/lib/hack/telemetry";
+import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
 // The intruder's side of the counter-intrusion duel.
 //
@@ -28,14 +30,16 @@ export function DuelPanel({
 }) {
   const [pending, startTransition] = useTransition();
   const [answer, setAnswer] = useRoundInput(duel.nonce);
+  const telemetry = useRoundTelemetry(duel.nonce);
 
   const submit = useCallback(() => {
     if (pending) return;
     const form = new FormData();
     form.set("nonce", duel.nonce);
     form.set("answer", answer);
+    form.set("signals", telemetry.snapshot());
     startTransition(async () => onDone(await submitDuelAnswerAction(null, form)));
-  }, [duel.nonce, answer, pending, onDone]);
+  }, [duel.nonce, answer, pending, onDone, telemetry]);
 
   return (
     <div className="term-panel alert-panel space-y-3">
@@ -65,12 +69,15 @@ export function DuelPanel({
         onExpire={() => void pollDuelAction().then(onDone)}
       />
 
+      <OffTerminalNotice ms={telemetry.offTerminalMs} />
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
         className="space-y-3"
+        {...telemetry.guardProps}
       >
         <div>
           <h3 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
@@ -87,6 +94,7 @@ export function DuelPanel({
           value={answer}
           onChange={setAnswer}
           disabled={pending}
+          signals={telemetry.signals}
         />
 
         {feedback && <p className="text-sm text-[var(--term-amber)]">{feedback}</p>}

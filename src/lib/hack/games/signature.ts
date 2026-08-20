@@ -34,6 +34,8 @@ export const signatureGame: HackGame = {
   minBand: 3,
   maxBand: 5,
   timeFactor: 1.3,
+  // Fragments are clicked rather than typed, so a short token assembles fast.
+  minHumanMs: 8000,
 
   generate(band, rng) {
     const realCount = band === 3 ? 5 : band === 4 ? 6 : 8;

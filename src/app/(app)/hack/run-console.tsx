@@ -16,6 +16,8 @@ import {
 } from "./actions";
 import type { PublicChallenge } from "@/lib/hack/engine";
 import type { PublicDuel } from "@/lib/hack/duel";
+import { useRoundTelemetry } from "@/lib/hack/telemetry";
+import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
 // How often the console asks whether RAISA has engaged it.
 //
@@ -87,6 +89,10 @@ export function RunConsole({
 
   const challenge = phase.kind === "challenge" ? phase.challenge : null;
   const [answer, setAnswer] = useRoundInput(challenge?.nonce ?? "");
+  // Conduct telemetry for the round on screen. Resets with the nonce, exactly
+  // as the answer box does. Nothing it collects affects grading — see the
+  // header of lib/hack/telemetry.ts.
+  const telemetry = useRoundTelemetry(challenge?.nonce ?? "");
   const [checkPending, startCheckTransition] = useTransition();
   const [checkFeedback, setCheckFeedback] = useState<string | null>(null);
 
@@ -154,10 +160,11 @@ export function RunConsole({
     const form = new FormData();
     form.set("nonce", challenge.nonce);
     form.set("answer", answer);
+    form.set("signals", telemetry.snapshot());
     startTransition(async () => {
       apply(await submitHackAnswerAction(null, form));
     });
-  }, [challenge, answer, pending, apply]);
+  }, [challenge, answer, pending, apply, telemetry]);
 
   // A preview, not a submission: burns no attempt and never advances the
   // round. Separate from TRANSMIT so a player can see how close a guess is
@@ -202,6 +209,8 @@ export function RunConsole({
             onExpire={() => router.refresh()}
           />
 
+          <OffTerminalNotice ms={telemetry.offTerminalMs} />
+
           <p className="text-xs text-[var(--term-fg-dim)] leading-snug">
             {phase.challenge.brief}
           </p>
@@ -212,6 +221,7 @@ export function RunConsole({
               submit();
             }}
             className="space-y-3"
+            {...telemetry.guardProps}
           >
             <GameSurface
               game={phase.challenge.game}
@@ -222,6 +232,7 @@ export function RunConsole({
                 setAnswer(v);
               }}
               disabled={pending}
+              signals={telemetry.signals}
             />
 
             {phase.feedback && (

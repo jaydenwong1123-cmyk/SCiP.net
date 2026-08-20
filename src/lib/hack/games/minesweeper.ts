@@ -49,9 +49,14 @@ export const minesweeperGame: HackGame = {
   label: "MINE SURVEY",
   brief:
     "CLICK A COVERED CELL TO UNCOVER IT. FLAG EVERY CELL THAT MUST BE A MINE. CLEAR THE FIELD AND FLAG EVERY MINE, THEN TRANSMIT.",
-  minBand: 1,
+  // Raised off band 1 so the deep stages skew toward it: a minefield lives in
+  // the RENDER, not in any text on the page, and its state only exists after
+  // clicks that no screenshot captures.
+  minBand: 2,
   maxBand: 5,
   timeFactor: 1.3,
+  // The field must be cleared AND every mine flagged - dozens of clicks at minimum.
+  minHumanMs: 20000,
 
   generate(band, rng) {
     const size = band <= 2 ? 4 : band === 3 ? 6 : band === 4 ? 8 : 10;
