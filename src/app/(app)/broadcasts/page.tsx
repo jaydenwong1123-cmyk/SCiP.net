@@ -148,7 +148,7 @@ export default async function BroadcastsPage() {
             <div className="flex flex-wrap items-center gap-3 pt-2 text-sm">
               {canEditBroadcast(user, b) && (
                 <Link href={`/broadcasts/${b.id}/edit`} className="term-link">
-                  [AMEND]
+                  [EDIT]
                 </Link>
               )}
               {canManage && b.revisionCount > 0 && (

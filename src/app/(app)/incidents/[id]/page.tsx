@@ -38,7 +38,7 @@ export default async function IncidentDetailPage({
       >
         {canEdit && (
           <Link href={`/incidents/${report.id}/edit`} className="term-link text-sm">
-            [AMEND]
+            [EDIT]
           </Link>
         )}
         {canViewHistory && (

@@ -108,7 +108,7 @@ export default async function ScpDetailPage({
       >
         {canEdit && (
           <Link href={`/scp/${file.id}/edit`} className="term-link text-sm">
-            [AMEND]
+            [EDIT]
           </Link>
         )}
         {canViewHistory && (
