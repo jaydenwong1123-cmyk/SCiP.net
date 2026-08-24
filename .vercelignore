@@ -1,0 +1,19 @@
+# Files that must never be uploaded to a Vercel build.
+#
+# The local SQLite database above all. It is gitignored, but .gitignore does not
+# govern what the Vercel CLI uploads — a `vercel --prod` from a developer's
+# machine was shipping prisma/dev.db into the build container, where the build's
+# own `prisma migrate deploy` then happily migrated IT instead of the real
+# database. It also carries the seeded owner's password hash and invite codes.
+prisma/dev.db
+prisma/*.db
+*.db
+*.db-journal
+
+# Local database exports. These contain password hashes, invite codes and every
+# private message on the site.
+backups/
+
+.env*
+.next/
+node_modules/
