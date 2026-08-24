@@ -15,17 +15,22 @@ import {
 export function NewTicketForm({
   canRequestScp,
   scpFiles,
+  canAppealConduct = false,
 }: {
   canRequestScp: boolean;
   scpFiles: { id: string; title: string; clearanceRequired: number }[];
+  /** True when the member has a terminal sanction on record. */
+  canAppealConduct?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(createTicketAction, null);
   const [type, setType] = useState<TicketType>(TICKET_TYPES.general);
 
   const types: TicketType[] = [TICKET_TYPES.general, TICKET_TYPES.bug];
   if (canRequestScp) types.push(TICKET_TYPES.scpAccess);
+  if (canAppealConduct) types.push(TICKET_TYPES.conductAppeal);
 
   const isScpRequest = type === TICKET_TYPES.scpAccess;
+  const isConductAppeal = type === TICKET_TYPES.conductAppeal;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -52,6 +57,19 @@ export function NewTicketForm({
           </label>
         ))}
       </fieldset>
+
+      {isConductAppeal && (
+        <div className="space-y-2 border-l-2 border-[var(--term-amber)]/40 pl-3">
+          <p className="text-sm text-[var(--term-amber)]">
+            THIS APPEAL IS READ BY ADMINISTRATION, NOT BY THE COUNTER-INTEL
+            DESK.
+          </p>
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            STATE WHAT WAS RESTRICTED AND WHY YOU BELIEVE IT WAS ISSUED IN
+            ERROR. THE REVIEWER CAN SEE THE FULL RECORD BEHIND THE DECISION.
+          </p>
+        </div>
+      )}
 
       {isScpRequest && (
         <div className="space-y-3 border-l-2 border-[var(--term-border)]/40 pl-3">

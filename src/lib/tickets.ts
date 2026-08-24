@@ -10,6 +10,10 @@ export const TICKET_TYPES = {
   general: "general",
   bug: "bug",
   scpAccess: "scp_access",
+  // Contesting a terminal sanction (lib/hack/sanctions.ts). Routed to Admin
+  // and above because that is the only tier that can see the conduct evidence
+  // a sanction rests on, and the only tier that can lift one.
+  conductAppeal: "conduct_appeal",
 } as const;
 
 export type TicketType = (typeof TICKET_TYPES)[keyof typeof TICKET_TYPES];
@@ -27,6 +31,7 @@ export const TICKET_TYPE_LABELS: Record<string, string> = {
   [TICKET_TYPES.general]: "GENERAL ASSISTANCE",
   [TICKET_TYPES.bug]: "BUG REPORT",
   [TICKET_TYPES.scpAccess]: "SCP FILE ACCESS REQUEST",
+  [TICKET_TYPES.conductAppeal]: "CONDUCT REVIEW APPEAL",
 };
 
 export const TICKET_TYPE_DESCRIPTIONS: Record<string, string> = {
@@ -36,6 +41,12 @@ export const TICKET_TYPE_DESCRIPTIONS: Record<string, string> = {
     "Something on the network is broken or behaving incorrectly.",
   [TICKET_TYPES.scpAccess]:
     "Request temporary read access to a single SCP file above your clearance.",
+  // Worded to describe the SANCTION, which the member has been told about, and
+  // never the conduct flag, which they have not. The flag is deliberately
+  // silent — see lib/hack/conduct.ts — and this description must not become the
+  // thing that tells them it exists.
+  [TICKET_TYPES.conductAppeal]:
+    "Contest a restriction or blacklist placed on your terminal access.",
 };
 
 export function isValidTicketType(value: string): value is TicketType {
@@ -66,6 +77,14 @@ export function canRequestScpAccess(user: { department: string | null }): boolea
 //   scp_access  → Admin and above (admin, co-owner, owner). Approving one of
 //                 these issues a temporary access grant, and granting access is
 //                 an Admin power, so Staff do not work this queue either.
+//   conduct_appeal → Admin and above. Two reasons, both binding: the conduct
+//                 evidence an appeal argues about lives in ConductRecord, which
+//                 /admin/conduct gates at Admin+ because its rows are
+//                 name-keyed; and lifting a sanction is the same power as
+//                 issuing one. A Helper reading these would see neither the
+//                 evidence nor be able to act — and RAISA, who can see the case,
+//                 is deliberately kept out of discipline entirely (see
+//                 lib/counter-intel.ts).
 //
 // A ticket's own author can always read their own ticket regardless of type —
 // that is `canViewTicket`, below.
@@ -103,6 +122,8 @@ export function canHandleTicketType(viewer: Viewer, type: string): boolean {
     case TICKET_TYPES.bug:
       return viewer.isOwner;
     case TICKET_TYPES.scpAccess:
+      return adminOrAbove(viewer);
+    case TICKET_TYPES.conductAppeal:
       return adminOrAbove(viewer);
     default:
       return false;

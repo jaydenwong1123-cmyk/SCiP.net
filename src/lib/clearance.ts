@@ -152,6 +152,14 @@ export function parseClearanceToken(token: string): number | null {
   const raw = token.trim();
   if (raw === "") return null;
 
+  // A signed token is never a clearance level, and must not be normalized into
+  // one. Without this, the dash-stripping below turns "-1" into "1", which then
+  // matches L-1 — so a nonsense redaction tag like [*SECRET*][-1] would resolve
+  // to the LOWEST rank and be readable by everyone, instead of failing closed
+  // to a full redaction the way [*SECRET*][NONSENSE] does. Redaction must fail
+  // closed on input it cannot understand.
+  if (raw.startsWith("-") || raw.startsWith("+")) return null;
+
   // Plain rank number (1-7).
   if (/^\d+$/.test(raw)) {
     const n = parseInt(raw, 10);

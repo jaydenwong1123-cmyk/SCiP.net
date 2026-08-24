@@ -74,9 +74,58 @@ export default async function OmegaPage() {
         )}
       </HudPanel>
 
+      {/* Placed ABOVE both destructive panels on purpose: the last thing the
+          overseer should pass on the way to the purge button is the export
+          button. */}
+      <HudPanel
+        code="01"
+        title="NETWORK EXPORT"
+        variant="secure"
+        status="RECOVERY"
+      >
+        <div className="p-4 space-y-3">
+          <p className="text-sm">
+            DOWNLOAD THE ENTIRE NETWORK AS A SINGLE ARCHIVE — EVERY MEMBER,
+            FILE, INCIDENT, MESSAGE, CASE AND LOG ENTRY. THIS IS THE ONLY
+            RECOVERY PATH THAT EXISTS FOR A DATA PURGE.
+          </p>
+          <p className="text-sm text-[var(--term-amber)]">
+            ⚠ THE EXPORTED ARCHIVE CONTAINS CREDENTIAL HASHES, INVITE CODES AND
+            EVERY PRIVATE TRANSMISSION ON THE NETWORK. IT IS AS SENSITIVE AS THE
+            DATABASE ITSELF. THE EXPORT IS RECORDED IN THE ACCESS LOG.
+          </p>
+          <TickRule />
+          <div className="flex flex-wrap gap-3">
+            {/* Plain anchors, not next/link: these are file downloads, and a
+                client-side navigation would try to render JSON as a page. */}
+            <a
+              href="/admin/omega/backup"
+              className="term-button"
+              download
+            >
+              [EXPORT RECORDS]
+            </a>
+            <a
+              href="/admin/omega/backup?attachments=1"
+              className="term-button term-button--ghost"
+              download
+            >
+              [EXPORT RECORDS + FILES]
+            </a>
+          </div>
+          <p className="text-sm text-[var(--term-fg-dim)]">
+            ATTACHMENT BYTES ARE HELD IN THE DATABASE, SO THE SECOND OPTION MAY
+            BE VERY LARGE AND CAN TIME OUT ON A BIG NETWORK. FOR A COMPLETE
+            OFFLINE ARCHIVE RUN{" "}
+            <span className="text-[var(--term-fg)]">npm run db:backup</span>{" "}
+            AGAINST THE PRODUCTION DATABASE INSTEAD.
+          </p>
+        </div>
+      </HudPanel>
+
       {cfg.shutdownMode ? (
         <HudPanel
-          code="01"
+          code="02"
           title="SITE RESTORATION"
           variant="secure"
           status="NETWORK DARK"
@@ -85,7 +134,7 @@ export default async function OmegaPage() {
         </HudPanel>
       ) : (
         <HudPanel
-          code="01"
+          code="02"
           title={OMEGA_OPS.terminate.label}
           variant="alert"
           status={armed?.op === "terminate" ? "ARMED" : "SAFE"}
@@ -102,7 +151,7 @@ export default async function OmegaPage() {
       )}
 
       <HudPanel
-        code="02"
+        code="03"
         title={OMEGA_OPS.purge.label}
         variant="alert"
         status={armed?.op === "purge" ? "ARMED" : "SAFE"}

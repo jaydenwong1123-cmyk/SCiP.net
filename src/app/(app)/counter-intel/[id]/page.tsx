@@ -17,6 +17,7 @@ import { TraceConsole } from "../trace-console";
 import { RevokeForm } from "./revoke-form";
 import { DeleteForm } from "./delete-form";
 import { CaseStatusForm } from "./case-status-form";
+import { ClaimForm } from "./claim-form";
 import { StationHead, HudPanel, Readout, Lamp } from "@/components/hud";
 
 export default async function CounterIntelCasePage({
@@ -33,6 +34,7 @@ export default async function CounterIntelCasePage({
     include: {
       user: { select: { id: true, displayName: true, email: true } },
       traceBy: { select: { id: true, displayName: true, email: true } },
+      claimedBy: { select: { id: true, displayName: true, email: true } },
       grant: { select: { id: true, tier: true, expiresAt: true, revokedAt: true } },
       duel: {
         select: {
@@ -65,11 +67,14 @@ export default async function CounterIntelCasePage({
       })
     : undefined;
 
-  // Everything below renders from `c` and never from `run`. The raw row holds
-  // the intruder's name; only the projection is safe to put in JSX.
-  const c = anonymiseRun({ ...run, conductRecords });
   // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for expiry display
   const now = Date.now();
+  // Everything below renders from `c` and never from `run`. The raw row holds
+  // the intruder's name; only the projection is safe to put in JSX.
+  //
+  // `now` is passed in rather than read inside, so the claim expiry the
+  // projection reports and the one this page renders are the same instant.
+  const c = anonymiseRun({ ...run, conductRecords }, now);
   const grantLive = c.grant && !c.grant.revoked && c.grant.expiresAtMs > now;
 
   return (
@@ -101,12 +106,24 @@ export default async function CounterIntelCasePage({
         title="CASE WORKFLOW"
         status={c.tracedByName ? `TRACED BY ${c.tracedByName}` : "UNTRACED"}
       >
-        <CaseStatusForm
+        {/* Ownership first: who is working this case is the question an
+            officer opening it needs answered before they decide to spend a
+            trace attempt on it. */}
+        <ClaimForm
           runId={c.id}
-          current={c.caseStatus}
-          flagged={c.flagged}
-          canResolve={canResolveCounterIntelCase(user)}
+          claimedByName={c.claimedByName}
+          heldByMe={c.claimedById === user.id}
+          claimExpiresAtMs={c.claimExpiresAtMs}
+          nowMs={now}
         />
+        <div className="pt-3">
+          <CaseStatusForm
+            runId={c.id}
+            current={c.caseStatus}
+            flagged={c.flagged}
+            canResolve={canResolveCounterIntelCase(user)}
+          />
+        </div>
         {canDeleteCounterIntelLog(user) && (
           <div className="pt-3">
             <DeleteForm runId={c.id} />

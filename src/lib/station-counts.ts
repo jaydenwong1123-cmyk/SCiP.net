@@ -2,7 +2,11 @@ import { cache } from "react";
 import { db } from "@/lib/db";
 import { hasStaffPowers } from "@/lib/session";
 import { TICKET_STATUSES, handleableTicketTypes } from "@/lib/tickets";
-import { canAccessCounterIntel, REVEAL_MAX } from "@/lib/counter-intel";
+import {
+  canAccessCounterIntel,
+  unclaimedWhere,
+  CASE_STATUSES,
+} from "@/lib/counter-intel";
 import type { BadgeCounts } from "@/lib/sections";
 
 // Badge counts for the command rail and the station board.
@@ -49,8 +53,22 @@ export const getStationCounts = cache(
             },
           })
         : Promise.resolve(0),
+      // Cases actually awaiting someone: still NEEDS_ACTION, and held by
+      // nobody (or held by a claim that has since lapsed).
+      //
+      // This previously counted every case whose trace was incomplete, which
+      // in practice meant nearly every case ever filed — a badge that is always
+      // lit tells an officer nothing, and most of what it counted was closed
+      // work no one intended to trace further. Matching the desk's own
+      // "UNCLAIMED" filter makes the number a call to action again, and matches
+      // the badgeLabel in lib/sections.ts.
       raisa
-        ? db.hackRun.count({ where: { revealLevel: { lt: REVEAL_MAX } } })
+        ? db.hackRun.count({
+            where: {
+              caseStatus: CASE_STATUSES.needsAction,
+              ...unclaimedWhere(),
+            },
+          })
         : Promise.resolve(0),
     ]);
 

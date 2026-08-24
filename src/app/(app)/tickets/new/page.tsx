@@ -20,6 +20,16 @@ export default async function NewTicketPage() {
       })
     : [];
 
+  // The conduct appeal option is offered only to members who have a sanction on
+  // record — active, expired or already lifted. This discloses nothing: a
+  // sanction is announced to its subject by design (that is what separates it
+  // from the silent conduct flag), so anyone who sees this option was already
+  // told why. Offering it to everyone would be clutter; hiding it from someone
+  // currently blacklisted would remove their only route to contest it.
+  const sanctionCount = await db.hackSanction.count({
+    where: { userId: user.id },
+  });
+
   return (
     <>
       <StationHead code="SEC-07 // NEW SUPPORT REQUEST" title="OPEN A TICKET">
@@ -32,6 +42,7 @@ export default async function NewTicketPage() {
         <NewTicketForm
           canRequestScp={mayRequestScp}
           scpFiles={requestableFiles}
+          canAppealConduct={sanctionCount > 0}
         />
       </HudPanel>
     </>

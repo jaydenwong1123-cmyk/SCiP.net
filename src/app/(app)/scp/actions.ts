@@ -25,6 +25,12 @@ import {
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 import {
+  consumeRateLimit,
+  contentLimitError,
+  CONTENT_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
+import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
@@ -74,6 +80,18 @@ export async function createScpFileAction(
         authoringClearance(user)
       ),
     };
+  }
+
+  // Spent only once the submission is known-good, so a rejected draft never
+  // costs the author a slot. Placed immediately before the write for the same
+  // reason: the bucket counts rows created, not requests made.
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   await db.scpFile.create({
@@ -160,6 +178,18 @@ export async function updateScpFileAction(
     clearanceRequired === existing.clearanceRequired &&
     classification === existing.classification;
   if (unchanged) redirect(`/scp/${id}`);
+
+  // An edit writes a Revision row as well as updating the file, so it counts
+  // against the same bucket as authoring. Checked after the unchanged-check so
+  // a no-op save never spends a slot.
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
+  }
 
   // Snapshot the outgoing version before overwriting it.
   await snapshotRevision({
@@ -335,6 +365,15 @@ export async function addScpTestLogAction(
         authoringClearance(user)
       ),
     };
+  }
+
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   // Sequence is per file and derived from the highest existing entry, so

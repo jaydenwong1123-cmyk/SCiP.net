@@ -19,6 +19,13 @@ import {
   canViewTicket,
   isValidTicketType,
 } from "@/lib/tickets";
+import {
+  consumeRateLimit,
+  contentLimitError,
+  TICKET_RULE,
+  MESSAGE_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
 
 type ActionState = { ok: boolean; error?: string } | null;
 
@@ -29,11 +36,17 @@ async function handlersFor(type: string) {
   if (type === TICKET_TYPES.bug) {
     return db.user.findMany({ where: { isOwner: true }, select: { id: true } });
   }
-  if (type === TICKET_TYPES.scpAccess) {
+  if (
+    type === TICKET_TYPES.scpAccess ||
+    type === TICKET_TYPES.conductAppeal
+  ) {
     return db.user.findMany({
       where: {
+        // A conduct appeal is the one ticket type a SUSPENDED member may still
+        // need answered, but the HANDLER list is unaffected by that — this
+        // filter is about who works the queue, not who may file into it.
         suspended: false,
-        // Admin and above, matching canHandleTicketType for this type.
+        // Admin and above, matching canHandleTicketType for these types.
         OR: [{ isOwner: true }, { isCoOwner: true }, { isAdmin: true }],
       },
       select: { id: true },
@@ -114,6 +127,18 @@ export async function createTicketAction(
     }
   }
 
+  // Tightest of the content rules: a new ticket fans a notification out to
+  // every handler of its type, so flooding this queue is an attack on the
+  // people who work it, not merely on storage.
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.ticket,
+    user.id,
+    TICKET_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
+  }
+
   const ticket = await db.ticket.create({
     data: {
       type,
@@ -162,6 +187,18 @@ export async function replyToTicketAction(
   }
   if (ticket.status !== TICKET_STATUSES.open) {
     return { ok: false, error: "THIS TICKET IS CLOSED." };
+  }
+
+  // Replies use the correspondence bucket, not the (much tighter) ticket one:
+  // a support thread is a conversation, and throttling it at the rate we
+  // throttle NEW tickets would punish the member who is being helped.
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.message,
+    user.id,
+    MESSAGE_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   await db.ticketReply.create({

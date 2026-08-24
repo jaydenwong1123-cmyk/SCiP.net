@@ -11,6 +11,7 @@ import { checkRateLimit, recordAttempt, HACK_RULE } from "@/lib/rate-limit";
 import { clearanceLabel } from "@/lib/clearance";
 import { RAISA_DEPARTMENT, caseCode } from "@/lib/counter-intel";
 import {
+  CHALLENGE_KINDS,
   MAX_STAGE,
   RUN_STATUS,
   formatDuration,
@@ -36,12 +37,34 @@ import {
 } from "@/lib/hack/duel";
 import { hackCooldownState, issueGrant } from "@/lib/hack/grant";
 import { DUEL_RULE } from "@/lib/rate-limit";
+import {
+  activeSanction,
+  blocksRuns,
+  cooldownMultiplier,
+  sanctionRefusal,
+} from "@/lib/hack/sanctions";
+import {
+  consumeTool,
+  refundTool,
+  isToolKind,
+  ghostedRevealLevel,
+  TOOL_KINDS,
+  TOOL_LABELS,
+  RECOMPILE_TIME_FACTOR,
+  SPOOF_DURATION_MS,
+  type ToolKind,
+} from "@/lib/hack/tools";
+import { recompileRound } from "@/lib/hack/engine";
 
 export type HackActionState =
   | { ok: true; kind: "challenge"; challenge: PublicChallenge; feedback?: string }
   | { ok: true; kind: "checkpoint" }
   | { ok: true; kind: "failed"; reason: string }
-  | { ok: true; kind: "extracted" }
+  | { ok: true; kind: "extracted"; tools?: string[] }
+  // The round was lost, but an armed DEAD MAN SWITCH banked the depth already
+  // cleared. An extraction as far as access is concerned; shown differently so
+  // the member can see what the tool bought them.
+  | { ok: true; kind: "deadman"; reason: string }
   // A RAISA officer has engaged this run head-to-head. Winning the duel is an
   // extraction and losing it is a failed run, so the two terminal kinds above
   // cover the outcomes and only the live puzzle needs a kind of its own.
@@ -76,11 +99,26 @@ export async function beginHackRunAction(): Promise<HackActionState> {
     return { ok: true, kind: "challenge", challenge: publicChallenge(challenge) };
   }
 
-  const cooldown = await hackCooldownState(user.id, hasStaffPowers(user));
+  // A sanction is checked BEFORE the cooldown, so a blacklisted member is told
+  // they are blacklisted rather than being shown a cooldown that would not have
+  // let them in anyway. Staff bypass the cooldown but NOT a sanction: a
+  // disciplinary step aimed at a staff member has to actually land.
+  const sanction = await activeSanction(user.id);
+  if (blocksRuns(sanction) && sanction) {
+    return { ok: false, error: sanctionRefusal(sanction) };
+  }
+
+  const cooldown = await hackCooldownState(
+    user.id,
+    hasStaffPowers(user),
+    cooldownMultiplier(sanction)
+  );
   if (cooldown.blocked) {
     return {
       ok: false,
-      error: `TRACE COOLDOWN ACTIVE — RETRY IN ${formatDuration(cooldown.retryAfterMs)}.`,
+      error: `TRACE COOLDOWN ACTIVE — RETRY IN ${formatDuration(
+        cooldown.retryAfterMs
+      )}.${cooldown.restricted ? " TERMINAL RESTRICTED BY ADMINISTRATION — COOLDOWN EXTENDED." : ""}`,
     };
   }
 
@@ -201,6 +239,14 @@ export async function submitHackAnswerAction(
       await logHackFailure(outcome.reason);
       revalidatePath("/hack");
       return { ok: true, kind: "failed", reason: outcome.reason };
+    case "deadman":
+      // The run still ended on a lost round, so the repelled verb is still the
+      // truthful one for the trail — the switch changed what the intruder kept,
+      // not whether they were caught.
+      await logHackFailure(`${outcome.reason} (DEAD MAN SWITCH FIRED)`);
+      // Effective clearance changed, exactly as a clean extraction does.
+      revalidatePath("/", "layout");
+      return { ok: true, kind: "deadman", reason: outcome.reason };
   }
 }
 
@@ -406,6 +452,212 @@ export async function pushDeeperAction(): Promise<HackActionState> {
   const advanced = await pushDeeper(run);
   const challenge = await getOrIssueChallenge(advanced);
   return { ok: true, kind: "challenge", challenge: publicChallenge(challenge) };
+}
+
+// ---------------------------------------------------------------------------
+// Intrusion toolkit
+// ---------------------------------------------------------------------------
+
+export type ToolActionState =
+  | { ok: true; kind: "challenge"; challenge: PublicChallenge; note: string }
+  | { ok: true; kind: "note"; note: string }
+  | { ok: false; error: string; resync?: boolean };
+
+// Spend one earned countermeasure.
+//
+// ORDER OF OPERATIONS MATTERS HERE, and it is the same discipline
+// submitIntrusionAnswer follows: establish the run's state FIRST, then spend the
+// tool, then apply the effect. Spending before validating would let a member
+// burn a tool on a run that had already timed out; applying before spending
+// would let two tabs apply the effect twice off one tool.
+//
+// The tool is refunded if the effect cannot be applied after it was consumed.
+// That window is small but real (RECOMPILE writes three rows), and eating a
+// member's earned tool because of a transient database error is not acceptable
+// when the fix is four lines.
+export async function spendHackToolAction(
+  _prevState: ToolActionState | null,
+  formData: FormData
+): Promise<ToolActionState> {
+  const user = await requireUser();
+
+  const raw = String(formData.get("kind") ?? "");
+  if (!isToolKind(raw)) return { ok: false, error: "UNKNOWN COUNTERMEASURE." };
+  const kind: ToolKind = raw;
+
+  // One clock read for the whole action, so every deadline comparison and every
+  // timestamp written below agrees on when "now" was.
+  const now = Date.now();
+
+  // GHOST is the one tool that acts on a FINISHED case rather than a live run,
+  // so it takes its own path entirely — see below.
+  if (kind === TOOL_KINDS.ghost) return applyGhostProtocol(user.id);
+
+  const run = await resolveStaleRuns(user.id);
+  if (!run || run.status !== RUN_STATUS.active) {
+    return { ok: false, error: "NO ACTIVE INTRUSION.", resync: true };
+  }
+  // Frozen for the same reason EXTRACT and PUSH DEEPER are: a duel must be
+  // fought, not tooled out of.
+  if (await liveDuelFor(run.id)) {
+    return { ok: false, error: DUEL_LOCK_ERROR, resync: true };
+  }
+
+  // RECOMPILE and DEADMAN both change what happens to the round in flight, so
+  // neither may be spent once that round's clock has run out. Without this,
+  // both become "click after losing".
+  const open = await db.hackChallenge.findFirst({
+    where: {
+      runId: run.id,
+      kind: CHALLENGE_KINDS.intrusion,
+      cursor: run.cursor,
+      correct: null,
+    },
+    select: { deadlineAt: true },
+  });
+
+  if (kind === TOOL_KINDS.recompile) {
+    if (run.atCheckpoint || !open) {
+      return { ok: false, error: "NO ROUND IN PROGRESS TO REDRAW." };
+    }
+    if (now > open.deadlineAt.getTime()) {
+      return { ok: false, error: "ROUND ALREADY LOST — TOO LATE.", resync: true };
+    }
+
+    const toolId = await consumeTool(user.id, kind, run.id);
+    if (!toolId) return { ok: false, error: "NO RECOMPILE CHARGE REMAINING." };
+
+    try {
+      const next = await recompileRound(run, RECOMPILE_TIME_FACTOR);
+      return {
+        ok: true,
+        kind: "challenge",
+        challenge: publicChallenge(next),
+        note: `${TOOL_LABELS[kind]} APPLIED — NEW PUZZLE, SHORTENED CLOCK.`,
+      };
+    } catch (err) {
+      await refundTool(toolId);
+      console.error("[hack] recompile failed", err);
+      return { ok: false, error: "REDRAW FAILED — CHARGE REFUNDED.", resync: true };
+    }
+  }
+
+  if (kind === TOOL_KINDS.deadman) {
+    if (run.deadmanArmed) {
+      return { ok: false, error: "DEAD MAN SWITCH ALREADY ARMED." };
+    }
+    // Arming with nothing banked would spend a tool for no effect: the switch
+    // saves cleared depth, and there is none until a layer is complete.
+    if (run.clearedStages < 1) {
+      return {
+        ok: false,
+        error: "NOTHING BANKED YET — CLEAR A LAYER BEFORE ARMING.",
+      };
+    }
+
+    const toolId = await consumeTool(user.id, kind, run.id);
+    if (!toolId) return { ok: false, error: "NO DEAD MAN CHARGE REMAINING." };
+
+    try {
+      await db.hackRun.update({
+        where: { id: run.id },
+        data: { deadmanArmed: true },
+      });
+      return {
+        ok: true,
+        kind: "note",
+        note: `${TOOL_LABELS[kind]} ARMED — A FAILURE NOW BANKS LAYER ${run.clearedStages}.`,
+      };
+    } catch {
+      await refundTool(toolId);
+      return { ok: false, error: "ARMING FAILED — CHARGE REFUNDED." };
+    }
+  }
+
+  // SIGNAL SPOOF.
+  if (run.spoofedUntil && run.spoofedUntil.getTime() > now) {
+    return { ok: false, error: "SIGNAL ALREADY SUPPRESSED." };
+  }
+
+  const toolId = await consumeTool(user.id, kind, run.id);
+  if (!toolId) return { ok: false, error: "NO SPOOF CHARGE REMAINING." };
+
+  try {
+    await db.hackRun.update({
+      where: { id: run.id },
+      data: { spoofedUntil: new Date(now + SPOOF_DURATION_MS) },
+    });
+    return {
+      ok: true,
+      kind: "note",
+      note: `${TOOL_LABELS[TOOL_KINDS.spoof]} ACTIVE FOR ${formatDuration(
+        SPOOF_DURATION_MS
+      )} — SIGNAL SUPPRESSED ON THE COUNTER-INTEL BOARD.`,
+    };
+  } catch {
+    await refundTool(toolId);
+    return { ok: false, error: "SUPPRESSION FAILED — CHARGE REFUNDED." };
+  }
+}
+
+// GHOST PROTOCOL: scrub one traced field from the member's most recent case.
+//
+// Applies to a FINISHED run, which is what makes it the only tool with any use
+// after the terminal closes — the trace ladder runs on RAISA's schedule, not the
+// intruder's, so the field being scrubbed is usually uncovered long after the
+// run ended.
+//
+// Deliberately does not touch traceById or identifiedAt: the record that the
+// desk got there stays. GHOST buys back a field, never the history.
+async function applyGhostProtocol(userId: string): Promise<ToolActionState> {
+  const target = await db.hackRun.findFirst({
+    where: { userId, revealLevel: { gt: 0 } },
+    orderBy: { startedAt: "desc" },
+    select: { id: true, revealLevel: true },
+  });
+  if (!target) {
+    return {
+      ok: false,
+      error: "NOTHING TO SCRUB — NO CASE OF YOURS HAS BEEN TRACED.",
+    };
+  }
+
+  const toolId = await consumeTool(userId, TOOL_KINDS.ghost, target.id);
+  if (!toolId) return { ok: false, error: "NO GHOST CHARGE REMAINING." };
+
+  try {
+    const next = ghostedRevealLevel(target.revealLevel);
+    await db.hackRun.update({
+      where: { id: target.id },
+      // traceCursor moves with it so the desk must re-solve a trace round to
+      // recover the field, rather than the ladder handing it straight back.
+      data: { revealLevel: next, traceCursor: { increment: 1 } },
+    });
+
+    // Audited with a NULL actor, exactly like the other intruder-side verbs:
+    // naming the member here would hand /admin/audit the identity the reveal
+    // ladder exists to protect — and this entry is specifically about that
+    // identity being pulled back.
+    await logAudit({
+      action: AUDIT_ACTIONS.hackTraceScrubbed,
+      actor: null,
+      targetType: "hack_run",
+      targetId: target.id,
+      targetName: caseCode(target.id),
+      summary: `Counter-forensic scrub — reveal level rolled back to ${next}`,
+    });
+
+    return {
+      ok: true,
+      kind: "note",
+      note: `${TOOL_LABELS[TOOL_KINDS.ghost]} APPLIED — CASE ${caseCode(
+        target.id
+      )} ROLLED BACK TO REVEAL LEVEL ${next}.`,
+    };
+  } catch {
+    await refundTool(toolId);
+    return { ok: false, error: "SCRUB FAILED — CHARGE REFUNDED." };
+  }
 }
 
 // Walk away mid-round. Counts as a failure, and carries the failure cooldown:

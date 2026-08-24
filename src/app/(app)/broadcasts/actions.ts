@@ -18,6 +18,12 @@ import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
+import {
+  consumeRateLimit,
+  contentLimitError,
+  CONTENT_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
 
 export async function createBroadcastAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -57,6 +63,15 @@ export async function createBroadcastAction(
   }
   if (expiresAt && expiresAt.getTime() <= Date.now()) {
     return { ok: false, error: "STAND-DOWN TIME IS ALREADY IN THE PAST." };
+  }
+
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   await db.broadcast.create({
@@ -138,6 +153,15 @@ export async function updateBroadcastAction(
   const nextBody = body.slice(0, 10000);
   if (nextTitle === existing.title && nextBody === existing.body) {
     redirect("/broadcasts");
+  }
+
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   await snapshotRevision({

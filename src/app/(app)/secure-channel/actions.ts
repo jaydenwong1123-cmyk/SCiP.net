@@ -13,6 +13,13 @@ import {
   pruneExpiredAttachments,
 } from "@/lib/attachments";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  consumeRateLimit,
+  contentLimitError,
+  MESSAGE_RULE,
+  ATTACHMENT_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
 
 export async function postSecureMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -48,6 +55,29 @@ export async function postSecureMessageAction(
     const result = await validateUpload(upload);
     if (!result.ok) return { ok: false, error: result.error };
     file = result.file;
+  }
+
+  // Two buckets, because a transmission carrying a file costs the database far
+  // more than one carrying text. Both are checked before either is spent, so a
+  // post that is going to be refused for its attachment does not first burn the
+  // author's message slot.
+  const messageLimit = await consumeRateLimit(
+    CONTENT_SCOPES.message,
+    user.id,
+    MESSAGE_RULE
+  );
+  if (messageLimit.blocked) {
+    return { ok: false, error: contentLimitError(messageLimit.retryAfterMs) };
+  }
+  if (file) {
+    const uploadLimit = await consumeRateLimit(
+      CONTENT_SCOPES.attachment,
+      user.id,
+      ATTACHMENT_RULE
+    );
+    if (uploadLimit.blocked) {
+      return { ok: false, error: contentLimitError(uploadLimit.retryAfterMs) };
+    }
   }
 
   const message = await db.secureMessage.create({

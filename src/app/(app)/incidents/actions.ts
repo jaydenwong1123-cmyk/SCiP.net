@@ -22,6 +22,12 @@ import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
+import {
+  consumeRateLimit,
+  contentLimitError,
+  CONTENT_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
 
 export async function createIncidentReportAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -70,6 +76,15 @@ export async function createIncidentReportAction(
         authoringClearance(user)
       ),
     };
+  }
+
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   await db.incidentReport.create({
@@ -158,6 +173,15 @@ export async function updateIncidentReportAction(
     severity === existing.severity &&
     clearanceRequired === existing.clearanceRequired;
   if (unchanged) redirect(`/incidents/${id}`);
+
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.document,
+    user.id,
+    CONTENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
+  }
 
   await snapshotRevision({
     entityType: REVISION_ENTITIES.incident,

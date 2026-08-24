@@ -13,6 +13,10 @@ import {
   CASE_STATUSES,
   COUNTER_INTEL_RETENTION_DAYS,
   REVEAL_MAX,
+  unclaimedWhere,
+  claimTtlCutoff,
+  slaTier,
+  SLA_TIERS,
 } from "@/lib/counter-intel";
 import { RUN_STATUS } from "@/lib/hack/config";
 import { duelsForRuns } from "@/lib/hack/duel";
@@ -44,14 +48,26 @@ export default async function CounterIntelPage({
   const { page, filter } = await searchParams;
   const pageNum = Math.max(1, Number(page) || 1);
   const scope =
-    filter === "inProgress" || filter === "flagged" ? filter : "all";
+    filter === "inProgress" ||
+    filter === "flagged" ||
+    filter === "mine" ||
+    filter === "unclaimed"
+      ? filter
+      : "all";
 
   const where =
     scope === "inProgress"
       ? { caseStatus: CASE_STATUSES.inProgress }
       : scope === "flagged"
         ? { flagged: true }
-        : {};
+        : scope === "mine"
+          // A lapsed claim is not mine any more, so the cutoff is part of the
+          // filter rather than something the projection hides afterwards —
+          // otherwise "my cases" would paginate over rows it then blanks.
+          ? { claimedById: user.id, claimedAt: { gte: claimTtlCutoff() } }
+          : scope === "unclaimed"
+            ? { ...unclaimedWhere(), caseStatus: CASE_STATUSES.needsAction }
+            : {};
 
   const grantSelect = {
     id: true,
@@ -73,6 +89,7 @@ export default async function CounterIntelPage({
       include: {
         user: { select: { id: true, displayName: true, email: true } },
         traceBy: { select: { id: true, displayName: true, email: true } },
+        claimedBy: { select: { id: true, displayName: true, email: true } },
         grant: { select: grantSelect },
       },
     }),
@@ -81,14 +98,32 @@ export default async function CounterIntelPage({
     // any one page's list, so it always reflects the whole log regardless of
     // which filter or page is currently open.
     db.hackRun.findMany({
-      select: { status: true, flagged: true, grant: { select: grantSelect } },
+      select: {
+        status: true,
+        flagged: true,
+        caseStatus: true,
+        startedAt: true,
+        claimedById: true,
+        claimedAt: true,
+        grant: { select: grantSelect },
+      },
     }),
     // Breaches in progress, for the duel panel. Own runs are excluded HERE
     // rather than disabled in the UI: a RAISA officer who is also the intruder
     // must not be able to identify their own case code by spotting the row
     // that will not engage.
     db.hackRun.findMany({
-      where: { status: RUN_STATUS.active, userId: { not: user.id } },
+      where: {
+        status: RUN_STATUS.active,
+        userId: { not: user.id },
+        // A SIGNAL SPOOF charge (lib/hack/tools.ts) suppresses a run from THIS
+        // board only, and only while it holds. The case file, the case list and
+        // the audit trail are all untouched — what the intruder bought is a
+        // window in which they cannot be ENGAGED, not a window in which the
+        // intrusion did not happen. Evaluated at query time rather than swept,
+        // like every other expiry in this codebase.
+        OR: [{ spoofedUntil: null }, { spoofedUntil: { lte: new Date() } }],
+      },
       select: { id: true, startedAt: true, clearedStages: true },
       orderBy: { startedAt: "desc" },
       take: LIVE_LIMIT,
@@ -115,7 +150,7 @@ export default async function CounterIntelPage({
     };
   });
 
-  const cases = rows.map(anonymiseRun);
+  const cases = rows.map((row) => anonymiseRun(row));
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canDelete = canDeleteCounterIntelLog(user);
 
@@ -138,6 +173,30 @@ export default async function CounterIntelPage({
 
   const flaggedCount = resolutionRows.filter((run) => run.flagged).length;
 
+  // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock for SLA bucketing
+  const now = Date.now();
+
+  // Desk workload, computed over the same unpaginated sweep the resolution bar
+  // uses so the counters describe the whole log rather than the open page.
+  const workload = resolutionRows.reduce(
+    (acc, run) => {
+      const tier = slaTier(run, now);
+      if (tier === null) return acc;
+      acc.unclaimed += 1;
+      if (tier === SLA_TIERS.overdue) acc.overdue += 1;
+      else if (tier === SLA_TIERS.aging) acc.aging += 1;
+      return acc;
+    },
+    { unclaimed: 0, aging: 0, overdue: 0 }
+  );
+
+  const myCases = resolutionRows.filter(
+    (run) =>
+      run.claimedById === user.id &&
+      run.claimedAt !== null &&
+      run.claimedAt.getTime() >= claimTtlCutoff(new Date(now)).getTime()
+  ).length;
+
   const seg = (active: boolean) => `hud-seg${active ? " hud-seg--on" : ""}`;
 
   return (
@@ -154,6 +213,17 @@ export default async function CounterIntelPage({
           value={flaggedCount}
           tone={flaggedCount > 0 ? "amber" : "dim"}
         />
+        <Readout
+          label="Unclaimed"
+          value={workload.unclaimed}
+          tone={workload.unclaimed > 0 ? "amber" : "dim"}
+        />
+        <Readout
+          label="Overdue"
+          value={workload.overdue}
+          tone={workload.overdue > 0 ? "red" : "dim"}
+        />
+        <Readout label="Yours" value={myCases} small />
         <Readout label="Retention" value={`${COUNTER_INTEL_RETENTION_DAYS}D`} small />
       </StationHead>
 
@@ -189,7 +259,28 @@ export default async function CounterIntelPage({
               >
                 FLAGGED
               </Link>
+              <Link
+                href="/counter-intel?filter=unclaimed"
+                className={seg(scope === "unclaimed")}
+              >
+                UNCLAIMED{workload.unclaimed > 0 && ` (${workload.unclaimed})`}
+              </Link>
+              <Link
+                href="/counter-intel?filter=mine"
+                className={seg(scope === "mine")}
+              >
+                MINE{myCases > 0 && ` (${myCases})`}
+              </Link>
             </div>
+
+            {workload.overdue > 0 && scope !== "unclaimed" && (
+              <p className="text-xs text-[var(--term-red)] mb-2">
+                ▲ {workload.overdue} CASE(S) PAST THE ACTION WINDOW AND UNHELD.{" "}
+                <Link href="/counter-intel?filter=unclaimed" className="term-link">
+                  [REVIEW QUEUE]
+                </Link>
+              </p>
+            )}
 
             <CaseList cases={cases} revealMax={REVEAL_MAX} canDelete={canDelete} />
 

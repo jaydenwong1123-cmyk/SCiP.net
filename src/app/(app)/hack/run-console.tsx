@@ -14,8 +14,10 @@ import {
   submitHackAnswerAction,
   type HackActionState,
 } from "./actions";
+import { ToolkitPanel } from "./toolkit-panel";
 import type { PublicChallenge } from "@/lib/hack/engine";
 import type { PublicDuel } from "@/lib/hack/duel";
+import type { ToolInventory } from "@/lib/hack/tools";
 import { useRoundTelemetry } from "@/lib/hack/telemetry";
 import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
@@ -33,7 +35,9 @@ type Phase =
   | { kind: "duel"; duel: PublicDuel; feedback?: string }
   | { kind: "checkpoint" }
   | { kind: "failed"; reason: string }
-  | { kind: "extracted" };
+  | { kind: "extracted" }
+  // A lost round that an armed DEAD MAN SWITCH converted into an extraction.
+  | { kind: "deadman"; reason: string };
 
 type Props = {
   initial: PublicChallenge | null;
@@ -45,6 +49,10 @@ type Props = {
   clearedStages: number;
   tierLabels: string[];
   maxStage: number;
+  /** Unspent countermeasures, for the in-run toolkit. */
+  toolkit: ToolInventory;
+  /** Whether the dead man's switch is already armed on this run. */
+  deadmanArmed: boolean;
 };
 
 // The intrusion console.
@@ -62,6 +70,8 @@ export function RunConsole({
   clearedStages,
   tierLabels,
   maxStage,
+  toolkit,
+  deadmanArmed,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -134,6 +144,11 @@ export function RunConsole({
           break;
         case "extracted":
           setPhase({ kind: "extracted" });
+          router.refresh();
+          break;
+        case "deadman":
+          setPhase({ kind: "deadman", reason: state.reason });
+          // Effective clearance changed just as a clean extraction's does.
           router.refresh();
           break;
       }
@@ -305,6 +320,26 @@ export function RunConsole({
         </div>
       )}
 
+      {phase.kind === "deadman" && (
+        <div className="term-panel alert-panel space-y-2">
+          <div className="alert-stripe" />
+          <h2 className="text-sm tracking-widest text-[var(--term-amber)]">
+            :: DEAD MAN SWITCH FIRED ::
+          </h2>
+          <p className="text-sm">{phase.reason}</p>
+          <p className="text-sm text-[var(--term-fg-bright)]">
+            THE LINK WAS LOST, BUT THE SWITCH BANKED CLEARANCE{" "}
+            {tierLabels[curCleared - 1] ?? "?"}. READ ACCESS ONLY.
+          </p>
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            THE INTRUSION IS STILL RECORDED AS REPELLED. THE CHARGE IS SPENT.
+          </p>
+          <button onClick={() => router.refresh()} className="term-button">
+            [ CLOSE LINK ]
+          </button>
+        </div>
+      )}
+
       {phase.kind === "extracted" && (
         <div className="term-panel space-y-2">
           <h2 className="text-sm tracking-widest text-[var(--term-fg-bright)]">
@@ -317,6 +352,41 @@ export function RunConsole({
             [ CLOSE LINK ]
           </button>
         </div>
+      )}
+
+      {/* The kit is live only while a round or checkpoint is actually in play.
+          Hidden during a duel for the same reason EXTRACT and PUSH DEEPER are
+          refused there: a duel must be fought, not tooled out of. */}
+      {(phase.kind === "challenge" || phase.kind === "checkpoint") && (
+        <>
+          {deadmanArmed && (
+            <p className="text-xs text-[var(--term-amber)] px-1">
+              {"> "}DEAD MAN SWITCH ARMED — A FAILURE NOW BANKS LAYER{" "}
+              {curCleared}.
+            </p>
+          )}
+          <ToolkitPanel
+            inventory={toolkit}
+            live
+            onApplied={(next, note) => {
+              setError(null);
+              if (next) {
+                // RECOMPILE handed back a redrawn round. Adopt it from the
+                // response rather than waiting on the refresh below — the
+                // shortened clock starts now, and the puzzle should be on
+                // screen before the server round-trip returns.
+                setPhase({ kind: "challenge", challenge: next, feedback: note });
+                setCurStage(next.stage);
+              }
+              // Refresh either way, so the kit's charge counts stay honest.
+              // Safe to do alongside the state set above: `phase` lives in this
+              // client component and survives the re-render, and the server's
+              // getOrIssueChallenge is idempotent on the run's cursor, so the
+              // refresh cannot hand back a different puzzle or a fresh clock.
+              router.refresh();
+            }}
+          />
+        </>
       )}
     </div>
   );

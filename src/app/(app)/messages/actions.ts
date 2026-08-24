@@ -9,6 +9,12 @@ import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 import { authoringClearance } from "@/lib/clearance";
 import {
+  consumeRateLimit,
+  contentLimitError,
+  MESSAGE_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
+import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
@@ -58,6 +64,17 @@ export async function sendMessageAction(
       select: { threadId: true, id: true },
     });
     if (root) threadId = root.threadId ?? root.id;
+  }
+
+  // A message fans out into notification rows as well as its own — including
+  // one per @mention — so the throttle here protects more than the inbox.
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.message,
+    user.id,
+    MESSAGE_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
   }
 
   const created = await db.message.create({

@@ -12,8 +12,8 @@ import type { Rng } from "@/lib/hack/rng";
 // to solve is solvable by a script reading the same inputs. Nothing here
 // pretends otherwise. What the design does buy is that the *answer* is never
 // present client-side, the clock is server-owned, and a solver has to cover
-// twelve different mechanics with randomized rule templates rather than one.
-// The defence is cost and time pressure, not cryptography.
+// every mechanic in the registry, each with randomized rule templates, rather
+// than one. The defence is cost and time pressure, not cryptography.
 export type HackGame = {
   id: string;
   // Shown as the console header while the puzzle is up.
@@ -26,7 +26,7 @@ export type HackGame = {
   minBand: number;
   maxBand: number;
   // Multiplies the stage's base round clock. A game that is legitimately
-  // slower to read (daemon, packetfilter) gets more than 1.0; a snap judgement
+  // slower to read (daemon, signature) gets more than 1.0; a snap judgement
   // (waveform) gets less.
   timeFactor: number;
   // The fastest a HUMAN could plausibly clear this game from a cold start:

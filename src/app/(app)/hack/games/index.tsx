@@ -16,7 +16,7 @@ import type { MinesweeperPayload } from "@/lib/hack/games/minesweeper";
 import { Glyphs } from "./obfuscate";
 import type { RoundSignals } from "@/lib/hack/telemetry";
 
-// The twelve puzzle renderers.
+// The puzzle renderers, one per game in lib/hack/games.
 //
 // Every one of them is presentational: it draws the payload and reports a
 // string. None decides whether the answer is right, none knows the deadline,
@@ -24,7 +24,7 @@ import type { RoundSignals } from "@/lib/hack/telemetry";
 // intrusion console and RAISA's trace console share them without either
 // knowing which game is on screen.
 //
-// They are collected in one module rather than twelve files because they are
+// They are collected in one module rather than one file each because they are
 // each 20-40 lines of markup with no logic worth isolating, and a single
 // dispatch table is easier to keep in step with the server registry.
 

@@ -141,7 +141,7 @@ export const SECTIONS: Section[] = [
     group: "restricted",
     accent: "red",
     badge: "openCases",
-    badgeLabel: "untraced intrusion signals",
+    badgeLabel: "unclaimed cases awaiting action",
     gate: "counterIntel",
   },
   {

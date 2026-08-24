@@ -4,12 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push --skip-generate --accept-data-loss && next build",
+    "build": "prisma generate && tsx prisma/baseline.ts && prisma migrate deploy && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:baseline": "tsx prisma/baseline.ts",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:backup": "tsx prisma/backup.ts",
+    "db:backfill-personnel-expiry": "tsx prisma/backfill-personnel-expiry.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
@@ -33,6 +40,7 @@
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

@@ -13,8 +13,11 @@ import {
   canResolveCounterIntelCase,
   caseCode,
   isCaseStatus,
+  isClaimLive,
+  claimTtlCutoff,
   CASE_STATUSES,
   CASE_STATUS_LABELS,
+  CLAIM_TTL_MS,
   REVEAL_MAX,
 } from "@/lib/counter-intel";
 import {
@@ -445,6 +448,129 @@ export async function setCaseStatusAction(
 
   revalidatePath("/counter-intel");
   revalidatePath(`/counter-intel/${run.id}`);
+  return { ok: true };
+}
+
+// Pick a case up, so the rest of the desk can see it is being worked.
+//
+// ANY desk member may claim — a claim is investigative work, not a
+// recordkeeping decision, so it carries none of the L-R5 gates that RESOLVED
+// and delete do. It is also not a lock: nothing here prevents another officer
+// tracing a claimed case. It is a coordination signal, and treating it as
+// enforcement would mean a lapsed claim could strand a case nobody could touch.
+//
+// Claiming advances NEEDS_ACTION to IN_PROGRESS, because that is what picking a
+// case up means; a case already past NEEDS_ACTION keeps whatever status it has.
+export async function claimCaseAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const runId = String(formData.get("runId") ?? "");
+  if (!runId) return { ok: false, error: "MISSING CASE ID." };
+
+  const run = await db.hackRun.findUnique({
+    where: { id: runId },
+    select: {
+      id: true,
+      caseStatus: true,
+      claimedById: true,
+      claimedAt: true,
+    },
+  });
+  if (!run) return { ok: false, error: "CASE NOT FOUND." };
+
+  if (isClaimLive(run)) {
+    if (run.claimedById === user.id) return { ok: true };
+    const holder = await db.user.findUnique({
+      where: { id: run.claimedById! },
+      select: { displayName: true, email: true },
+    });
+    return {
+      ok: false,
+      error: `ALREADY CLAIMED BY ${holder?.displayName ?? holder?.email ?? "ANOTHER OFFICER"}.`,
+    };
+  }
+
+  // Conditional on the claim still being free, so two officers clicking at
+  // once produce one claim rather than a silent overwrite. Matches the
+  // conditional-write pattern resolveDuel and consumeTool use.
+  const { count } = await db.hackRun.updateMany({
+    where: {
+      id: runId,
+      OR: [
+        { claimedById: null },
+        { claimedAt: { lt: claimTtlCutoff() } },
+        { claimedById: user.id },
+      ],
+    },
+    data: {
+      claimedById: user.id,
+      claimedAt: new Date(),
+      caseStatus:
+        run.caseStatus === CASE_STATUSES.needsAction
+          ? CASE_STATUSES.inProgress
+          : run.caseStatus,
+    },
+  });
+  if (count !== 1) {
+    return { ok: false, error: "CASE WAS CLAIMED BY ANOTHER OFFICER." };
+  }
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackCaseClaimed,
+    actor: user,
+    targetType: "hack_run",
+    targetId: runId,
+    targetName: caseCode(runId),
+    summary: `Case picked up — held for ${formatDuration(CLAIM_TTL_MS)}`,
+  });
+
+  revalidatePath("/counter-intel");
+  revalidatePath(`/counter-intel/${runId}`);
+  return { ok: true };
+}
+
+// Hand a case back to the queue.
+//
+// Only the holder may release, and only while the claim is live — an officer
+// must not be able to clear somebody else's name off a case. A lapsed claim
+// needs no release: it is already gone as far as every reader is concerned.
+export async function releaseCaseAction(
+  _prevState: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireRaisa();
+  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
+
+  const runId = String(formData.get("runId") ?? "");
+  if (!runId) return { ok: false, error: "MISSING CASE ID." };
+
+  // Releasing deliberately does NOT revert caseStatus. Work that was done on
+  // the case was still done; putting it back to NEEDS_ACTION would erase that
+  // and restart the SLA clock, which is exactly the wrong incentive for an
+  // officer being honest about handing something over.
+  const { count } = await db.hackRun.updateMany({
+    where: { id: runId, claimedById: user.id },
+    data: { claimedById: null, claimedAt: null },
+  });
+  if (count !== 1) {
+    return { ok: false, error: "YOU DO NOT HOLD THIS CASE." };
+  }
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackCaseReleased,
+    actor: user,
+    targetType: "hack_run",
+    targetId: runId,
+    targetName: caseCode(runId),
+    summary: "Case released back to the queue",
+  });
+
+  revalidatePath("/counter-intel");
+  revalidatePath(`/counter-intel/${runId}`);
   return { ok: true };
 }
 

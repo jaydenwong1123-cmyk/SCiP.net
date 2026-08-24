@@ -15,7 +15,7 @@ import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
 // RAISA's trace console.
 //
-// Same engine, same twelve renderers, gentler settings: one round per reveal,
+// Same engine, same renderers, gentler settings: one round per reveal,
 // drawn from the shallow end of the registry with a slack clock. Their job is
 // oversight, not a gauntlet — the intruder is the one meant to sweat.
 export function TraceConsole({

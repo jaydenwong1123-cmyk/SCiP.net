@@ -10,6 +10,7 @@ import {
   gradeAnswer,
 } from "@/lib/hack/games";
 import { liveDuelFor, sweepDuel } from "@/lib/hack/duel";
+import { issueGrant } from "@/lib/hack/grant";
 import {
   accumulateRunSuspicion,
   recordConduct,
@@ -156,10 +157,45 @@ export async function getOrIssueChallenge(
 
 // Mark a run failed. Never partially credits: whatever was banked in earlier
 // stages is forfeit, which is what makes the EXTRACT decision a real one.
+//
+// THE ONE EXCEPTION is an armed DEAD MAN SWITCH (lib/hack/tools.ts). A member
+// who spent that tool before the round bought exactly this: the failure banks
+// the depth already cleared instead of forfeiting it. Handled here rather than
+// at each call site because every intrusion-side failure funnels through this
+// function — including the lazy sweep in resolveStaleRuns(), which is the whole
+// reason the switch is stored on the run rather than held in the console: it
+// has to fire for a member whose tab is already shut.
+//
+// A DUEL LOSS DELIBERATELY DOES NOT COME THROUGH HERE (see the note in
+// lib/hack/duel.ts about writing the effect out by hand). That is intentional
+// and not an oversight: a duel is a contest against another player, and letting
+// the intruder's insurance blunt the officer's win would take something real
+// away from the seat that earned it.
+//
+// Returns the updated run. Callers must read `status` rather than assuming a
+// failure — when the switch fires the run comes back `extracted`.
 export async function failRun(
   run: HackRun,
   reason: string
 ): Promise<HackRun> {
+  if (run.deadmanArmed && run.clearedStages >= 1) {
+    const saved = await db.hackRun.update({
+      where: { id: run.id },
+      data: {
+        status: RUN_STATUS.extracted,
+        endedAt: new Date(),
+        // Kept on the row so the case file records what actually happened —
+        // the run did fail, and the switch is why it still paid.
+        failReason: `${reason.slice(0, 90)} — DEAD MAN SWITCH FIRED`,
+        atCheckpoint: false,
+        stageDeadlineAt: null,
+        deadmanArmed: false,
+      },
+    });
+    await issueGrant(saved);
+    return saved;
+  }
+
   return db.hackRun.update({
     where: { id: run.id },
     data: {
@@ -271,8 +307,22 @@ export type SubmitOutcome =
   | { kind: "stale" }
   | { kind: "wrong"; feedback?: string; challenge: PublicChallenge }
   | { kind: "failed"; reason: string }
+  // The round was lost but an armed DEAD MAN SWITCH banked the depth already
+  // cleared. Distinct from "failed" because the console must show an
+  // extraction, and distinct from a clean extraction because the member should
+  // be told what saved them.
+  | { kind: "deadman"; reason: string }
   | { kind: "advanced"; challenge: PublicChallenge }
   | { kind: "checkpoint" };
+
+// Fold failRun's result into the outcome the console needs. failRun returns an
+// `extracted` run when the switch fires, and every caller has to branch on that
+// the same way — so it is written once here.
+function failureOutcome(ended: HackRun, reason: string): SubmitOutcome {
+  return ended.status === RUN_STATUS.extracted
+    ? { kind: "deadman", reason }
+    : { kind: "failed", reason };
+}
 
 // Grade one answer and move the run.
 //
@@ -319,12 +369,13 @@ export async function submitIntrusionAnswer(
   if (await liveDuelFor(run.id)) return { kind: "stale" };
 
   if (now > challenge.deadlineAt.getTime() + DEADLINE_GRACE_MS) {
-    await failRun(run, "TIMER EXPIRED");
-    return { kind: "failed", reason: "TIMER EXPIRED" };
+    return failureOutcome(await failRun(run, "TIMER EXPIRED"), "TIMER EXPIRED");
   }
   if (run.stageDeadlineAt && now > run.stageDeadlineAt.getTime()) {
-    await failRun(run, "STAGE WINDOW CLOSED");
-    return { kind: "failed", reason: "STAGE WINDOW CLOSED" };
+    return failureOutcome(
+      await failRun(run, "STAGE WINDOW CLOSED"),
+      "STAGE WINDOW CLOSED"
+    );
   }
 
   const result = gradeAnswer(
@@ -367,8 +418,8 @@ export async function submitIntrusionAnswer(
       where: { id: challenge.id },
       data: { correct: false, answeredAt: new Date() },
     });
-    await failRun(run, result.feedback ?? "INVALID CREDENTIAL");
-    return { kind: "failed", reason: result.feedback ?? "INVALID CREDENTIAL" };
+    const reason = result.feedback ?? "INVALID CREDENTIAL";
+    return failureOutcome(await failRun(run, reason), reason);
   }
 
   await db.hackChallenge.update({
@@ -401,6 +452,59 @@ export async function submitIntrusionAnswer(
   });
   const next = await getOrIssueChallenge(advanced);
   return { kind: "advanced", challenge: publicChallenge(next) };
+}
+
+// Redraw the round in flight — the effect behind the RECOMPILE tool.
+//
+// Implemented by advancing the run's cursor, which is the same mechanism that
+// makes every other replay impossible: the challenge currently on screen is
+// stamped with the old cursor, so the instant this returns that nonce grades as
+// "stale" and cannot be submitted. There is no window in which both puzzles are
+// live, and no way to hold the old one back and answer it later.
+//
+// The replacement's clock is deliberately shorter (RECOMPILE_TIME_FACTOR).
+// Without that, recompiling would be strictly better than thinking, and the
+// tool would just be a free re-roll on every hard draw.
+//
+// Callers MUST have verified the run is live and unexpired first. This function
+// does not check the clock, and it must never become a way to escape a round
+// whose deadline has already passed — see useToolAction.
+export async function recompileRound(
+  run: HackRun,
+  timeFactorScale: number
+): Promise<HackChallenge> {
+  // Retire the outgoing challenge explicitly rather than leaving it dangling.
+  // It can no longer be answered either way, but a row left with correct: null
+  // reads as an unresolved round in the case file, which it is not.
+  await db.hackChallenge.updateMany({
+    where: {
+      runId: run.id,
+      kind: CHALLENGE_KINDS.intrusion,
+      cursor: run.cursor,
+      correct: null,
+    },
+    data: { correct: false, answeredAt: new Date() },
+  });
+
+  const advanced = await db.hackRun.update({
+    where: { id: run.id },
+    data: { cursor: run.cursor + 1 },
+  });
+
+  const issued = await getOrIssueChallenge(advanced);
+
+  // getOrIssueChallenge owns the deadline, so the shortened clock is applied
+  // afterwards against the issue stamp — not by re-deriving it, which would
+  // duplicate roundDeadlineMs's contract in a second place.
+  const budget = issued.deadlineAt.getTime() - issued.issuedAt.getTime();
+  return db.hackChallenge.update({
+    where: { id: issued.id },
+    data: {
+      deadlineAt: new Date(
+        issued.issuedAt.getTime() + Math.round(budget * timeFactorScale)
+      ),
+    },
+  });
 }
 
 // Move from a checkpoint into the next stage.

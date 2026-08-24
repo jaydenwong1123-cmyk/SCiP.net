@@ -13,6 +13,12 @@ import {
   TickRule,
   EmptyState,
 } from "@/components/hud";
+import {
+  SANCTION_LABELS,
+  isSanctionLevel,
+  SANCTION_LEVELS,
+} from "@/lib/hack/sanctions";
+import { IssueSanctionForm, LiftSanctionForm } from "./sanction-console";
 
 // The conduct log: every graded puzzle round, and what its timing looked like.
 //
@@ -67,6 +73,49 @@ export default async function ConductLogPage({
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  // The sanction ladder. Fetched alongside the log because acting on a record
+  // and reading one belong on the same screen — an admin who has to navigate
+  // away to issue a step will read the evidence less carefully, not more.
+  const now = new Date();
+  const [sanctionRows, members] = await Promise.all([
+    db.hackSanction.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 25,
+      include: {
+        user: { select: { id: true, displayName: true, email: true } },
+        issuedBy: { select: { displayName: true, email: true } },
+      },
+    }),
+    // The owner is excluded here as well as in the action: an option that can
+    // only be refused is worse than no option.
+    db.user.findMany({
+      where: { displayName: { not: null }, isOwner: false },
+      orderBy: [{ displayName: "asc" }],
+      select: { id: true, displayName: true, email: true },
+    }),
+  ]);
+
+  const sanctions = sanctionRows.map((s) => ({
+    id: s.id,
+    level: s.level,
+    reason: s.reason,
+    memberId: s.user.id,
+    memberName: s.user.displayName ?? s.user.email,
+    issuedByName: s.issuedBy.displayName ?? s.issuedBy.email,
+    createdAtLabel: s.createdAt.toISOString().slice(0, 16).replace("T", " "),
+    expiresAtLabel: s.expiresAt
+      ? s.expiresAt.toISOString().slice(0, 16).replace("T", " ")
+      : null,
+    liftedAtLabel: s.liftedAt
+      ? s.liftedAt.toISOString().slice(0, 16).replace("T", " ")
+      : null,
+    active:
+      s.liftedAt === null &&
+      (s.expiresAt === null || s.expiresAt.getTime() > now.getTime()),
+  }));
+
+  const activeSanctions = sanctions.filter((s) => s.active).length;
+
   const qs = (next: {
     surface?: string | null;
     all?: boolean;
@@ -89,6 +138,12 @@ export default async function ConductLogPage({
       <StationHead code="ADM // CONDUCT" title="PUZZLE CONDUCT LOG">
         <Readout label="Records" value={total} />
         <Readout label="At Threshold" value={marked} small />
+        <Readout
+          label="Sanctions Live"
+          value={activeSanctions}
+          tone={activeSanctions > 0 ? "red" : "dim"}
+          small
+        />
         <Link href="/admin" className="term-link text-sm">
           [BACK TO ADMIN]
         </Link>
@@ -112,7 +167,86 @@ export default async function ConductLogPage({
         </p>
       </HudPanel>
 
-      <HudPanel code="02" title="QUERY" status="LOG FILTER">
+      <HudPanel
+        code="02"
+        title="SANCTION LADDER"
+        status={`${activeSanctions} LIVE`}
+        variant={activeSanctions > 0 ? "alert" : undefined}
+      >
+        <p className="text-sm leading-snug mb-2">
+          A conduct score is silent — the member is never told they scored. A
+          SANCTION is the opposite: it is announced to them in full, with its
+          reason and its expiry, which is what makes it appealable through IT
+          SUPPORT. Walk the ladder; do not start at the top.
+        </p>
+        <p className="text-xs text-[var(--term-fg-dim)] leading-snug mb-3">
+          This is an ADMINISTRATION power, not a counter-intel one. The desk
+          uncovers identities; it does not decide what happens to them.
+        </p>
+
+        <TickRule className="mb-3" />
+
+        <IssueSanctionForm
+          members={members.map((m) => ({
+            id: m.id,
+            name: m.displayName ?? m.email,
+          }))}
+          suggestedLevel={SANCTION_LEVELS.warning}
+        />
+
+        {sanctions.length > 0 && (
+          <>
+            <TickRule className="my-3" />
+            <div className="hud-list">
+              {sanctions.map((s) => (
+                <div key={s.id} className="term-row text-sm space-y-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <span className="min-w-0 break-words">
+                      <span className="hud-recid mr-2">{s.createdAtLabel}</span>
+                      <Link
+                        href={`/personnel/${s.memberId}`}
+                        className="term-link text-[var(--term-fg-bright)]"
+                      >
+                        {s.memberName}
+                      </Link>{" "}
+                      <span
+                        className={
+                          s.active
+                            ? "text-[var(--term-red)]"
+                            : "text-[var(--term-fg-dim)]"
+                        }
+                      >
+                        {isSanctionLevel(s.level)
+                          ? SANCTION_LABELS[s.level]
+                          : s.level.toUpperCase()}
+                      </span>
+                    </span>
+                    <span className="hud-recid shrink-0">
+                      {s.liftedAtLabel
+                        ? `LIFTED ${s.liftedAtLabel}`
+                        : s.expiresAtLabel
+                          ? `UNTIL ${s.expiresAtLabel}`
+                          : "NO EXPIRY"}
+                    </span>
+                  </div>
+                  {s.reason && (
+                    <p className="text-xs text-[var(--term-amber)]">
+                      <span className="text-[var(--term-fg-dim)]">{">"}</span>{" "}
+                      {s.reason}
+                    </p>
+                  )}
+                  <p className="text-xs text-[var(--term-fg-dim)]">
+                    ISSUED BY {s.issuedByName}
+                  </p>
+                  {s.active && <LiftSanctionForm sanctionId={s.id} />}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </HudPanel>
+
+      <HudPanel code="03" title="QUERY" status="LOG FILTER">
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <span className="hud-readout__label w-16">SURFACE</span>
           <div className="hud-segmented">
@@ -147,7 +281,7 @@ export default async function ConductLogPage({
       </HudPanel>
 
       <HudPanel
-        code="03"
+        code="04"
         title="GRADED ROUNDS"
         status={`PAGE ${pageNum} / ${totalPages}`}
         variant={marked > 0 ? "alert" : undefined}

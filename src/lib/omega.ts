@@ -29,7 +29,7 @@ export const OMEGA_OPS: Record<
     phrase: "PURGE ALL DATA",
     irreversible: true,
     blurb:
-      "Destroys every record on the network — members, files, incidents, messages, cases, logs. Your account survives. Nothing else does. There is no backup.",
+      "Destroys every record on the network — members, files, incidents, messages, cases, logs. Your account survives. Nothing else does. Nothing is kept: if you have not exported a backup, this cannot be undone.",
   },
 };
 

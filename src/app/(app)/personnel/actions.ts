@@ -17,6 +17,12 @@ import { isInfractionSeverity } from "@/lib/infractions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  consumeRateLimit,
+  contentLimitError,
+  ATTACHMENT_RULE,
+  CONTENT_SCOPES,
+} from "@/lib/rate-limit";
 
 export async function addMemberNoteAction(formData: FormData) {
   const author = await requireUser();
@@ -70,6 +76,18 @@ export async function addPersonnelAttachmentAction(
 
   const result = await validateUpload(formData.get("attachment"));
   if (!result.ok) return { ok: false, error: result.error };
+
+  // Dossier evidence is the one attachment class with NO expiry — these rows
+  // are kept indefinitely, so an unthrottled uploader grows the database
+  // permanently rather than for fourteen days.
+  const limit = await consumeRateLimit(
+    CONTENT_SCOPES.attachment,
+    user.id,
+    ATTACHMENT_RULE
+  );
+  if (limit.blocked) {
+    return { ok: false, error: contentLimitError(limit.retryAfterMs) };
+  }
 
   await storeAttachment({
     entityType: ATTACHMENT_ENTITIES.personnel,

@@ -71,6 +71,110 @@ export function isCaseStatus(value: string): value is CaseStatus {
   return (Object.values(CASE_STATUSES) as string[]).includes(value);
 }
 
+// ---------------------------------------------------------------------------
+// Desk workload: claims and the escalation SLA
+//
+// The desk was previously a shared pile. Every officer saw the same list, any
+// of them could start a trace on any case, and nothing recorded that someone
+// was already working one — so two officers could each burn a 30-minute trace
+// backoff on the same intruder without ever learning the other had been there.
+//
+// A CLAIM fixes that, and is deliberately a THIRD axis rather than a reuse of
+// either existing one:
+//   status     — what stage the case is at        (NEEDS_ACTION → RESOLVED)
+//   flagged    — does this deserve a second look  (independent boolean)
+//   claim      — who is working it right now      (this)
+//
+// A claim LAPSES. Holding one forever would just be the old pile with names on
+// it, so the window is bounded and an expired claim is indistinguishable from
+// no claim at all — the case falls back into the queue and starts ageing again.
+// Expiry is evaluated at query time and never swept, the same rule HackGrant,
+// ScpAccessGrant and broadcast scheduling all follow, because this deployment
+// has no cron.
+// ---------------------------------------------------------------------------
+
+// How long a claim holds before it lapses. Long enough to cover a real sitting
+// at the desk — the trace ladder alone can cost four rounds and a 30-minute
+// backoff — short enough that a case cannot be quietly parked overnight.
+export const CLAIM_TTL_MS = 4 * 60 * 60 * 1000;
+
+/** Claims made before this moment have lapsed. */
+export function claimTtlCutoff(now = new Date()): Date {
+  return new Date(now.getTime() - CLAIM_TTL_MS);
+}
+
+/** A Prisma filter matching cases that are effectively unclaimed. */
+export function unclaimedWhere(now = new Date()) {
+  return {
+    OR: [
+      { claimedById: null },
+      { claimedAt: { lt: claimTtlCutoff(now) } },
+    ],
+  };
+}
+
+export function isClaimLive(
+  run: { claimedById: string | null; claimedAt: Date | null },
+  now = Date.now()
+): boolean {
+  if (!run.claimedById || !run.claimedAt) return false;
+  return run.claimedAt.getTime() + CLAIM_TTL_MS > now;
+}
+
+// The escalation ladder for a case nobody has picked up.
+//
+// Measured from when the intrusion STARTED, not from when it was last touched:
+// the clock the desk is answerable to is the one the intruder started, and a
+// case that has been passed over three times is not fresher for it.
+export const SLA_AGING_MS = 6 * 60 * 60 * 1000;
+export const SLA_OVERDUE_MS = 24 * 60 * 60 * 1000;
+
+export const SLA_TIERS = {
+  fresh: "FRESH",
+  aging: "AGING",
+  overdue: "OVERDUE",
+} as const;
+
+export type SlaTier = (typeof SLA_TIERS)[keyof typeof SLA_TIERS];
+
+/**
+ * How overdue an unactioned case is, or null when the SLA does not apply.
+ *
+ * Returns null for a case that is claimed, or that has moved past
+ * NEEDS_ACTION — the SLA measures the queue nobody has picked up, not work in
+ * progress. A case whose claim has lapsed re-enters the ladder at whatever tier
+ * its age now puts it in, which is the point of the lapse.
+ */
+export function slaTier(
+  run: {
+    caseStatus: string;
+    startedAt: Date;
+    claimedById: string | null;
+    claimedAt: Date | null;
+  },
+  now = Date.now()
+): SlaTier | null {
+  if (run.caseStatus !== CASE_STATUSES.needsAction) return null;
+  if (isClaimLive(run, now)) return null;
+
+  const age = now - run.startedAt.getTime();
+  if (age >= SLA_OVERDUE_MS) return SLA_TIERS.overdue;
+  if (age >= SLA_AGING_MS) return SLA_TIERS.aging;
+  return SLA_TIERS.fresh;
+}
+
+export const SLA_LABELS: Record<SlaTier, string> = {
+  [SLA_TIERS.fresh]: "IN WINDOW",
+  [SLA_TIERS.aging]: "AGEING",
+  [SLA_TIERS.overdue]: "OVERDUE",
+};
+
+export const SLA_COLORS: Record<SlaTier, string> = {
+  [SLA_TIERS.fresh]: "var(--term-fg-dim)",
+  [SLA_TIERS.aging]: "var(--term-amber)",
+  [SLA_TIERS.overdue]: "var(--term-red)",
+};
+
 // Case files are purged 30 days after the intrusion attempt started, whether
 // or not it was ever traced. Enforced lazily rather than by a cron (this
 // deployment has none — see MESSAGE_LOG_RETENTION_DAYS in lib/message-logs.ts
@@ -168,6 +272,15 @@ export type AnonymisedRun = {
   // revealLevel — this names one of RAISA's own, not the intruder, so the
   // anonymity boundary the rest of this projection enforces doesn't apply.
   tracedByName: string | null;
+  // Who is working this case right now, if anyone. Ungated for the same reason
+  // tracedByName is: it names an officer, not the operator.
+  claimedByName: string | null;
+  claimedById: string | null;
+  claimExpiresAtMs: number | null;
+  // Escalation tier for an unclaimed case still awaiting action; null when the
+  // SLA does not apply. See slaTier().
+  sla: SlaTier | null;
+  ageMs: number;
   traceLockedUntilMs: number | null;
   // The counter-intrusion duel, if one was ever fought on this case. Ungated
   // for the same reason tracedByName is: it records what the DESK did, and
@@ -216,6 +329,7 @@ export type AnonymisedRun = {
 type RunWithExtras = HackRun & {
   user?: { id: string; displayName: string | null; email: string } | null;
   traceBy?: { id: string; displayName: string | null; email: string } | null;
+  claimedBy?: { id: string; displayName: string | null; email: string } | null;
   grant?: {
     id: string;
     tier: number;
@@ -251,8 +365,15 @@ type RunWithExtras = HackRun & {
 //
 // Consequently the page MUST pass only this function's output into JSX, and
 // must not hand a raw run (or an `include: { user: true }` result) any further.
-export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
+export function anonymiseRun(
+  run: RunWithExtras,
+  now = Date.now()
+): AnonymisedRun {
   const level = Math.max(0, Math.min(run.revealLevel, REVEAL_MAX));
+
+  // A lapsed claim is projected as no claim at all — the list, the filters and
+  // the claim button must all agree that the case is back in the queue.
+  const claimLive = isClaimLive(run, now);
 
   const grant = run.grant
     ? {
@@ -280,6 +401,16 @@ export function anonymiseRun(run: RunWithExtras): AnonymisedRun {
     tracedByName: run.traceById
       ? (run.traceBy?.displayName ?? run.traceBy?.email ?? "UNKNOWN")
       : null,
+    claimedByName: claimLive
+      ? (run.claimedBy?.displayName ?? run.claimedBy?.email ?? "UNKNOWN")
+      : null,
+    claimedById: claimLive ? run.claimedById : null,
+    claimExpiresAtMs:
+      claimLive && run.claimedAt
+        ? run.claimedAt.getTime() + CLAIM_TTL_MS
+        : null,
+    sla: slaTier(run, now),
+    ageMs: Math.max(0, now - run.startedAt.getTime()),
     traceLockedUntilMs: run.traceLockedUntil
       ? run.traceLockedUntil.getTime()
       : null,

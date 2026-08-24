@@ -8,6 +8,9 @@ import {
   CASE_RESOLUTION_LABELS,
   CASE_STATUSES,
   CASE_STATUS_LABELS,
+  SLA_LABELS,
+  SLA_COLORS,
+  SLA_TIERS,
   type AnonymisedRun,
 } from "@/lib/counter-intel";
 
@@ -49,6 +52,22 @@ function CaseBadges({ c }: { c: AnonymisedRun }) {
       </span>
       {c.flagged && (
         <span className="text-[var(--term-amber)]">⚑ FLAGGED</span>
+      )}
+      {/* Workload, in the order the desk reads it: who holds it, or how long
+          it has gone unheld. The two are mutually exclusive by construction —
+          slaTier() returns null for a live claim. */}
+      {c.claimedByName ? (
+        <span className="text-[var(--term-fg-bright)]">
+          ◆ HELD BY {c.claimedByName}
+        </span>
+      ) : (
+        c.sla &&
+        c.sla !== SLA_TIERS.fresh && (
+          <span style={{ color: SLA_COLORS[c.sla] }}>
+            {c.sla === SLA_TIERS.overdue ? "▲ " : ""}
+            {SLA_LABELS[c.sla]}
+          </span>
+        )
       )}
       {c.tracedByName && <span>TRACED BY {c.tracedByName}</span>}
     </>

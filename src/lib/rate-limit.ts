@@ -40,6 +40,46 @@ export const SENTINEL_RULE: RateLimitRule = { limit: 5, windowMs: 15 * 60 * 1000
 // see verifyOmega in lib/omega.ts.
 export const OMEGA_RULE: RateLimitRule = { limit: 5, windowMs: 60 * 60 * 1000 };
 
+// ---------------------------------------------------------------------------
+// Content write throttles
+//
+// Everything above governs GUESSING — a bucket is spent by a failure, and a
+// success clears it. These govern PRODUCTION, so they invert that: a bucket is
+// spent by a SUCCESSFUL write, and nothing clears it but time. Use
+// consumeRateLimit() for these, never checkRateLimit()/recordAttempt().
+//
+// Sized so that no member playing normally will ever meet one. They exist so
+// that a script cannot fill the archive, the inbox or — most importantly — the
+// attachment table, whose bytes live in the database itself.
+// ---------------------------------------------------------------------------
+
+// Documents: SCP files, incident reports, broadcasts, test logs, revisions.
+// Writing one of these is a deliberate act of authorship; a dozen in ten
+// minutes is already far past anything a person does by hand.
+export const CONTENT_RULE: RateLimitRule = { limit: 12, windowMs: 10 * 60 * 1000 };
+
+// Correspondence: direct messages, secure-channel posts, ticket replies.
+// Looser than CONTENT_RULE because conversation is legitimately bursty — a
+// back-and-forth thread should never trip this.
+export const MESSAGE_RULE: RateLimitRule = { limit: 25, windowMs: 10 * 60 * 1000 };
+
+// New tickets. Tight on purpose: a ticket routes to a human queue, so flooding
+// it is a denial of service against Helpers and Admins rather than merely a
+// storage cost. Replies are governed by MESSAGE_RULE instead.
+export const TICKET_RULE: RateLimitRule = { limit: 5, windowMs: 30 * 60 * 1000 };
+
+// Attachment uploads. The tightest of the four, because Attachment.data holds
+// the file BYTES in the database — every upload is direct Turso storage and
+// egress, and unlike a document it cannot be capped by a .slice().
+export const ATTACHMENT_RULE: RateLimitRule = { limit: 10, windowMs: 30 * 60 * 1000 };
+
+export const CONTENT_SCOPES = {
+  document: "content:document",
+  message: "content:message",
+  ticket: "content:ticket",
+  attachment: "content:attachment",
+} as const;
+
 export type RateLimitStatus = {
   blocked: boolean;
   remaining: number;
@@ -99,6 +139,39 @@ export async function recordAttempt(
   } catch (err) {
     console.warn("[rate-limit] record failed", scope, err);
   }
+}
+
+// Check a bucket and, if there is room, spend one slot in the same call.
+//
+// The counterpart to checkRateLimit/recordAttempt for the content rules above,
+// where the thing being counted is a SUCCESSFUL write rather than a failed
+// guess. Returns the status as it was BEFORE the slot was taken, so a caller
+// that is blocked gets a retryAfterMs it can show.
+//
+// Not atomic, and deliberately not: making it so would need a transaction on
+// every post in the app to close a race whose worst outcome is one extra row
+// past the limit. The limits are abuse ceilings, not quotas.
+//
+// FAILS OPEN, like checkRateLimit — a throttling outage must not stop members
+// filing documents. The kill-switch rule (OMEGA) is the only one in this module
+// that fails closed, and it does that in its own caller.
+export async function consumeRateLimit(
+  scope: string,
+  id: string,
+  rule: RateLimitRule
+): Promise<RateLimitStatus> {
+  const status = await checkRateLimit(scope, id, rule);
+  if (status.blocked) return status;
+  await recordAttempt(scope, id);
+  return status;
+}
+
+// The refusal a throttled content write shows. One phrasing for all four
+// scopes so the console reads consistently.
+export function contentLimitError(retryAfterMs: number): string {
+  return `TRANSMISSION THROTTLED — TOO MANY SUBMISSIONS. RETRY IN ${formatRetryAfter(
+    retryAfterMs
+  )}.`;
 }
 
 // Clear a bucket after a legitimate success, so a member who mistypes a few

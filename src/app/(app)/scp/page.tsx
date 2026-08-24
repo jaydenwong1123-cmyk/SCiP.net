@@ -6,40 +6,64 @@ import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
 import { CLASSIFICATIONS, classificationColor } from "@/lib/classification";
 import { ClassificationBadge, SignalDot } from "@/components/signal-badge";
 import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
+import { FilterRow, FilterSearch } from "@/components/filter-bar";
+import {
+  filterHref,
+  hasActiveFilters,
+  pickOption,
+  pickRank,
+  pickQuery,
+  containsFilter,
+} from "@/lib/filters";
 
 export default async function ScpListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ class?: string; level?: string }>;
+  searchParams: Promise<{ class?: string; level?: string; q?: string }>;
 }) {
   const user = await requireUser();
-  const { class: classParam, level: levelParam } = await searchParams;
+  const { class: classParam, level: levelParam, q: qParam } = await searchParams;
 
-  const activeClass =
-    classParam && CLASSIFICATIONS.some((c) => c.name === classParam)
-      ? classParam
-      : null;
-  const levelNum = levelParam ? parseInt(levelParam, 10) : NaN;
-  const activeLevel =
-    Number.isInteger(levelNum) && levelNum >= 1 && levelNum <= user.clearance
-      ? levelNum
-      : null;
+  const activeClass = pickOption(
+    classParam,
+    CLASSIFICATIONS.map((c) => c.name)
+  );
+  // Capped at the viewer's own clearance, so the level row can never be used
+  // to ask "does anything exist at L-5" from an L-2 account.
+  const activeLevel = pickRank(levelParam, 1, user.clearance);
+  const query = pickQuery(qParam);
 
   const files = await db.scpFile.findMany({
     where: {
-      OR: [
+      // The clearance/grant test and the facet filters are deliberately
+      // separate AND-ed clauses. Folding the facets into the OR would let a
+      // filter widen the result set past what the viewer may read.
+      AND: [
         {
-          clearanceRequired: activeLevel
-            ? { equals: activeLevel }
-            : { lte: user.clearance },
+          OR: [
+            {
+              clearanceRequired: activeLevel
+                ? { equals: activeLevel }
+                : { lte: user.clearance },
+            },
+            {
+              accessGrants: {
+                some: {
+                  userId: user.id,
+                  revokedAt: null,
+                  expiresAt: { gt: new Date() },
+                },
+              },
+            },
+          ],
         },
-        {
-          accessGrants: {
-            some: { userId: user.id, revokedAt: null, expiresAt: { gt: new Date() } },
-          },
-        },
+        ...(activeClass ? [{ classification: activeClass }] : []),
+        // Title only, never body: a body search would report a hit inside a
+        // passage the viewer is not cleared to read, which is exactly what
+        // lib/redact.tsx exists to prevent. Titles are already shown in full
+        // on this page, so searching them reveals nothing new.
+        ...(query ? [{ title: containsFilter(query) }] : []),
       ],
-      ...(activeClass ? { classification: activeClass } : {}),
     },
     orderBy: { createdAt: "desc" },
   });
@@ -47,17 +71,14 @@ export default async function ScpListPage({
   // Levels the viewer can actually read files at.
   const readableLevels = CLEARANCE_LEVELS.filter((l) => l.rank <= user.clearance);
 
-  const qs = (next: { class?: string | null; level?: string | null }) => {
-    const params = new URLSearchParams();
-    const c = next.class === undefined ? activeClass : next.class;
-    const l = next.level === undefined ? activeLevel?.toString() : next.level;
-    if (c) params.set("class", c);
-    if (l) params.set("level", l);
-    const s = params.toString();
-    return s ? `/scp?${s}` : "/scp";
+  const current = {
+    class: activeClass,
+    level: activeLevel?.toString() ?? null,
+    q: query,
   };
-
-  const seg = (active: boolean) => `hud-seg${active ? " hud-seg--on" : ""}`;
+  const qs = (change: Record<string, string | null>) =>
+    filterHref("/scp", current, change);
+  const filtered = hasActiveFilters(current);
 
   return (
     <>
@@ -76,40 +97,32 @@ export default async function ScpListPage({
       </StationHead>
 
       <HudPanel code="01" title="QUERY" status="ARCHIVE FILTER">
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <span className="hud-readout__label w-14">CLASS</span>
-          <div className="hud-segmented">
-            <Link href={qs({ class: null })} className={seg(!activeClass)}>
-              ALL
-            </Link>
-            {CLASSIFICATIONS.map((c) => (
-              <Link
-                key={c.name}
-                href={qs({ class: c.name })}
-                className={seg(activeClass === c.name)}
-                style={{ color: activeClass === c.name ? c.color : undefined }}
-              >
-                {c.name.toUpperCase()}
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="hud-readout__label w-14">LEVEL</span>
-          <div className="hud-segmented">
-            <Link href={qs({ level: null })} className={seg(!activeLevel)}>
-              ALL
-            </Link>
-            {readableLevels.map((l) => (
-              <Link
-                key={l.rank}
-                href={qs({ level: l.rank.toString() })}
-                className={seg(activeLevel === l.rank)}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
+        <div className="space-y-2">
+          <FilterRow
+            label="CLASS"
+            active={activeClass}
+            options={CLASSIFICATIONS.map((c) => ({
+              value: c.name,
+              label: c.name.toUpperCase(),
+              color: c.color,
+            }))}
+            hrefFor={(value) => qs({ class: value })}
+          />
+          <FilterRow
+            label="LEVEL"
+            active={activeLevel?.toString() ?? null}
+            options={readableLevels.map((l) => ({
+              value: l.rank.toString(),
+              label: l.label,
+            }))}
+            hrefFor={(value) => qs({ level: value })}
+          />
+          <FilterSearch
+            action="/scp"
+            query={query}
+            hidden={{ class: activeClass, level: activeLevel?.toString() }}
+            placeholder="SEARCH FILE TITLES..."
+          />
         </div>
       </HudPanel>
 
@@ -122,11 +135,11 @@ export default async function ScpListPage({
           {files.length === 0 && (
             <EmptyState title="No files match">
               <p className="text-xs">
-                {activeClass || activeLevel
+                {filtered
                   ? "NO DOCUMENTS MATCH THE CURRENT FILTER."
                   : "NO DOCUMENTS ARE READABLE AT YOUR CLEARANCE."}
               </p>
-              {(activeClass || activeLevel) && (
+              {filtered && (
                 <Link href="/scp" className="term-button term-button--sm mt-1">
                   CLEAR FILTERS
                 </Link>

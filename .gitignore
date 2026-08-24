@@ -46,6 +46,11 @@ next-env.d.ts
 *.db
 *.db-journal
 
+# database exports from `npm run db:backup`. These contain password hashes,
+# invite codes, the maintenance bypass code and every private message on the
+# site — they must never be committed.
+/backups
+
 .vercel
 .env*
 

@@ -55,6 +55,10 @@ export const AUDIT_ACTIONS = {
   hackRunDeleted: "hack.run.delete",
   hackCaseStatusSet: "hack.case_status.set",
   hackCaseFlagToggled: "hack.case_flag.toggle",
+  // Desk workload. Named actors, like every other RAISA-side verb: who picked a
+  // case up and who put it down is oversight of the overseer.
+  hackCaseClaimed: "hack.case.claim",
+  hackCaseReleased: "hack.case.release",
   // A run crossed the conduct threshold. NULL actor, like the other
   // intruder-side verbs: the whole point of the reveal ladder is that
   // /admin/audit must not name the intruder before RAISA has earned it. The
@@ -62,6 +66,15 @@ export const AUDIT_ACTIONS = {
   hackConductFlagged: "hack.conduct.flag",
   hackDuelEngaged: "hack.duel.engage",
   hackDuelResolved: "hack.duel.resolve",
+  // A GHOST PROTOCOL charge rolled a case's reveal level back. NULL actor, like
+  // every other intruder-side verb — this entry is about an identity being
+  // pulled back out of view, and naming it here would defeat the point.
+  hackTraceScrubbed: "hack.trace.scrub",
+  // Terminal conduct sanctions, issued from /admin/conduct. These DO carry
+  // their actor: a disciplinary step is an exercise of power over a named
+  // member, and belongs in the trail with the name of who took it.
+  hackSanctionIssued: "hack.sanction.issue",
+  hackSanctionLifted: "hack.sanction.lift",
   bulkMemberAction: "user.bulk",
   // OMEGA AUTHORITY. The rejection verbs matter as much as the success ones:
   // a sentinel failure or a refused OMEGA attempt is the tripwire telling the
@@ -76,6 +89,10 @@ export const AUDIT_ACTIONS = {
   siteTerminated: "site.terminate",
   siteRestored: "site.restore",
   sitePurged: "site.purge",
+  // A full network export. Logged for the same reason the purge is: it is the
+  // one read in this application that takes everything at once, and a backup
+  // file is as sensitive as the database it came from.
+  siteBackupExported: "site.backup.export",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -123,8 +140,13 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.hackRunDeleted]: "CASE FILE DELETED",
   [AUDIT_ACTIONS.hackCaseStatusSet]: "CASE STATUS SET",
   [AUDIT_ACTIONS.hackCaseFlagToggled]: "CASE FLAG TOGGLED",
+  [AUDIT_ACTIONS.hackCaseClaimed]: "CASE CLAIMED",
+  [AUDIT_ACTIONS.hackCaseReleased]: "CASE RELEASED",
   [AUDIT_ACTIONS.hackDuelEngaged]: "COUNTER-INTRUSION ENGAGED",
   [AUDIT_ACTIONS.hackDuelResolved]: "COUNTER-INTRUSION RESOLVED",
+  [AUDIT_ACTIONS.hackTraceScrubbed]: "TRACE SCRUBBED",
+  [AUDIT_ACTIONS.hackSanctionIssued]: "TERMINAL SANCTION ISSUED",
+  [AUDIT_ACTIONS.hackSanctionLifted]: "TERMINAL SANCTION LIFTED",
   [AUDIT_ACTIONS.bulkMemberAction]: "BULK MEMBER ACTION",
   [AUDIT_ACTIONS.sentinelPassed]: "SENTINEL CLEARED",
   [AUDIT_ACTIONS.sentinelFailed]: "SENTINEL FAILED",
@@ -135,6 +157,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.siteTerminated]: "SITE TERMINATED",
   [AUDIT_ACTIONS.siteRestored]: "SITE RESTORED",
   [AUDIT_ACTIONS.sitePurged]: "DATA PURGED",
+  [AUDIT_ACTIONS.siteBackupExported]: "BACKUP EXPORTED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

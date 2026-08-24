@@ -56,7 +56,15 @@ export function parseSignals(raw: string): ConductSignals | null {
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return null;
+    // Arrays are excluded explicitly: `typeof [] === "object"`, so without this
+    // a client could send "[]" and get back a well-formed all-undefined signal
+    // set instead of null — which skips the "NO TELEMETRY REPORTED" penalty in
+    // scoreSubmission that an empty or malformed blob would have earned. Small,
+    // but it is a free 15 points to anyone who notices, and the whole reason
+    // the reported tier is weighted low is that it is forgeable.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
     const src = parsed as Record<string, unknown>;
     const num = (key: string): number | undefined => {
       const v = src[key];

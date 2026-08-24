@@ -76,10 +76,14 @@ model User {
   ticketReplies    TicketReply[]  @relation("TicketReplyAuthor")
   hackRuns          HackRun[]   @relation("HackRunUser")
   hackRunsTraced    HackRun[]   @relation("HackRunTracer")
+  hackRunsClaimed   HackRun[]   @relation("HackRunClaimant")
   hackGrants        HackGrant[] @relation("HackGrantUser")
   hackGrantsRevoked HackGrant[] @relation("HackGrantRevoker")
   hackDuelsDefended HackDuel[]  @relation("HackDuelDefender")
   conductRecords    ConductRecord[] @relation("ConductSubject")
+  hackSanctions        HackSanction[] @relation("HackSanctionSubject")
+  hackSanctionsIssued  HackSanction[] @relation("HackSanctionIssuer")
+  hackTools            HackTool[]     @relation("HackToolOwner")
 }
 
 // An IT support ticket. One table backs all three kinds because they share
@@ -391,6 +395,33 @@ model HackRun {
   // see lib/hack/suspicion.ts for why the evidence is advisory, not a verdict.
   suspicionScore Int @default(0)
 
+  // --- Intrusion toolkit effects (see lib/hack/tools.ts) --------------------
+  // DEADMAN SWITCH: armed mid-run, it converts the next failure into an
+  // extraction at whatever depth was already banked. Stored on the run rather
+  // than consumed at failure time so that the effect survives the tab closing
+  // — the lazy abandonment sweep honours it exactly like a live failure does.
+  deadmanArmed Boolean @default(false)
+  // SIGNAL SPOOF: hides this case from the desk's live-intrusion panel until
+  // it lapses. It never hides the case FILE — the audit trail and the case list
+  // are untouched — only the real-time board RAISA watches to catch a duel.
+  spoofedUntil DateTime?
+
+  // --- Desk workload (see lib/counter-intel.ts) -----------------------------
+  // Which officer has picked this case up. Deliberately separate from
+  // `traceById` (who last advanced the ladder) and from `caseStatus` (what
+  // stage the case is at): a claim records WHO IS WORKING IT RIGHT NOW, which
+  // is the one thing the desk previously had no way to express. Without it two
+  // officers can spend their trace backoffs on the same case without ever
+  // knowing the other was there.
+  //
+  // A claim LAPSES rather than being held forever — the expiry is derived from
+  // claimedAt at query time (claimTtlCutoff), not stored, so the window can be
+  // retuned without a migration. Same query-time-expiry rule as every other
+  // deadline in this schema.
+  claimedById String?
+  claimedBy   User?     @relation("HackRunClaimant", fields: [claimedById], references: [id])
+  claimedAt   DateTime?
+
   caseStatus String  @default("NEEDS_ACTION")
   // Anyone on the desk may flag a case for attention — independent of
   // caseStatus, so a case already IN_PROGRESS can still be flagged without
@@ -407,6 +438,8 @@ model HackRun {
   @@index([userId, startedAt])
   @@index([status])
   @@index([startedAt])
+  // Drives the desk's "my cases" filter and the unclaimed/overdue counts.
+  @@index([claimedById, claimedAt])
 }
 
 // The counter-intrusion duel: one puzzle, two seats, one winner.
@@ -575,6 +608,79 @@ model ConductRecord {
   @@index([score, createdAt])
   @@index([runId])
   @@index([createdAt])
+}
+
+// A disciplinary step against a member's terminal access.
+//
+// ISSUED BY ADMINS, NOT BY RAISA — and that is the whole design. The desk at
+// /counter-intel holds the power to UNCOVER a name; the conduct log at
+// /admin/conduct holds the power to ACT on one. lib/counter-intel.ts explains
+// at length why those two must not be the same people, and a sanction issued
+// from the desk would collapse exactly that separation. The evidence a sanction
+// rests on (ConductRecord) is already Admin+ only for the same reason.
+//
+// Three rungs, escalating, in lib/hack/sanctions.ts:
+//   warning     — recorded and shown to the member. No access effect at all.
+//   restricted  — the intrusion cooldown is multiplied while it holds.
+//   blacklisted — no run may be started while it holds.
+//
+// Unlike the silent conduct flag, a sanction is DELIBERATELY VISIBLE to its
+// subject. That is what makes it appealable: a member who cannot tell anything
+// happened cannot contest it, and lib/tickets.ts carries the appeal queue this
+// pairs with.
+model HackSanction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("HackSanctionSubject", fields: [userId], references: [id])
+  // "warning" | "restricted" | "blacklisted"
+  level  String
+  // Shown to the member verbatim. A sanction with no stated reason is not
+  // appealable in any meaningful sense, so the issuing form requires one.
+  reason String @default("")
+  // When the sanction lapses. NULL means indefinite — permitted only for
+  // "blacklisted", and only deliberately.
+  expiresAt DateTime?
+
+  issuedById String
+  issuedBy   User   @relation("HackSanctionIssuer", fields: [issuedById], references: [id])
+  createdAt  DateTime @default(now())
+
+  // Lifted early, e.g. on a successful appeal. Never deleted: the row is the
+  // record that the sanction was issued AND that it was withdrawn, which is
+  // the same reasoning HackGrant.revokedAt follows.
+  liftedAt   DateTime?
+  liftedById String?
+  liftReason String @default("")
+
+  @@index([userId, createdAt])
+  @@index([userId, liftedAt, expiresAt])
+}
+
+// One earned, single-use countermeasure in a member's intrusion toolkit.
+//
+// A row per tool rather than a per-kind counter on User: a counter cannot say
+// where a tool came from or when it was spent, and both of those matter when a
+// case is being reviewed. Spending a tool sets `usedAt` — rows are never
+// deleted, so the toolkit doubles as its own audit trail.
+//
+// See lib/hack/tools.ts for what each kind does and how they are earned.
+model HackTool {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("HackToolOwner", fields: [userId], references: [id])
+  // "recompile" | "spoof" | "ghost" | "deadman"
+  kind   String
+  // The run that paid out this tool, for provenance. Nullable so a tool
+  // outlives its case being purged from the desk.
+  earnedFromRunId String?
+  createdAt DateTime @default(now())
+
+  // Spent. Null while the tool is still in the kit.
+  usedAt      DateTime?
+  usedOnRunId String?
+
+  @@index([userId, usedAt])
+  @@index([usedOnRunId])
 }
 
 model Broadcast {
