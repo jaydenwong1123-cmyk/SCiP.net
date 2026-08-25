@@ -93,7 +93,7 @@ export const STOPWATCH_EXTEND_MS = 30 * 1000;
 // Ceiling on unspent tools. Without it a member who never spends anything
 // accumulates an arsenal and the scarcity that makes the choice interesting
 // disappears. Earnings past the cap are simply not granted.
-export const MAX_UNUSED_TOOLS = 5;
+export const MAX_UNUSED_TOOLS = 10;
 
 // The depth a run must reach before it pays a tool at all. Layer 3 is the first
 // stage that takes two rounds back to back, so this is also the first depth
