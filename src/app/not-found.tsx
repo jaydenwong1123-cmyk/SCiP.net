@@ -13,14 +13,14 @@ export default function RootNotFound() {
       <div className="hud-banner hud-banner--ts">
         <span>TOP SECRET</span>
         <span aria-hidden>{"//"}</span>
-        <span>SCiP-220</span>
+        <span>SCiP-147</span>
         <span aria-hidden>{"//"}</span>
         <span>AUTHORIZED PERSONNEL ONLY</span>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="term-panel w-full max-w-md space-y-4 text-center p-6">
-          <div className="hud-recid">SCiP-220 // ROUTING FAULT</div>
+          <div className="hud-recid">SCiP-147 // ROUTING FAULT</div>
           <h1
             className="text-lg text-[var(--term-amber)]"
             style={{ letterSpacing: "0.18em" }}

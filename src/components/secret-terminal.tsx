@@ -7,7 +7,7 @@ type Line = { kind: "in" | "out"; text: string };
 
 const BANNER = [
   "╔══════════════════════════════════════════════╗",
-  "║  SCiP.NET // FACILITY-220 MAINTENANCE SHELL    ║",
+  "║  SCiP.NET // FACILITY-147 MAINTENANCE SHELL    ║",
   "║  UNAUTHORIZED ACCESS IS A CLASS-3 VIOLATION    ║",
   "╚══════════════════════════════════════════════╝",
   "★ You found the easter egg. Welcome, operative. ★",
@@ -39,7 +39,7 @@ function runCommand(raw: string): {
         out: [
           "OPERATIVE: [REDACTED]",
           "DESIGNATION: L-R5 (Recordkeeper, rank-6 access)",
-          "STATION: Facility-220, Sub-level 4",
+          "STATION: Facility-147, Sub-level 4",
         ],
       };
     case "clearance":
@@ -53,10 +53,10 @@ function runCommand(raw: string): {
         ],
       };
     case "unlock":
-      if (arg.toLowerCase() === "facility-220" || arg === "220") {
+      if (arg.toLowerCase() === "facility-147" || arg === "147") {
         return {
           out: [
-            "░░ FACILITY-220 CORE UNSEALED ░░",
+            "░░ FACILITY-147 CORE UNSEALED ░░",
             "Purpose: long-term anomaly archival & recordkeeping.",
             "Current containment status: NOMINAL.",
           ],
@@ -90,7 +90,7 @@ function runCommand(raw: string): {
     case "manifest":
       return {
         out: [
-          "220-ROSTER: Recordkeeper, Archivist, Custodian, [DATA EXPUNGED]",
+          "147-ROSTER: Recordkeeper, Archivist, Custodian, [DATA EXPUNGED]",
         ],
       };
     case "clear":
@@ -168,7 +168,7 @@ export function SecretTerminal({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between mb-2">
           <span className="tracking-widest text-[var(--term-fg-bright)]">
-            :: FACILITY-220 SHELL ::
+            :: FACILITY-147 SHELL ::
           </span>
           <button type="button" onClick={onClose} className="term-button text-xs">
             [CLOSE]

@@ -33,7 +33,7 @@ const MOBILE_PRIMARY = ["/personnel", "/messages", "/scp", "/incidents"];
 export function CommandRail({
   sections,
   counts,
-  facility = "SCiP-220",
+  facility = "SCiP-147",
   callsign,
   linkState = "SECURE",
 }: {
@@ -166,7 +166,7 @@ export function CommandRail({
         <div className="hud-drawer sm:hidden" role="dialog" aria-label="All stations">
           <div className="hud-station-head mb-3">
             <div>
-              <span className="hud-station-head__code">SCiP-220</span>
+              <span className="hud-station-head__code">SCiP-147</span>
               <span className="hud-station-head__title">STATION INDEX</span>
             </div>
             <button

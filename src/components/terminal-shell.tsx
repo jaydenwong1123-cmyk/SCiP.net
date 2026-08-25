@@ -54,7 +54,7 @@ export function TerminalShell({
         <div className="hud-banner hud-banner--ts">
           <span>TOP SECRET</span>
           <span aria-hidden>{"//"}</span>
-          <span>SCiP-220</span>
+          <span>SCiP-147</span>
           <span aria-hidden>{"//"}</span>
           <span>NOFORN</span>
         </div>
@@ -64,7 +64,7 @@ export function TerminalShell({
           <span className="hud-statusbar__sep" aria-hidden>
             │
           </span>
-          <span className="text-[var(--term-amber)]">FACILITY-220</span>
+          <span className="text-[var(--term-amber)]">FACILITY-147</span>
           <StationBreadcrumb />
 
           <div className="hud-statusbar__right">

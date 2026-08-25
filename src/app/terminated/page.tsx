@@ -25,7 +25,7 @@ export default async function TerminatedPage() {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="secure-panel w-full max-w-md space-y-4">
           <div className="alert-stripe" aria-hidden />
-          <div className="hud-recid">SCiP-220 // OMEGA</div>
+          <div className="hud-recid">SCiP-147 // OMEGA</div>
           <h1
             className="text-lg text-[var(--term-red)]"
             style={{ letterSpacing: "0.18em" }}

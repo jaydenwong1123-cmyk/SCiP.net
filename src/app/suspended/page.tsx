@@ -16,7 +16,7 @@ export default async function SuspendedPage() {
       <div className="flex-1 flex items-center justify-center p-4">
       <div className="alert-panel w-full max-w-md space-y-4 text-center">
         <div className="alert-stripe" aria-hidden />
-        <div className="hud-recid">SCiP-220 // SECURITY ACTION</div>
+        <div className="hud-recid">SCiP-147 // SECURITY ACTION</div>
         <h1
           className="text-lg text-[var(--term-red)]"
           style={{ letterSpacing: "0.18em" }}

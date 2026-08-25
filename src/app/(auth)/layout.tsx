@@ -30,7 +30,7 @@ export default async function AuthLayout({
       <div className="hud-banner hud-banner--ts">
         <span>TOP SECRET</span>
         <span aria-hidden>{"//"}</span>
-        <span>SCiP-220</span>
+        <span>SCiP-147</span>
         <span aria-hidden>{"//"}</span>
         <span>AUTHORIZED PERSONNEL ONLY</span>
       </div>

@@ -42,7 +42,7 @@ export default function GlobalError({
 
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="term-panel w-full max-w-md space-y-4 text-center p-6">
-            <div className="hud-recid">SCiP-220 // SYSTEM FAULT</div>
+            <div className="hud-recid">SCiP-147 // SYSTEM FAULT</div>
             <h1
               className="text-lg text-[var(--term-red)]"
               style={{ letterSpacing: "0.18em" }}

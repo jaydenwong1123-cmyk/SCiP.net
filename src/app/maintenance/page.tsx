@@ -26,7 +26,7 @@ export default async function MaintenancePage() {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="secure-panel w-full max-w-md space-y-4">
           <div className="alert-stripe" aria-hidden />
-          <div className="hud-recid">SCiP-220 // SITE CONTROL</div>
+          <div className="hud-recid">SCiP-147 // SITE CONTROL</div>
           <h1
             className="text-lg text-[var(--term-amber)]"
             style={{ letterSpacing: "0.18em" }}

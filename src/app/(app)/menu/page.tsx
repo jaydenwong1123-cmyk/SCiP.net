@@ -32,7 +32,7 @@ export default async function MenuPage() {
 
   return (
     <>
-      <StationHead code="SCiP-220 // STATION BOARD" title="MAIN MENU">
+      <StationHead code="SCiP-147 // STATION BOARD" title="MAIN MENU">
         <Readout
           label="Clearance"
           value={clearanceDisplay(user.clearance, user.designation)}

@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div className="hud-panel-head">
           <span className="hud-panel-head__code">AUTH</span>
           <span>SECURE LOGIN</span>
-          <span className="hud-panel-head__status">SCiP-220</span>
+          <span className="hud-panel-head__status">SCiP-147</span>
         </div>
         <form action={handleSubmit} className="space-y-3">
           <div>
