@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { GameSurface, useRoundInput } from "../hack/games";
 import {
   beginTraceAction,
-  checkTraceAnswerAction,
   submitTraceAnswerAction,
   type TraceState,
 } from "./actions";
@@ -38,8 +37,6 @@ export function TraceConsole({
   const [notice, setNotice] = useState<string | null>(lockedNotice);
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useRoundInput(challenge?.nonce ?? "");
-  const [checkPending, startCheckTransition] = useTransition();
-  const [checkFeedback, setCheckFeedback] = useState<string | null>(null);
   // The desk is held to the same conduct standard as the people it
   // investigates. An officer who solves a trace faster than it can be read is
   // buying somebody's identity with a language model, and that belongs in the
@@ -54,7 +51,6 @@ export function TraceConsole({
         return;
       }
       setError(null);
-      setCheckFeedback(null);
       switch (state.kind) {
         case "challenge":
           setNotice(null);
@@ -133,36 +129,11 @@ export function TraceConsole({
             game={challenge.game}
             payload={challenge.payload}
             value={answer}
-            onChange={(v) => {
-              setCheckFeedback(null);
-              setAnswer(v);
-            }}
+            onChange={setAnswer}
             disabled={pending}
             signals={telemetry.signals}
           />
-          {checkFeedback && (
-            <p className="text-sm text-[var(--term-fg-bright)]">{checkFeedback}</p>
-          )}
           <div className="flex flex-wrap gap-2">
-            {challenge.game === "icebreaker" && (
-              <button
-                type="button"
-                disabled={pending || checkPending}
-                className="term-button"
-                onClick={() => {
-                  if (!challenge || pending || checkPending) return;
-                  const form = new FormData();
-                  form.set("nonce", challenge.nonce);
-                  form.set("answer", answer);
-                  startCheckTransition(async () => {
-                    const result = await checkTraceAnswerAction(null, form);
-                    setCheckFeedback(result.ok ? result.feedback : result.error);
-                  });
-                }}
-              >
-                {checkPending ? "CHECKING..." : "[ CHECK ]"}
-              </button>
-            )}
             <button type="submit" disabled={pending} className="term-button">
               {pending ? "RESOLVING..." : "[ RESOLVE ]"}
             </button>

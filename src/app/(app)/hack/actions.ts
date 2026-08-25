@@ -18,7 +18,6 @@ import {
   stageCapMs,
 } from "@/lib/hack/config";
 import {
-  checkIntrusionAnswer,
   failRun,
   getOrIssueChallenge,
   publicChallenge,
@@ -249,42 +248,6 @@ export async function submitHackAnswerAction(
       revalidatePath("/", "layout");
       return { ok: true, kind: "deadman", reason: outcome.reason };
   }
-}
-
-// Preview an answer's feedback without spending an attempt or advancing
-// anything. Throttled identically to a real submission — otherwise CHECK
-// would be a free, unlimited oracle for brute-forcing the guess-carrying
-// games (icebreaker's letters-correct count above all).
-export async function checkHackAnswerAction(
-  _prevState: { ok: boolean; feedback?: string; error?: string } | null,
-  formData: FormData
-): Promise<{ ok: boolean; feedback?: string; error?: string }> {
-  const user = await requireUser();
-
-  if (findNonAsciiFormField(formData)) {
-    return { ok: false, error: NON_ASCII_ERROR };
-  }
-
-  if (!hasStaffPowers(user)) {
-    const throttle = await checkRateLimit("hack", user.id, HACK_RULE);
-    if (throttle.blocked) {
-      return {
-        ok: false,
-        error: `TERMINAL LOCKED — RETRY IN ${formatDuration(throttle.retryAfterMs)}.`,
-      };
-    }
-    await recordAttempt("hack", user.id);
-  }
-
-  const nonce = String(formData.get("nonce") ?? "");
-  const answer = String(formData.get("answer") ?? "").slice(0, 400);
-  if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
-
-  const outcome = await checkIntrusionAnswer(user.id, nonce, answer);
-  if (!outcome.ok) {
-    return { ok: false, error: "STALE CHALLENGE — RESYNCHRONIZING." };
-  }
-  return { ok: true, feedback: outcome.feedback };
 }
 
 // ---------------------------------------------------------------------------

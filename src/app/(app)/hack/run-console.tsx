@@ -7,7 +7,6 @@ import { Countdown } from "./countdown";
 import { DuelPanel } from "./duel-panel";
 import {
   abortHackRunAction,
-  checkHackAnswerAction,
   extractHackRunAction,
   pollDuelAction,
   pushDeeperAction,
@@ -103,8 +102,6 @@ export function RunConsole({
   // as the answer box does. Nothing it collects affects grading — see the
   // header of lib/hack/telemetry.ts.
   const telemetry = useRoundTelemetry(challenge?.nonce ?? "");
-  const [checkPending, startCheckTransition] = useTransition();
-  const [checkFeedback, setCheckFeedback] = useState<string | null>(null);
 
   const apply = useCallback(
     (state: HackActionState) => {
@@ -119,7 +116,6 @@ export function RunConsole({
       // reading, nor disturb the phase they are mid-puzzle on.
       if (state.kind === "idle") return;
       setError(null);
-      setCheckFeedback(null);
       switch (state.kind) {
         case "challenge":
           setPhase({
@@ -171,7 +167,6 @@ export function RunConsole({
 
   const submit = useCallback(() => {
     if (!challenge || pending) return;
-    setCheckFeedback(null);
     const form = new FormData();
     form.set("nonce", challenge.nonce);
     form.set("answer", answer);
@@ -180,20 +175,6 @@ export function RunConsole({
       apply(await submitHackAnswerAction(null, form));
     });
   }, [challenge, answer, pending, apply, telemetry]);
-
-  // A preview, not a submission: burns no attempt and never advances the
-  // round. Separate from TRANSMIT so a player can see how close a guess is
-  // (e.g. icebreaker's letters-correct count) without risking anything.
-  const check = useCallback(() => {
-    if (!challenge || pending || checkPending) return;
-    const form = new FormData();
-    form.set("nonce", challenge.nonce);
-    form.set("answer", answer);
-    startCheckTransition(async () => {
-      const result = await checkHackAnswerAction(null, form);
-      setCheckFeedback(result.ok ? (result.feedback ?? null) : (result.error ?? null));
-    });
-  }, [challenge, answer, pending, checkPending]);
 
   return (
     <div className="space-y-4">
@@ -242,10 +223,7 @@ export function RunConsole({
               game={phase.challenge.game}
               payload={phase.challenge.payload}
               value={answer}
-              onChange={(v) => {
-                setCheckFeedback(null);
-                setAnswer(v);
-              }}
+              onChange={setAnswer}
               disabled={pending}
               signals={telemetry.signals}
             />
@@ -253,22 +231,9 @@ export function RunConsole({
             {phase.feedback && (
               <p className="text-sm text-[var(--term-amber)]">{phase.feedback}</p>
             )}
-            {checkFeedback && (
-              <p className="text-sm text-[var(--term-fg-bright)]">{checkFeedback}</p>
-            )}
             {error && <p className="text-sm text-[var(--term-red)]">{error}</p>}
 
             <div className="flex flex-wrap gap-2">
-              {phase.challenge.game === "icebreaker" && (
-                <button
-                  type="button"
-                  onClick={check}
-                  disabled={pending || checkPending}
-                  className="term-button"
-                >
-                  {checkPending ? "CHECKING..." : "[ CHECK ]"}
-                </button>
-              )}
               <button type="submit" disabled={pending} className="term-button">
                 {pending ? "TRANSMITTING..." : "[ TRANSMIT ]"}
               </button>

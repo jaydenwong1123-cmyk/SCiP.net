@@ -262,46 +262,11 @@ export async function resolveStaleRuns(userId: string): Promise<HackRun | null> 
   return active;
 }
 
-// Grade a candidate answer for on-screen feedback ONLY — no attempt spent, no
-// challenge or run row touched. Exists so a player can see the letters-correct
-// count on ICE PASSWORD CRACK without it costing anything, which is the whole
-// reason CHECK is a separate button from TRANSMIT. Restricted to that one game:
-// every other game's grade() only ever returns a bare correct/incorrect, so a
-// free CHECK there would just be a no-cost extra guess.
-export async function checkIntrusionAnswer(
-  userId: string,
-  nonce: string,
-  answer: string
-): Promise<{ ok: true; feedback: string } | { ok: false }> {
-  const challenge = await db.hackChallenge.findUnique({
-    where: { nonce },
-    include: { run: true },
-  });
-
-  if (
-    !challenge ||
-    challenge.run.userId !== userId ||
-    challenge.kind !== CHALLENGE_KINDS.intrusion ||
-    challenge.run.status !== RUN_STATUS.active ||
-    challenge.correct !== null ||
-    challenge.cursor !== challenge.run.cursor ||
-    challenge.game !== "icebreaker"
-  ) {
-    return { ok: false };
-  }
-
-  const result = gradeAnswer(
-    challenge.game,
-    JSON.parse(challenge.solution),
-    answer
-  );
-  return {
-    ok: true,
-    feedback: result.correct
-      ? "MATCH — HIT TRANSMIT TO CONFIRM"
-      : (result.feedback ?? "NO MATCH"),
-  };
-}
+// There is deliberately no free "preview" grader here. ICE PASSWORD CRACK's
+// likeness count is the whole puzzle, so a grade that costs nothing is an
+// unlimited oracle: guess every candidate for free, read the counts, and the
+// attempt budget the generator hands out stops meaning anything. The only way
+// to see a likeness count is to spend an attempt on it.
 
 export type SubmitOutcome =
   | { kind: "stale" }

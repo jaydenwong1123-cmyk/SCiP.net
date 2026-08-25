@@ -51,10 +51,6 @@ export type TraceState =
   | { ok: true; kind: "locked"; reason: string }
   | { ok: false; error: string; resync?: boolean };
 
-export type TraceCheckState =
-  | { ok: true; feedback: string }
-  | { ok: false; error: string };
-
 // Shared gate. Department string only — see the header of lib/counter-intel.ts
 // for why staff powers deliberately do not open this desk.
 async function requireRaisa() {
@@ -230,51 +226,9 @@ export async function submitTraceAnswerAction(
   return { ok: true, kind: "revealed", revealLevel };
 }
 
-// Preview a trace answer's feedback without spending it — no cursor advance,
-// no backoff, no reveal. Mirrors checkHackAnswerAction on the intrusion side;
-// see its comment for why CHECK has to be a separate verb from RESOLVE.
-export async function checkTraceAnswerAction(
-  _prevState: TraceCheckState | null,
-  formData: FormData
-): Promise<TraceCheckState> {
-  const user = await requireRaisa();
-  if (!user) return { ok: false, error: "NOT AUTHORIZED." };
-
-  if (findNonAsciiFormField(formData)) {
-    return { ok: false, error: NON_ASCII_ERROR };
-  }
-
-  const nonce = String(formData.get("nonce") ?? "");
-  const answer = String(formData.get("answer") ?? "").slice(0, 400);
-  if (!nonce) return { ok: false, error: "MISSING CHALLENGE HANDLE." };
-
-  const challenge = await db.hackChallenge.findUnique({
-    where: { nonce },
-    include: { run: true },
-  });
-
-  if (
-    !challenge ||
-    challenge.kind !== CHALLENGE_KINDS.trace ||
-    challenge.correct !== null ||
-    challenge.cursor !== challenge.run.traceCursor ||
-    challenge.run.revealLevel >= REVEAL_MAX ||
-    // CHECK only exists for ICE PASSWORD CRACK — every other game's grade()
-    // only returns correct/incorrect, so a free preview there is just a
-    // no-cost extra guess.
-    challenge.game !== "icebreaker"
-  ) {
-    return { ok: false, error: "STALE TRACE — RESYNCHRONIZING." };
-  }
-
-  const result = gradeAnswer(challenge.game, JSON.parse(challenge.solution), answer);
-  return {
-    ok: true,
-    feedback: result.correct
-      ? "MATCH — HIT RESOLVE TO CONFIRM"
-      : (result.feedback ?? "NO MATCH"),
-  };
-}
+// There is deliberately no free trace-answer preview here, exactly as on the
+// intrusion side: a likeness count that costs nothing turns ICE PASSWORD
+// CRACK's attempt budget into an unlimited oracle. RESOLVE is the only grader.
 
 // ---------------------------------------------------------------------------
 // Counter-intrusion duel
