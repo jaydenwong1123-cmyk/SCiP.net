@@ -164,6 +164,60 @@ export async function awardTools(input: {
   }
 }
 
+/**
+ * Issue tools by hand, from the quartermaster's desk rather than from a run.
+ *
+ * Two things separate this from awardTools(). It may name the KIND — the random
+ * draw exists so the earned economy cannot be farmed for one mechanic, and a
+ * deliberate, audited, owner-level act is not farming. And it is NOT
+ * best-effort: nobody's run hangs on it, so a write that fails must surface as
+ * a failure instead of silently issuing nothing.
+ *
+ * MAX_UNUSED_TOOLS still binds. The cap is what makes a charge worth spending,
+ * and a grant that could ignore it would hand the quartermaster a switch for
+ * turning the whole toolkit off. Returns what was actually issued, which may be
+ * short of what was asked for — the caller must tell the truth about that.
+ */
+export async function issueTools(input: {
+  userId: string;
+  kind: ToolKind | null;
+  count: number;
+}): Promise<ToolKind[]> {
+  if (input.count <= 0) return [];
+
+  const held = inventoryTotal(await toolInventory(input.userId));
+  const room = Math.max(0, MAX_UNUSED_TOOLS - held);
+  const grant = Math.min(input.count, room);
+  if (grant === 0) return [];
+
+  // A null kind means "let the desk draw", matching what a run pays out.
+  const rng = input.kind ? null : createRng();
+  const kinds: ToolKind[] = [];
+  for (let i = 0; i < grant; i++) {
+    kinds.push(input.kind ?? rng!.pick(TOOL_ORDER));
+  }
+
+  await db.hackTool.createMany({
+    // No earnedFromRunId: this charge came from no run, and the column is
+    // nullable precisely so provenance can say so rather than lie.
+    data: kinds.map((kind) => ({ userId: input.userId, kind })),
+  });
+  return kinds;
+}
+
+/** Unspent tools held, per member, for a set of members. */
+export async function heldToolCounts(
+  userIds: string[]
+): Promise<Map<string, number>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await db.hackTool.groupBy({
+    by: ["userId"],
+    where: { userId: { in: userIds }, usedAt: null },
+    _count: true,
+  });
+  return new Map(rows.map((r) => [r.userId, r._count]));
+}
+
 /** How many tools a run of this depth pays out. */
 export function toolsEarnedFor(clearedStages: number): number {
   if (clearedStages < TOOL_EARN_MIN_STAGE) return 0;

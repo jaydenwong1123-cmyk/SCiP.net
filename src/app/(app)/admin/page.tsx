@@ -14,6 +14,8 @@ import {
 } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberList } from "./member-list";
+import { Quartermaster } from "./quartermaster";
+import { heldToolCounts, MAX_UNUSED_TOOLS } from "@/lib/hack/tools";
 import {
   StationHead,
   HudPanel,
@@ -112,6 +114,17 @@ export default async function AdminPage() {
   ];
 
   const siteConfig = ownerPowers ? await getSiteConfig() : null;
+
+  // The quartermaster roster. Co-owners are left off for the same reason their
+  // member rows are: an owner-level peer is not something another owner-level
+  // peer administers. Suspended members are off it too — they cannot reach the
+  // ladder to spend a charge.
+  const quartermasterMembers = ownerPowers
+    ? members.filter((m) => !m.isCoOwner && !m.suspended)
+    : [];
+  const toolHolders = ownerPowers
+    ? await heldToolCounts(quartermasterMembers.map((m) => m.id))
+    : null;
 
   return (
     <>
@@ -411,8 +424,51 @@ export default async function AdminPage() {
         />
       </HudPanel>
 
+      {/* Owner and Co-Owner only. Handing out tool charges is minting currency
+          in the hack ladder's economy, so it sits a step above the sanctions
+          desk that Admin runs. issueToolsAction() enforces the same gate with
+          requireOwner(); this is signposting, not the boundary. */}
+      {ownerPowers && toolHolders && (
+        <HudPanel
+          code="06"
+          title={
+            <span className="text-[var(--term-amber)]">
+              QUARTERMASTER — ISSUE INTRUSION TOOLING
+            </span>
+          }
+          status={`${quartermasterMembers.length} ELIGIBLE`}
+          variant="secure"
+        >
+          <p className="text-xs text-[var(--term-fg-dim)]">
+            Grant power-up charges directly to a member&apos;s kit at{" "}
+            <span className="hud-recid">/hack</span>, without them clearing a
+            run for it. The member is notified and every issue is logged to the
+            action log. A kit still caps at {MAX_UNUSED_TOOLS} unspent charges —
+            grants past the cap are trimmed, not stacked.
+          </p>
+          <TickRule className="my-3" />
+          <Quartermaster
+            members={quartermasterMembers.map((m) => ({
+              id: m.id,
+              name: m.displayName ?? m.email,
+              held: toolHolders.get(m.id) ?? 0,
+            }))}
+            // Both stops are stored normalised, and both must be present for a
+            // gradient to exist — a half-set pair is treated as unset.
+            gradient={
+              siteConfig?.quartermasterFrom && siteConfig?.quartermasterTo
+                ? {
+                    from: siteConfig.quartermasterFrom,
+                    to: siteConfig.quartermasterTo,
+                  }
+                : null
+            }
+          />
+        </HudPanel>
+      )}
+
       <HudPanel
-        code="06"
+        code="07"
         title="INVITE CODES"
         status={`${inviteCodes.length} ISSUED`}
       >

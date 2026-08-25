@@ -73,6 +73,8 @@ export const AUDIT_ACTIONS = {
   // Terminal conduct sanctions, issued from /admin/conduct. These DO carry
   // their actor: a disciplinary step is an exercise of power over a named
   // member, and belongs in the trail with the name of who took it.
+  hackToolsIssued: "hack.tool.issue",
+  quartermasterThemeSet: "site.quartermaster_theme.set",
   hackSanctionIssued: "hack.sanction.issue",
   hackSanctionLifted: "hack.sanction.lift",
   bulkMemberAction: "user.bulk",
@@ -145,6 +147,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.hackDuelEngaged]: "COUNTER-INTRUSION ENGAGED",
   [AUDIT_ACTIONS.hackDuelResolved]: "COUNTER-INTRUSION RESOLVED",
   [AUDIT_ACTIONS.hackTraceScrubbed]: "TRACE SCRUBBED",
+  [AUDIT_ACTIONS.hackToolsIssued]: "TOOLING ISSUED",
+  [AUDIT_ACTIONS.quartermasterThemeSet]: "QUARTERMASTER THEME SET",
   [AUDIT_ACTIONS.hackSanctionIssued]: "TERMINAL SANCTION ISSUED",
   [AUDIT_ACTIONS.hackSanctionLifted]: "TERMINAL SANCTION LIFTED",
   [AUDIT_ACTIONS.bulkMemberAction]: "BULK MEMBER ACTION",

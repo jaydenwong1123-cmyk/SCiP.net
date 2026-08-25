@@ -21,8 +21,17 @@ import {
 import { isValidDepartment } from "@/lib/departments";
 import { updateSiteConfig, MAINT_COOKIE } from "@/lib/site-config";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
+import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
+import {
+  issueTools,
+  isToolKind,
+  TOOL_LABELS,
+  MAX_UNUSED_TOOLS,
+  type ToolKind,
+} from "@/lib/hack/tools";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
-import { findNonAsciiFormField } from "@/lib/validation";
+import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import { normalizeHexColor } from "@/lib/hex-color";
 import { purgeUser } from "@/lib/purge-user";
 import { isBulkOp, ADMIN_ONLY_BULK_OPS } from "@/lib/bulk-ops";
 
@@ -996,4 +1005,157 @@ export async function reviewClearanceRequestAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/personnel");
   revalidatePath("/clearance-request");
+}
+
+// ---------------------------------------------------------------------------
+// QUARTERMASTER — issuing intrusion tooling by hand.
+//
+// requireOwner() gates this, so the owner and the co-owners and nobody else.
+// That is deliberately one step above the sanctions desk: Admin may punish a
+// member, but only owner-level authority may hand out an advantage. A tool
+// charge is currency in the hack ladder, and letting every Admin mint it turns
+// the earned economy into a favour economy.
+//
+// MAX_UNUSED_TOOLS still binds — see issueTools(). The grant is clamped, not
+// refused, and the actor is told exactly how many landed.
+
+export type ToolGrantState = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+} | null;
+
+// "any" in the kind field means let the desk draw at random, the same way a
+// finished run pays out.
+const RANDOM_TOOL_KIND = "any";
+
+export async function issueToolsAction(
+  _prevState: ToolGrantState,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const actor = await requireOwner();
+  if (findNonAsciiFormField(formData)) return { ok: false, error: NON_ASCII_ERROR };
+
+  const userId = String(formData.get("userId") ?? "");
+  const rawKind = String(formData.get("kind") ?? RANDOM_TOOL_KIND);
+  const count = Number(formData.get("count"));
+  const note = String(formData.get("note") ?? "").trim().slice(0, 200);
+
+  if (!userId) return { ok: false, error: "SELECT A MEMBER." };
+
+  let kind: ToolKind | null = null;
+  if (rawKind !== RANDOM_TOOL_KIND) {
+    if (!isToolKind(rawKind)) return { ok: false, error: "UNKNOWN TOOL KIND." };
+    kind = rawKind;
+  }
+
+  if (!Number.isInteger(count) || count < 1 || count > MAX_UNUSED_TOOLS) {
+    return {
+      ok: false,
+      error: `CHARGE COUNT MUST BE 1-${MAX_UNUSED_TOOLS}.`,
+    };
+  }
+
+  // The owner and sitting co-owners are off the roster the panel renders, so a
+  // hand-crafted post is the only way to reach this branch.
+  const subject = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, displayName: true, email: true, isOwner: true, isCoOwner: true },
+  });
+  if (!subject) return { ok: false, error: "MEMBER NOT FOUND." };
+
+  const granted = await issueTools({ userId, kind, count });
+
+  if (granted.length === 0) {
+    return {
+      ok: false,
+      error: `NOTHING ISSUED — KIT IS FULL AT ${MAX_UNUSED_TOOLS} CHARGES.`,
+    };
+  }
+
+  const summaryOfKinds = kind
+    ? `${granted.length}x ${TOOL_LABELS[kind]}`
+    : `${granted.length}x RANDOM (${granted.map((k) => TOOL_LABELS[k]).join(", ")})`;
+
+  await createNotification({
+    userId,
+    type: NOTIFICATION_TYPES.intrusion,
+    body: `TOOLING ISSUED: ${summaryOfKinds}.${note ? ` ${note}` : ""}`,
+    link: "/hack",
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.hackToolsIssued,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: subject.displayName ?? subject.email,
+    summary: `Issued ${summaryOfKinds}${note ? ` — ${note}` : ""}`,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/hack");
+
+  const short = granted.length < count;
+  return {
+    ok: true,
+    message: `ISSUED ${summaryOfKinds} TO ${
+      subject.displayName ?? subject.email
+    }.${short ? ` CLAMPED FROM ${count} — KIT CAP IS ${MAX_UNUSED_TOOLS}.` : ""}`,
+  };
+}
+
+/**
+ * Recolour the quartermaster panel from two pasted hex stops.
+ *
+ * Cosmetic, but it writes a value that is rendered into a `style` attribute, so
+ * both stops go through normalizeHexColor() and a reject — never a coercion. A
+ * paste that isn't a colour is an error the actor sees, not something quietly
+ * patched into the nearest valid string.
+ *
+ * Clearing both fields removes the banner and returns the panel to standard
+ * terminal chrome; that is the reset, so no separate action is needed for it.
+ */
+export async function setQuartermasterGradientAction(
+  _prevState: ToolGrantState,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const actor = await requireOwner();
+  if (findNonAsciiFormField(formData)) return { ok: false, error: NON_ASCII_ERROR };
+
+  const rawFrom = String(formData.get("gradientFrom") ?? "").trim();
+  const rawTo = String(formData.get("gradientTo") ?? "").trim();
+
+  if (!rawFrom && !rawTo) {
+    await updateSiteConfig({ quartermasterFrom: "", quartermasterTo: "" });
+    await logAudit({
+      action: AUDIT_ACTIONS.quartermasterThemeSet,
+      actor,
+      targetType: "site",
+      summary: "Cleared the quartermaster gradient",
+    });
+    revalidatePath("/admin");
+    return { ok: true, message: "GRADIENT CLEARED — PANEL RESTORED TO DEFAULT." };
+  }
+
+  const from = normalizeHexColor(rawFrom);
+  const to = normalizeHexColor(rawTo);
+  if (!from || !to) {
+    return {
+      ok: false,
+      error: "BOTH STOPS MUST BE HEX COLOURS, E.G. #1E8F3D OR 33FF66.",
+    };
+  }
+
+  await updateSiteConfig({ quartermasterFrom: from, quartermasterTo: to });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.quartermasterThemeSet,
+    actor,
+    targetType: "site",
+    summary: `Set the quartermaster gradient to ${from} → ${to}`,
+  });
+
+  revalidatePath("/admin");
+  return { ok: true, message: `GRADIENT SAVED — ${from} → ${to}.` };
 }

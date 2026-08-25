@@ -669,10 +669,11 @@ model HackTool {
   id     String @id @default(cuid())
   userId String
   user   User   @relation("HackToolOwner", fields: [userId], references: [id])
-  // "recompile" | "spoof" | "ghost" | "deadman"
+  // "recompile" | "spoof" | "ghost" | "deadman" | "stopwatch"
   kind   String
   // The run that paid out this tool, for provenance. Nullable so a tool
-  // outlives its case being purged from the desk.
+  // outlives its case being purged from the desk — and so a charge issued by
+  // hand from the admin quartermaster can honestly say it came from no run.
   earnedFromRunId String?
   createdAt DateTime @default(now())
 
@@ -827,6 +828,14 @@ model SiteConfig {
   omegaArmedOp       String?
   omegaArmedAt       DateTime?
   omegaArmedBy       String?
+
+  // --- QUARTERMASTER BANNER -------------------------------------------------
+  // Two hex stops the owner/co-owners paste in to colour the tooling panel on
+  // /admin. Stored normalised to `#rrggbb` (see lib/hex-color.ts) — never the
+  // raw paste, since these land in a style attribute. Empty pair = no custom
+  // banner, and the panel falls back to the standard terminal chrome.
+  quartermasterFrom  String @default("")
+  quartermasterTo    String @default("")
 }
 
 model IncidentReport {
