@@ -454,6 +454,31 @@ select.term-input option {
   letter-spacing: 0.16em;
 }
 
+/* Collapsible panels use <details>/<summary>; the head becomes the toggle. */
+.hud-panel--collapsible > summary.hud-panel-head {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.hud-panel--collapsible > summary.hud-panel-head::-webkit-details-marker {
+  display: none;
+}
+
+.hud-panel-head__chevron {
+  color: var(--term-fg-dim);
+  transition: transform 0.15s ease;
+  margin-left: 0.25rem;
+}
+
+.hud-panel--collapsible[open] > summary .hud-panel-head__chevron {
+  transform: rotate(90deg);
+}
+
+.hud-panel--collapsible .hud-panel-body {
+  margin-top: var(--term-gap);
+}
+
 /* Screen-level station header — section code, title, live readouts. */
 .hud-station-head {
   display: flex;

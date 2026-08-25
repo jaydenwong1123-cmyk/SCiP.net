@@ -388,6 +388,8 @@ export default async function AdminPage() {
         code="05"
         title="MEMBER MANAGEMENT"
         status={`${members.length} ON ROSTER`}
+        collapsible
+        defaultOpen
       >
         <p className="hud-readout__label mb-2">
           CLICK A MEMBER TO OPEN ACTIONS, OR TICK SEVERAL TO ACT ON THEM AT ONCE.
@@ -471,6 +473,8 @@ export default async function AdminPage() {
         code="07"
         title="INVITE CODES"
         status={`${inviteCodes.length} ISSUED`}
+        collapsible
+        defaultOpen
       >
         <form
           action={generateInviteCodeAction}

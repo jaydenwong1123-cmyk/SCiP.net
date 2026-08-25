@@ -68,6 +68,8 @@ export function HudPanel({
   variant,
   children,
   className = "",
+  collapsible = false,
+  defaultOpen = true,
 }: {
   code?: string;
   title?: React.ReactNode;
@@ -76,17 +78,40 @@ export function HudPanel({
   variant?: "primary" | "sub" | "alert" | "secure";
   children: React.ReactNode;
   className?: string;
+  /** Renders the head as a click-to-toggle disclosure, body space collapsing when shut. */
+  collapsible?: boolean;
+  /** Only relevant when `collapsible` is set. */
+  defaultOpen?: boolean;
 }) {
   const variantClass = variant ? ` term-panel--${variant}` : "";
+  const head = (code || title) && (
+    <>
+      {code && <span className="hud-panel-head__code">{code}</span>}
+      {title && <span>{title}</span>}
+      {status && <span className="hud-panel-head__status">{status}</span>}
+      {collapsible && (
+        <span className="hud-panel-head__chevron" aria-hidden>
+          ▸
+        </span>
+      )}
+    </>
+  );
+
+  if (collapsible) {
+    return (
+      <details
+        className={`term-panel${variantClass} hud-panel--collapsible ${className}`.trim()}
+        open={defaultOpen}
+      >
+        <summary className="hud-panel-head">{head}</summary>
+        <div className="hud-panel-body">{children}</div>
+      </details>
+    );
+  }
+
   return (
     <section className={`term-panel${variantClass} ${className}`.trim()}>
-      {(code || title) && (
-        <div className="hud-panel-head">
-          {code && <span className="hud-panel-head__code">{code}</span>}
-          {title && <span>{title}</span>}
-          {status && <span className="hud-panel-head__status">{status}</span>}
-        </div>
-      )}
+      {(code || title) && <div className="hud-panel-head">{head}</div>}
       {children}
     </section>
   );

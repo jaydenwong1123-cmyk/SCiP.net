@@ -52,6 +52,16 @@ export const CIPHER_PHRASES: readonly string[] = [
   "CLOSE THE APERTURE",
   "HOLD THE PERIMETER",
   "BURN THE MANIFEST",
+  "SECURE THE ARCHIVE",
+  "RESET THE WARDS",
+  "AUTHORIZE THE PURGE",
+  "HOLD THE LINE",
+  "SEVER THE UPLINK",
+  "QUARANTINE THE WING",
+  "CONFIRM THE BREACH",
+  "SCRAMBLE THE SIGNAL",
+  "ISOLATE THE SUBJECT",
+  "ABANDON THE FLOOR",
 ];
 
 // Specimen designations for CONTAINMENT TRIAGE.
@@ -64,6 +74,8 @@ export const NODE_LABELS: readonly string[] = [
   "AXON", "BRIG", "CORE", "DOCK", "ECHO", "FLUX", "GATE", "HELM",
   "IRIS", "JOLT", "KILN", "LOOM", "MAST", "NODE", "ONYX", "PYRE",
   "QUAY", "RUNE", "SPUR", "TIDE", "VANE", "WELL", "YARD", "ZINC",
+  "CASK", "DRIP", "FERN", "GRID", "HAZE", "KELP", "LOCK", "MESH",
+  "PIER", "VEIL",
 ];
 
 // Fragment alphabet for TOKEN REASSEMBLY. Deliberately excludes characters
