@@ -52,9 +52,10 @@ import {
   TOOL_LABELS,
   RECOMPILE_TIME_FACTOR,
   SPOOF_DURATION_MS,
+  STOPWATCH_EXTEND_MS,
   type ToolKind,
 } from "@/lib/hack/tools";
-import { recompileRound } from "@/lib/hack/engine";
+import { recompileRound, extendRoundDeadline } from "@/lib/hack/engine";
 
 export type HackActionState =
   | { ok: true; kind: "challenge"; challenge: PublicChallenge; feedback?: string }
@@ -405,7 +406,7 @@ export async function extractHackRunAction(): Promise<HackActionState> {
     return { ok: false, error: "NOTHING BANKED — NO TIER REACHED." };
   }
 
-  const { tier, expiresAt } = await issueGrant(run);
+  const { tier, expiresAt, tools } = await issueGrant(run);
   await db.hackRun.update({
     where: { id: run.id },
     data: {
@@ -431,7 +432,7 @@ export async function extractHackRunAction(): Promise<HackActionState> {
   // Effective clearance changed, so the header chip, the nav and the menu all
   // have to re-render. Layout-wide, exactly as the "view as" toggle does.
   revalidatePath("/", "layout");
-  return { ok: true, kind: "extracted" };
+  return { ok: true, kind: "extracted", tools };
 }
 
 // Decline the checkpoint and take on the next stage.
@@ -513,7 +514,7 @@ export async function spendHackToolAction(
       cursor: run.cursor,
       correct: null,
     },
-    select: { deadlineAt: true },
+    select: { id: true, deadlineAt: true },
   });
 
   if (kind === TOOL_KINDS.recompile) {
@@ -571,6 +572,37 @@ export async function spendHackToolAction(
     } catch {
       await refundTool(toolId);
       return { ok: false, error: "ARMING FAILED — CHARGE REFUNDED." };
+    }
+  }
+
+  if (kind === TOOL_KINDS.stopwatch) {
+    // Same guard as RECOMPILE: a deadline that has already passed cannot be
+    // extended, or this becomes a way to un-lose a round rather than a way to
+    // buy more time on one still in play.
+    if (run.atCheckpoint || !open) {
+      return { ok: false, error: "NO ROUND IN PROGRESS TO EXTEND." };
+    }
+    if (now > open.deadlineAt.getTime()) {
+      return { ok: false, error: "ROUND ALREADY LOST — TOO LATE.", resync: true };
+    }
+
+    const toolId = await consumeTool(user.id, kind, run.id);
+    if (!toolId) return { ok: false, error: "NO STOPWATCH CHARGE REMAINING." };
+
+    try {
+      const next = await extendRoundDeadline(open, STOPWATCH_EXTEND_MS);
+      return {
+        ok: true,
+        kind: "challenge",
+        challenge: publicChallenge(next),
+        note: `${TOOL_LABELS[kind]} APPLIED — +${Math.round(
+          STOPWATCH_EXTEND_MS / 1000
+        )}S ON THE CLOCK.`,
+      };
+    } catch (err) {
+      await refundTool(toolId);
+      console.error("[hack] stopwatch failed", err);
+      return { ok: false, error: "EXTEND FAILED — CHARGE REFUNDED.", resync: true };
     }
   }
 

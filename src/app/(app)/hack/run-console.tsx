@@ -17,7 +17,7 @@ import {
 import { ToolkitPanel } from "./toolkit-panel";
 import type { PublicChallenge } from "@/lib/hack/engine";
 import type { PublicDuel } from "@/lib/hack/duel";
-import type { ToolInventory } from "@/lib/hack/tools";
+import { TOOL_LABELS, isToolKind, type ToolInventory } from "@/lib/hack/tools";
 import { useRoundTelemetry } from "@/lib/hack/telemetry";
 import { OffTerminalNotice } from "@/components/off-terminal-notice";
 
@@ -35,7 +35,7 @@ type Phase =
   | { kind: "duel"; duel: PublicDuel; feedback?: string }
   | { kind: "checkpoint" }
   | { kind: "failed"; reason: string }
-  | { kind: "extracted" }
+  | { kind: "extracted"; tools?: string[] }
   // A lost round that an armed DEAD MAN SWITCH converted into an extraction.
   | { kind: "deadman"; reason: string };
 
@@ -143,7 +143,7 @@ export function RunConsole({
           setPhase({ kind: "failed", reason: state.reason });
           break;
         case "extracted":
-          setPhase({ kind: "extracted" });
+          setPhase({ kind: "extracted", tools: state.tools });
           router.refresh();
           break;
         case "deadman":
@@ -348,6 +348,15 @@ export function RunConsole({
           <p className="text-sm">
             CLEARANCE {tierLabels[curCleared - 1] ?? "?"} GRANTED. READ ACCESS ONLY.
           </p>
+          {phase.tools && phase.tools.length > 0 && (
+            <p className="text-xs text-[var(--term-amber)]">
+              {"> "}SALVAGED{" "}
+              {phase.tools
+                .map((kind) => (isToolKind(kind) ? TOOL_LABELS[kind] : kind))
+                .join(", ")}
+              .
+            </p>
+          )}
           <button onClick={() => router.refresh()} className="term-button">
             [ CLOSE LINK ]
           </button>

@@ -507,6 +507,24 @@ export async function recompileRound(
   });
 }
 
+// Bolt extra time onto the round in flight — the effect behind the STOPWATCH
+// tool. Unlike RECOMPILE this does not touch the cursor or the puzzle: the
+// challenge on screen is still the one that must be answered, just with a
+// later deadline.
+//
+// Callers MUST have verified the run is live, at a round (not a checkpoint),
+// and that the round's clock has not already run out — extending a deadline
+// that has already passed would let this become a way to un-lose a round.
+export async function extendRoundDeadline(
+  challenge: Pick<HackChallenge, "id" | "deadlineAt">,
+  extraMs: number
+): Promise<HackChallenge> {
+  return db.hackChallenge.update({
+    where: { id: challenge.id },
+    data: { deadlineAt: new Date(challenge.deadlineAt.getTime() + extraMs) },
+  });
+}
+
 // Move from a checkpoint into the next stage.
 export async function pushDeeper(run: HackRun): Promise<HackRun> {
   const nextStage = Math.min(run.stage + 1, MAX_STAGE);

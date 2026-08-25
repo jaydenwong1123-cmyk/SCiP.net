@@ -39,6 +39,9 @@ export const TOOL_KINDS = {
   // Arm the dead man's switch: the next failure banks what was already cleared
   // instead of forfeiting it. Insurance, bought before the risk is taken.
   deadman: "deadman",
+  // Bolt extra time onto the round in flight. The one tool that never changes
+  // what is being asked — only how long there is to answer it.
+  stopwatch: "stopwatch",
 } as const;
 
 export type ToolKind = (typeof TOOL_KINDS)[keyof typeof TOOL_KINDS];
@@ -48,6 +51,7 @@ export const TOOL_ORDER: ToolKind[] = [
   TOOL_KINDS.deadman,
   TOOL_KINDS.spoof,
   TOOL_KINDS.ghost,
+  TOOL_KINDS.stopwatch,
 ];
 
 export const TOOL_LABELS: Record<ToolKind, string> = {
@@ -55,6 +59,7 @@ export const TOOL_LABELS: Record<ToolKind, string> = {
   [TOOL_KINDS.spoof]: "SIGNAL SPOOF",
   [TOOL_KINDS.ghost]: "GHOST PROTOCOL",
   [TOOL_KINDS.deadman]: "DEAD MAN SWITCH",
+  [TOOL_KINDS.stopwatch]: "STOPWATCH",
 };
 
 export const TOOL_BRIEFS: Record<ToolKind, string> = {
@@ -66,6 +71,8 @@ export const TOOL_BRIEFS: Record<ToolKind, string> = {
     "Scrub one field the desk has already traced on your last case. Cannot be used on a live run.",
   [TOOL_KINDS.deadman]:
     "Arm a fallback. If this run fails, the depth you have already cleared is banked instead of forfeited.",
+  [TOOL_KINDS.stopwatch]:
+    "Add 30 seconds to the round in flight. Same puzzle, same answer — just more clock.",
 };
 
 export function isToolKind(value: string): value is ToolKind {
@@ -80,6 +87,9 @@ export const RECOMPILE_TIME_FACTOR = 0.6;
 // How long a SIGNAL SPOOF hides a run from the live board.
 export const SPOOF_DURATION_MS = 8 * 60 * 1000;
 
+// How much extra time a STOPWATCH charge bolts onto the round in flight.
+export const STOPWATCH_EXTEND_MS = 30 * 1000;
+
 // Ceiling on unspent tools. Without it a member who never spends anything
 // accumulates an arsenal and the scarcity that makes the choice interesting
 // disappears. Earnings past the cap are simply not granted.
@@ -93,7 +103,7 @@ export const TOOL_EARN_MIN_STAGE = 3;
 export type ToolInventory = Record<ToolKind, number>;
 
 export function emptyInventory(): ToolInventory {
-  return { recompile: 0, spoof: 0, ghost: 0, deadman: 0 };
+  return { recompile: 0, spoof: 0, ghost: 0, deadman: 0, stopwatch: 0 };
 }
 
 /** Unspent tools held by a member, counted by kind. */
