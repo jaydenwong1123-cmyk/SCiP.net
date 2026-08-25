@@ -19,7 +19,12 @@
 export type SectionGroup = "operations" | "services" | "restricted" | "session";
 
 /** Access gate names, resolved server-side by lib/sections-access.ts. */
-export type Gate = "secureChannel" | "messageLogs" | "counterIntel" | "staff";
+export type Gate =
+  | "secureChannel"
+  | "messageLogs"
+  | "counterIntel"
+  | "staff"
+  | "helper";
 
 export type Gates = Record<Gate, boolean>;
 
@@ -143,6 +148,18 @@ export const SECTIONS: Section[] = [
     badge: "openCases",
     badgeLabel: "unclaimed cases awaiting action",
     gate: "counterIntel",
+  },
+  {
+    // The only station a Helper can reach. Nothing here touches a live run —
+    // see the HackDrill comment in schema.prisma — so it is safe at a tier
+    // that has no other panel access.
+    base: "/training",
+    label: "TRAINING RANGE",
+    code: "TRN",
+    desc: "Countermeasure drills — simulated, no live systems",
+    group: "restricted",
+    accent: "amber",
+    gate: "helper",
   },
   {
     base: "/admin",

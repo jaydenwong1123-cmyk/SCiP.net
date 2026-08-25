@@ -84,6 +84,7 @@ model User {
   hackSanctions        HackSanction[] @relation("HackSanctionSubject")
   hackSanctionsIssued  HackSanction[] @relation("HackSanctionIssuer")
   hackTools            HackTool[]     @relation("HackToolOwner")
+  hackDrills           HackDrill[]    @relation("HackDrillOwner")
 }
 
 // An IT support ticket. One table backs all three kinds because they share
@@ -681,6 +682,42 @@ model HackTool {
 
   @@index([userId, usedAt])
   @@index([usedOnRunId])
+}
+
+// One practice puzzle drawn on the training range — see lib/hack/drills.ts.
+//
+// Deliberately NOT a HackChallenge. Every constraint that makes that model safe
+// is a constraint about a RUN: it hangs off runId, it is unique per cursor so a
+// refresh cannot re-roll, and the deadline sweep fails it when the clock runs
+// out. A drill has no run, no stage, no cursor, no clock and no consequence, so
+// it would have to null out or fake all of that — and widening HackChallenge to
+// allow a runless row would weaken the model that guards real intrusions for
+// the sake of a sandbox. A separate table costs one migration and keeps the
+// ladder's invariants untouchable.
+//
+// Nothing here is ever read by the engine, the grant ledger or the conduct log.
+model HackDrill {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("HackDrillOwner", fields: [userId], references: [id])
+  // Registry id from lib/hack/games, and the band it was generated at.
+  game   String
+  band   Int
+  // Opaque handle the client echoes back. The client never learns the row id.
+  nonce  String @unique
+  // JSON the client renders. Contains no solution material.
+  payload  String
+  // JSON answer key. Withheld until the drill settles, then shown deliberately:
+  // seeing what the puzzle wanted is the entire point of a training range, and
+  // it is safe here precisely because nothing is staked on the answer. It still
+  // never leaves the server while the drill is live.
+  solution String
+  attemptsLeft Int      @default(1)
+  issuedAt     DateTime @default(now())
+  answeredAt   DateTime?
+  correct      Boolean?
+
+  @@index([userId, issuedAt])
 }
 
 model Broadcast {
