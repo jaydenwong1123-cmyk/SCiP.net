@@ -21,9 +21,12 @@ export type SiteConfig = {
   omegaArmedOp: string | null;
   omegaArmedAt: Date | null;
   omegaArmedBy: string | null;
-  // Custom gradient for the admin quartermaster panel. Both empty = unset.
+  // Custom gradient, rendered only for the member who set it — see
+  // quartermasterSetById. Both empty = unset.
   quartermasterFrom: string;
   quartermasterTo: string;
+  // Whose gradient this is. Null alongside two empty stops.
+  quartermasterSetById: string | null;
 };
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -40,6 +43,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   omegaArmedBy: null,
   quartermasterFrom: "",
   quartermasterTo: "",
+  quartermasterSetById: null,
 };
 
 // Read-only fetch of the singleton config. Returns an in-memory default if the

@@ -1127,16 +1127,19 @@ export async function setQuartermasterGradientAction(
   const rawTo = String(formData.get("gradientTo") ?? "").trim();
 
   if (!rawFrom && !rawTo) {
-    await updateSiteConfig({ quartermasterFrom: "", quartermasterTo: "" });
+    await updateSiteConfig({
+      quartermasterFrom: "",
+      quartermasterTo: "",
+      quartermasterSetById: null,
+    });
     await logAudit({
       action: AUDIT_ACTIONS.quartermasterThemeSet,
       actor,
       targetType: "site",
-      summary: "Cleared the quartermaster gradient",
+      summary: "Cleared their quartermaster gradient",
     });
     revalidatePath("/admin");
-    revalidatePath("/");
-    return { ok: true, message: "GRADIENT CLEARED — SITE RESTORED TO DEFAULT." };
+    return { ok: true, message: "GRADIENT CLEARED — YOUR BACKGROUND IS RESTORED." };
   }
 
   const from = normalizeHexColor(rawFrom);
@@ -1148,16 +1151,22 @@ export async function setQuartermasterGradientAction(
     };
   }
 
-  await updateSiteConfig({ quartermasterFrom: from, quartermasterTo: to });
+  // The singleton config holds one gradient at a time, so setting one here
+  // replaces whoever held it before — the previous holder simply stops seeing
+  // it, the same as if they had cleared it themselves.
+  await updateSiteConfig({
+    quartermasterFrom: from,
+    quartermasterTo: to,
+    quartermasterSetById: actor.id,
+  });
 
   await logAudit({
     action: AUDIT_ACTIONS.quartermasterThemeSet,
     actor,
     targetType: "site",
-    summary: `Set the quartermaster gradient to ${from} → ${to}`,
+    summary: `Set their own quartermaster gradient to ${from} → ${to}`,
   });
 
   revalidatePath("/admin");
-  revalidatePath("/");
-  return { ok: true, message: `GRADIENT SAVED — SITE-WIDE, ${from} → ${to}.` };
+  return { ok: true, message: `GRADIENT SAVED — ${from} → ${to}. ONLY YOU SEE IT.` };
 }

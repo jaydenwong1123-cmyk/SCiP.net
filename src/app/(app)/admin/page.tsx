@@ -456,9 +456,14 @@ export default async function AdminPage() {
               held: toolHolders.get(m.id) ?? 0,
             }))}
             // Both stops are stored normalised, and both must be present for a
-            // gradient to exist — a half-set pair is treated as unset.
+            // gradient to exist. Prefilled only when the viewer is the member
+            // who set it — the singleton config holds one gradient at a time,
+            // and a co-owner opening this panel must not see (or unknowingly
+            // overwrite) a gradient that belongs to someone else.
             gradient={
-              siteConfig?.quartermasterFrom && siteConfig?.quartermasterTo
+              siteConfig?.quartermasterFrom &&
+              siteConfig?.quartermasterTo &&
+              siteConfig.quartermasterSetById === viewer.id
                 ? {
                     from: siteConfig.quartermasterFrom,
                     to: siteConfig.quartermasterTo,

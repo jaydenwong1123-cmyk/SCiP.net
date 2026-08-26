@@ -28,7 +28,8 @@ export type QuartermasterGradient = { from: string; to: string } | null;
 const PREVIEW_FALLBACK = { from: "#1e8f3d", to: "#050705" };
 
 /**
- * Issue intrusion tooling to a member, and dress the panel while you are at it.
+ * Issue intrusion tooling to a member, and set your own background while
+ * you're at it.
  *
  * Owner/Co-Owner only — the page gates the panel and both actions re-check with
  * requireOwner(), which is the boundary that actually holds.
@@ -169,15 +170,21 @@ export function Quartermaster({
 }
 
 /**
- * Paste two hex stops and recolour the whole site.
+ * Paste two hex stops and recolour the background — for the member who set
+ * it, and no one else.
  *
- * Unlike the Settings page's theme/font/density pickers, this is not a
- * per-browser preference — it is a single value in SiteConfig that the root
- * layout renders straight into every visitor's page (see app/layout.tsx). The
- * preview here is computed with the same normalizeHexColor()/gradientCss() the
- * server and the layout use, so what is shown is what gets stored — a preview
- * drawn by a second, looser parser would happily show a gradient the server
- * then rejects.
+ * Unlike the Settings page's theme/font/density pickers this isn't a
+ * per-browser localStorage preference: it is one value in SiteConfig, and the
+ * root layout only renders it back on requests from whoever's id is stamped
+ * as the setter (see app/layout.tsx, quartermasterSetById). The preview here
+ * is computed with the same normalizeHexColor()/gradientCss() the server and
+ * the layout use, so what is shown is what gets stored — a preview drawn by a
+ * second, looser parser would happily show a gradient the server then rejects.
+ *
+ * `gradient` is null both when nothing is set and when someone ELSE currently
+ * holds it — the caller (page.tsx) only passes it through for the matching
+ * viewer, so this form never shows or silently overwrites another member's
+ * saved colours.
  */
 function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
   const [state, formAction, pending] = useActionState(
@@ -192,21 +199,23 @@ function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
   const bothBlank = from.trim() === "" && to.trim() === "";
   const previewFrom = fromOk ?? PREVIEW_FALLBACK.from;
   const previewTo = toOk ?? PREVIEW_FALLBACK.to;
+  // Unsaved edits against what's actually stored — Cancel only needs to show
+  // up once there is something for it to discard.
+  const isDirty = from !== (gradient?.from ?? "") || to !== (gradient?.to ?? "");
 
   return (
     <details className="term-row">
       <summary className="cursor-pointer text-xs text-[var(--term-fg-dim)]">
-        SITE APPEARANCE — CUSTOM GRADIENT
+        YOUR APPEARANCE — CUSTOM GRADIENT
       </summary>
 
       <form action={formAction} className="space-y-3 pt-3">
         <p className="text-xs text-[var(--term-fg-dim)]">
-          Paste two hex colours to paint the background behind every page on
-          the site, for every visitor — the same way a display theme works,
-          except set once here instead of per-browser. Three or six digits,
-          with or without the <span className="hud-recid">#</span>. Clear both
-          fields and save to remove it and restore the standard terminal
-          background.
+          Paste two hex colours to paint your own background across every page
+          on the site — visible only to you, on any device you sign in on.
+          Three or six digits, with or without the{" "}
+          <span className="hud-recid">#</span>. Clear both fields and save to
+          remove it and restore the standard terminal background.
         </p>
 
         <div className="flex flex-wrap items-end gap-3">
@@ -274,17 +283,32 @@ function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
           <p className="text-sm text-[var(--term-fg-bright)]">{state.message}</p>
         )}
 
-        <button
-          type="submit"
-          disabled={pending || (!bothBlank && (!fromOk || !toOk))}
-          className="term-button term-button--sm"
-        >
-          {pending
-            ? "SAVING..."
-            : bothBlank
-              ? "[CLEAR GRADIENT]"
-              : "[SAVE GRADIENT]"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={pending || (!bothBlank && (!fromOk || !toOk))}
+            className="term-button term-button--sm"
+          >
+            {pending
+              ? "SAVING..."
+              : bothBlank
+                ? "[CLEAR GRADIENT]"
+                : "[SAVE GRADIENT]"}
+          </button>
+          {isDirty && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setFrom(gradient?.from ?? "");
+                setTo(gradient?.to ?? "");
+              }}
+              className="term-button term-button--sm term-button--ghost"
+            >
+              [CANCEL]
+            </button>
+          )}
+        </div>
       </form>
     </details>
   );

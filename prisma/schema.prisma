@@ -830,12 +830,17 @@ model SiteConfig {
   omegaArmedBy       String?
 
   // --- QUARTERMASTER BANNER -------------------------------------------------
-  // Two hex stops the owner/co-owners paste in to colour the tooling panel on
-  // /admin. Stored normalised to `#rrggbb` (see lib/hex-color.ts) — never the
-  // raw paste, since these land in a style attribute. Empty pair = no custom
-  // banner, and the panel falls back to the standard terminal chrome.
-  quartermasterFrom  String @default("")
-  quartermasterTo    String @default("")
+  // Two hex stops an owner/co-owner pastes in to recolour their own background.
+  // Stored normalised to `#rrggbb` (see lib/hex-color.ts) — never the raw
+  // paste, since these land in a style attribute. Empty pair = no custom
+  // gradient set by anyone.
+  quartermasterFrom   String  @default("")
+  quartermasterTo     String  @default("")
+  // Who set it. The gradient is rendered only for this one member — it is a
+  // personal preference an owner-level member sets for themselves, not a
+  // site-wide reskin — so the layout must know whose id to match against the
+  // signed-in viewer before it applies. Null alongside two empty stops.
+  quartermasterSetById String?
 }
 
 model IncidentReport {

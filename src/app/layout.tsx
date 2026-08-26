@@ -12,6 +12,7 @@ import {
   DEFAULT_DENSITY,
 } from "@/lib/appearance";
 import { getSiteConfig } from "@/lib/site-config";
+import { getRealUser } from "@/lib/session";
 import { gradientCss } from "@/lib/hex-color";
 
 export const metadata: Metadata = {
@@ -50,22 +51,26 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Unlike the theme/font/density presets above, this is not a per-browser
-  // preference read from localStorage — it is a single owner-set value for the
-  // whole site, so it renders straight into the initial HTML rather than
-  // through the pre-paint script. That also means it needs no localStorage
-  // fallback dance: every visitor sees the same gradient, correct on first
-  // paint, with no flash to cover.
-  const siteConfig = await getSiteConfig();
-  const htmlStyle =
-    siteConfig.quartermasterFrom && siteConfig.quartermasterTo
-      ? ({
-          "--term-bg-image": gradientCss(
-            siteConfig.quartermasterFrom,
-            siteConfig.quartermasterTo
-          ),
-        } as React.CSSProperties)
-      : undefined;
+  // A personal preference, not a site-wide reskin: the singleton config holds
+  // one gradient at a time, but it is only ever rendered back to the member
+  // who set it (quartermasterSetById). Unlike the theme/font/density presets
+  // above it isn't read from localStorage — the identity check has to happen
+  // server-side, since the point is precisely that no other browser should be
+  // able to opt into seeing it.
+  const [siteConfig, viewer] = await Promise.all([getSiteConfig(), getRealUser()]);
+  const gradientIsMine =
+    !!viewer &&
+    viewer.id === siteConfig.quartermasterSetById &&
+    siteConfig.quartermasterFrom &&
+    siteConfig.quartermasterTo;
+  const htmlStyle = gradientIsMine
+    ? ({
+        "--term-bg-image": gradientCss(
+          siteConfig.quartermasterFrom,
+          siteConfig.quartermasterTo
+        ),
+      } as React.CSSProperties)
+    : undefined;
 
   return (
     <html lang="en" className="h-full" style={htmlStyle}>
