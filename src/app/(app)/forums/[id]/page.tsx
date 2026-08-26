@@ -27,20 +27,19 @@ export default async function ForumPage({
     where: { id },
     include: { creator: { select: { displayName: true } } },
   });
-  if (!forum) notFound();
+  // A topic below the viewer's clearance is treated as if it doesn't exist —
+  // same 404 as a bad id, so its title, description and post count never
+  // reach a client who guesses or bookmarks the URL.
+  if (!forum || !canAccessForum(user, forum)) notFound();
 
-  const authorized = canAccessForum(user, forum);
-
-  const posts = authorized
-    ? await db.forumPost.findMany({
-        where: { forumId: id },
-        orderBy: { createdAt: "asc" },
-        take: 500,
-        include: {
-          author: { select: { displayName: true, clearance: true, designation: true } },
-        },
-      })
-    : [];
+  const posts = await db.forumPost.findMany({
+    where: { forumId: id },
+    orderBy: { createdAt: "asc" },
+    take: 500,
+    include: {
+      author: { select: { displayName: true, clearance: true, designation: true } },
+    },
+  });
 
   return (
     <>
@@ -68,68 +67,55 @@ export default async function ForumPage({
         <p className="text-sm text-[var(--term-fg-dim)]">{forum.description}</p>
       )}
 
-      {!authorized && (
-        <HudPanel code="00" title="ACCESS DENIED" variant="alert">
-          <p className="text-sm">
-            THIS TOPIC REQUIRES {clearanceLabel(forum.minClearance)} OR HIGHER.
-            YOUR CURRENT ACCESS IS {clearanceDisplay(user.clearance, user.designation)}.
-          </p>
-        </HudPanel>
-      )}
+      <HudPanel code="01" title="POST" status={`REQUIRES ${clearanceLabel(forum.minClearance)}+`}>
+        <ForumPostForm forumId={forum.id} />
+      </HudPanel>
 
-      {authorized && (
-        <>
-          <HudPanel code="01" title="POST" status={`REQUIRES ${clearanceLabel(forum.minClearance)}+`}>
-            <ForumPostForm forumId={forum.id} />
-          </HudPanel>
-
-          <HudPanel code="02" title="THREAD" status={`${posts.length} POSTS`}>
-            <div className="hud-list">
-              {posts.length === 0 && (
-                <EmptyState glyph="◈" title="No posts yet">
-                  <p className="text-xs">BE THE FIRST TO POST IN THIS TOPIC.</p>
-                </EmptyState>
+      <HudPanel code="02" title="THREAD" status={`${posts.length} POSTS`}>
+        <div className="hud-list">
+          {posts.length === 0 && (
+            <EmptyState glyph="◈" title="No posts yet">
+              <p className="text-xs">BE THE FIRST TO POST IN THIS TOPIC.</p>
+            </EmptyState>
+          )}
+          {posts.map((p) => (
+            <div
+              key={p.id}
+              className="term-row space-y-1"
+              style={{
+                borderLeft: "2px solid color-mix(in srgb, var(--term-amber) 50%, transparent)",
+                paddingLeft: "0.75rem",
+              }}
+            >
+              <p className="text-xs flex flex-wrap items-center gap-2">
+                {p.author && (
+                  <span className="clearance-chip text-[10px]">
+                    {clearanceDisplay(p.author.clearance, p.author.designation)}
+                  </span>
+                )}
+                <span className="text-[var(--term-amber)]">
+                  {p.author?.displayName ?? p.authorName}
+                </span>
+                <span className="hud-recid">
+                  {p.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                </span>
+              </p>
+              <pre className="whitespace-pre-wrap break-words font-mono text-sm">
+                {p.body}
+              </pre>
+              {canDeleteForumPost(user, p) && (
+                <form action={deleteForumPostAction}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <input type="hidden" name="forumId" value={forum.id} />
+                  <button className="term-button term-button--danger term-button--sm">
+                    DELETE
+                  </button>
+                </form>
               )}
-              {posts.map((p) => (
-                <div
-                  key={p.id}
-                  className="term-row space-y-1"
-                  style={{
-                    borderLeft: "2px solid color-mix(in srgb, var(--term-amber) 50%, transparent)",
-                    paddingLeft: "0.75rem",
-                  }}
-                >
-                  <p className="text-xs flex flex-wrap items-center gap-2">
-                    {p.author && (
-                      <span className="clearance-chip text-[10px]">
-                        {clearanceDisplay(p.author.clearance, p.author.designation)}
-                      </span>
-                    )}
-                    <span className="text-[var(--term-amber)]">
-                      {p.author?.displayName ?? p.authorName}
-                    </span>
-                    <span className="hud-recid">
-                      {p.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
-                    </span>
-                  </p>
-                  <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-                    {p.body}
-                  </pre>
-                  {canDeleteForumPost(user, p) && (
-                    <form action={deleteForumPostAction}>
-                      <input type="hidden" name="id" value={p.id} />
-                      <input type="hidden" name="forumId" value={forum.id} />
-                      <button className="term-button term-button--danger term-button--sm">
-                        DELETE
-                      </button>
-                    </form>
-                  )}
-                </div>
-              ))}
             </div>
-          </HudPanel>
-        </>
-      )}
+          ))}
+        </div>
+      </HudPanel>
     </>
   );
 }
