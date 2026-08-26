@@ -7,6 +7,11 @@
   --term-fg-bright: #aaffc4;
   --term-border: #1e8f3d;
   --term-glow-rgb: 51, 255, 102;
+  /* Owner-set site gradient (admin quartermaster panel). A background IMAGE
+     layered over --term-bg, never a replacement for it — --term-bg is also
+     used as a solid foreground colour (inverted buttons) and inside
+     color-mix(), neither of which accepts a gradient. */
+  --term-bg-image: none;
   --term-red: #ff5555;
   --term-amber: #ffcc55;
   --term-orange: #ff9955;
@@ -67,7 +72,9 @@
 
 html,
 body {
-  background: var(--term-bg);
+  background-color: var(--term-bg);
+  background-image: var(--term-bg-image);
+  background-attachment: fixed;
   color: var(--term-fg);
   font-family: var(--term-font);
   font-size: var(--term-size);

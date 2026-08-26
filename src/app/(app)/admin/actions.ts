@@ -1135,7 +1135,8 @@ export async function setQuartermasterGradientAction(
       summary: "Cleared the quartermaster gradient",
     });
     revalidatePath("/admin");
-    return { ok: true, message: "GRADIENT CLEARED — PANEL RESTORED TO DEFAULT." };
+    revalidatePath("/");
+    return { ok: true, message: "GRADIENT CLEARED — SITE RESTORED TO DEFAULT." };
   }
 
   const from = normalizeHexColor(rawFrom);
@@ -1157,5 +1158,6 @@ export async function setQuartermasterGradientAction(
   });
 
   revalidatePath("/admin");
-  return { ok: true, message: `GRADIENT SAVED — ${from} → ${to}.` };
+  revalidatePath("/");
+  return { ok: true, message: `GRADIENT SAVED — SITE-WIDE, ${from} → ${to}.` };
 }

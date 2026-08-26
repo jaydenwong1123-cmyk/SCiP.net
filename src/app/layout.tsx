@@ -11,6 +11,8 @@ import {
   DEFAULT_FONT,
   DEFAULT_DENSITY,
 } from "@/lib/appearance";
+import { getSiteConfig } from "@/lib/site-config";
+import { gradientCss } from "@/lib/hex-color";
 
 export const metadata: Metadata = {
   title: "SCiP.net // Secure Terminal",
@@ -43,13 +45,30 @@ const appearanceScript = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Unlike the theme/font/density presets above, this is not a per-browser
+  // preference read from localStorage — it is a single owner-set value for the
+  // whole site, so it renders straight into the initial HTML rather than
+  // through the pre-paint script. That also means it needs no localStorage
+  // fallback dance: every visitor sees the same gradient, correct on first
+  // paint, with no flash to cover.
+  const siteConfig = await getSiteConfig();
+  const htmlStyle =
+    siteConfig.quartermasterFrom && siteConfig.quartermasterTo
+      ? ({
+          "--term-bg-image": gradientCss(
+            siteConfig.quartermasterFrom,
+            siteConfig.quartermasterTo
+          ),
+        } as React.CSSProperties)
+      : undefined;
+
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" style={htmlStyle}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: appearanceScript }} />
       </head>

@@ -52,17 +52,9 @@ export function Quartermaster({
 
   return (
     <div className="space-y-3">
-      {gradient && (
-        <GradientBanner
-          from={gradient.from}
-          to={gradient.to}
-          count={members.length}
-        />
-      )}
-
       {members.length === 0 && (
         <p className="text-sm text-[var(--term-fg-dim)] p-1">
-          ⚙ NO ELIGIBLE MEMBERS ON ROSTER — NOTHING TO ISSUE TO. THE PANEL
+          ⚙ NO ELIGIBLE MEMBERS ON ROSTER — NOTHING TO ISSUE TO. THE SITE
           APPEARANCE CONTROLS BELOW STILL APPLY.
         </p>
       )}
@@ -176,39 +168,16 @@ export function Quartermaster({
   );
 }
 
-/** The custom-coloured header band the two stops paint. */
-function GradientBanner({
-  from,
-  to,
-  count,
-}: {
-  from: string;
-  to: string;
-  count: number;
-}) {
-  // Black or white, whichever holds contrast across both stops — an arbitrary
-  // pasted pair must not be able to render its own label unreadable.
-  const fg = textColorOnGradient(from, to);
-  return (
-    <div
-      className="px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"
-      style={{ background: gradientCss(from, to), color: fg }}
-    >
-      <span className="text-lg tracking-[0.2em]">QUARTERMASTER</span>
-      <span className="text-xs tracking-[0.15em] opacity-80">
-        {count} ELIGIBLE — CAP {MAX_UNUSED_TOOLS} CHARGES
-      </span>
-    </div>
-  );
-}
-
 /**
- * Paste two hex stops and recolour the banner.
+ * Paste two hex stops and recolour the whole site.
  *
- * The preview is computed with the same normalizeHexColor()/gradientCss() the
- * server and the banner use, so what is shown here is what gets stored — a
- * preview drawn by a second, looser parser would happily show a gradient the
- * server then rejects.
+ * Unlike the Settings page's theme/font/density pickers, this is not a
+ * per-browser preference — it is a single value in SiteConfig that the root
+ * layout renders straight into every visitor's page (see app/layout.tsx). The
+ * preview here is computed with the same normalizeHexColor()/gradientCss() the
+ * server and the layout use, so what is shown is what gets stored — a preview
+ * drawn by a second, looser parser would happily show a gradient the server
+ * then rejects.
  */
 function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
   const [state, formAction, pending] = useActionState(
@@ -227,15 +196,17 @@ function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
   return (
     <details className="term-row">
       <summary className="cursor-pointer text-xs text-[var(--term-fg-dim)]">
-        PANEL APPEARANCE — CUSTOM GRADIENT
+        SITE APPEARANCE — CUSTOM GRADIENT
       </summary>
 
       <form action={formAction} className="space-y-3 pt-3">
         <p className="text-xs text-[var(--term-fg-dim)]">
-          Paste two hex colours to paint this panel&apos;s banner. Three or six
-          digits, with or without the <span className="hud-recid">#</span>. The
-          label colour is chosen automatically for contrast. Clear both fields
-          and save to remove the banner.
+          Paste two hex colours to paint the background behind every page on
+          the site, for every visitor — the same way a display theme works,
+          except set once here instead of per-browser. Three or six digits,
+          with or without the <span className="hud-recid">#</span>. Clear both
+          fields and save to remove it and restore the standard terminal
+          background.
         </p>
 
         <div className="flex flex-wrap items-end gap-3">
