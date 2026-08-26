@@ -2,9 +2,13 @@ import Link from "next/link";
 import { requireRootOwner } from "@/lib/session";
 import { getSiteConfig } from "@/lib/site-config";
 import { armState, OMEGA_OPS, ARM_DELAY_MS } from "@/lib/omega";
+import { activeMemetic } from "@/lib/memetic";
+import { clearanceDisplay } from "@/lib/clearance";
+import { db } from "@/lib/db";
 import { StationHead, HudPanel, Readout, TickRule } from "@/components/hud";
 import { OmegaConsole } from "./omega-console";
 import { RestoreConsole } from "./restore-console";
+import { MemeticConsole, type LiveExposure } from "./memetic-console";
 
 // Live arming state and shutdown posture; never prerendered.
 export const dynamic = "force-dynamic";
@@ -18,7 +22,7 @@ export const dynamic = "force-dynamic";
 //
 // Not registered in lib/sections.ts, so it appears in no navigation for anyone.
 export default async function OmegaPage() {
-  await requireRootOwner();
+  const owner = await requireRootOwner();
 
   const cfg = await getSiteConfig();
   const state = armState(cfg);
@@ -27,6 +31,40 @@ export default async function OmegaPage() {
     : null;
 
   const keyConfigured = (process.env.OMEGA_KEY ?? "").trim().length > 0;
+
+  // MEMETIC AGENT. The roster excludes the overseer's own account — the action
+  // refuses it too, but there is no reason to offer it — and suspended members,
+  // who cannot reach a page to be exposed on in the first place.
+  const roster = await db.user.findMany({
+    where: { suspended: false, id: { not: owner.id } },
+    select: {
+      id: true,
+      displayName: true,
+      email: true,
+      clearance: true,
+      designation: true,
+    },
+    orderBy: [{ displayName: "asc" }, { email: "asc" }],
+  });
+  const targets = roster.map((m) => ({
+    id: m.id,
+    name: m.displayName ?? m.email,
+    rank: clearanceDisplay(m.clearance, m.designation),
+  }));
+
+  const exposure = activeMemetic(cfg);
+  const live: LiveExposure = exposure
+    ? {
+        targetName:
+          targets.find((t) => t.id === exposure.targetId)?.name ??
+          // Fired at someone since suspended or removed. The exposure is still
+          // live and still recallable, so it must not vanish from the panel.
+          "UNKNOWN MEMBER",
+        agentLabel: exposure.agent.label,
+        cadenceLabel: exposure.cadence.label,
+        endsAt: exposure.endsAt,
+      }
+    : null;
 
   return (
     <>
@@ -164,6 +202,18 @@ export default async function OmegaPage() {
           irreversible={OMEGA_OPS.purge.irreversible}
           armed={armed}
         />
+      </HudPanel>
+
+      {/* Last on the page on purpose: it is the only control here aimed at a
+          person rather than at the site, and it does not belong above the two
+          it would otherwise be mistaken for. */}
+      <HudPanel
+        code="04"
+        title="MEMETIC AGENT"
+        variant="alert"
+        status={live ? "EXPOSURE LIVE" : "STANDBY"}
+      >
+        <MemeticConsole targets={targets} live={live} />
       </HudPanel>
     </>
   );

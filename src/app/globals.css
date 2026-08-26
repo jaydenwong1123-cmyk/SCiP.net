@@ -1782,6 +1782,72 @@ select.term-input option {
 }
 
 /* ---------------------------------------------------------------------------
+   MEMETIC AGENT overlay
+   Covers everything, including the command rail and both classification
+   banners — a cognitohazard that the site's own chrome frames is not one.
+   Deliberately holds no @keyframes: the cadence is driven from JS so the
+   reduced-motion reset below cannot silently freeze it on a lit frame.
+   --------------------------------------------------------------------------- */
+
+.memetic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #000;
+  overflow: hidden;
+  /* Nothing underneath is reachable while this is up, and nothing here is
+     worth clicking. */
+  cursor: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.memetic-overlay__plate {
+  position: absolute;
+  inset: -6%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Short enough to still read as a flash rather than a fade, long enough that
+     the edge is not a hard digital cut. */
+  transition: opacity 60ms linear, transform 60ms linear;
+  will-change: opacity, transform;
+}
+
+.memetic-overlay__stamp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(1.5rem, 6vh, 4rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 1rem;
+  text-align: center;
+  font-family: var(--term-font);
+  font-size: clamp(0.75rem, 1.6vw, 1.05rem);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 12px #000, 0 0 3px #000;
+  transition: opacity 60ms linear;
+  pointer-events: none;
+}
+
+.memetic-overlay__code {
+  color: var(--term-red, #ff4444);
+  letter-spacing: 0.34em;
+}
+
+.memetic-overlay__sub {
+  max-width: 46rem;
+  font-size: 0.68em;
+  letter-spacing: 0.16em;
+  opacity: 0.75;
+}
+
+/* ---------------------------------------------------------------------------
    Reduced motion
    Every animation here is decorative or a state cue; none carry information
    that is lost when stilled.

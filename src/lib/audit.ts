@@ -95,6 +95,12 @@ export const AUDIT_ACTIONS = {
   // one read in this application that takes everything at once, and a backup
   // file is as sensitive as the database it came from.
   siteBackupExported: "site.backup.export",
+  // MEMETIC AGENT. Both verbs carry their actor and name their target: this is
+  // the one control on the OMEGA page aimed at a PERSON rather than at the
+  // site, and an act done to a named member belongs in the trail with the name
+  // of who did it.
+  memeticDeployed: "memetic.deploy",
+  memeticRecalled: "memetic.recall",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -162,6 +168,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.siteRestored]: "SITE RESTORED",
   [AUDIT_ACTIONS.sitePurged]: "DATA PURGED",
   [AUDIT_ACTIONS.siteBackupExported]: "BACKUP EXPORTED",
+  [AUDIT_ACTIONS.memeticDeployed]: "MEMETIC AGENT DEPLOYED",
+  [AUDIT_ACTIONS.memeticRecalled]: "MEMETIC AGENT RECALLED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

@@ -18,6 +18,15 @@ import {
   armState,
   type OmegaOp,
 } from "@/lib/omega";
+import {
+  activeMemetic,
+  clampExposureSeconds,
+  findAgent,
+  findCadence,
+  formatExposure,
+  CLEAR_MEMETIC,
+} from "@/lib/memetic";
+import { db } from "@/lib/db";
 import { purgeSite } from "@/lib/purge-site";
 import { recordAttempt, clearAttempts } from "@/lib/rate-limit";
 import { logAudit, logAuditNow, clientIp, AUDIT_ACTIONS } from "@/lib/audit";
@@ -224,4 +233,105 @@ export async function restoreSiteAction(
 
   revalidatePath("/", "layout");
   return { ok: true, message: "NETWORK RESTORED." };
+}
+
+// --- MEMETIC AGENT ----------------------------------------------------------
+//
+// Unlike the two operations above, an exposure is neither destructive nor
+// irreversible — it ends on its own clock and RECALL kills it instantly — so it
+// does not go through the arm/hold/fire ceremony or ask for the OMEGA key
+// again. requireRootOwner(), which also enforces the SENTINEL challenge, is the
+// gate, exactly as it is for abortOmegaAction.
+//
+// What it IS is the only control on this page pointed at a person, so all three
+// of these hold: the target is chosen from a list rather than typed, the
+// cadence is clamped to the catalogue in lib/memetic.ts (see the
+// photosensitivity note there), and both verbs are audited by name.
+
+export async function deployMemeticAction(
+  _prev: OmegaState,
+  formData: FormData
+): Promise<OmegaState> {
+  const actor = await requireRootOwner();
+
+  const targetId = String(formData.get("targetId") ?? "");
+  const agent = findAgent(String(formData.get("agent") ?? ""));
+  const cadence = findCadence(String(formData.get("cadence") ?? ""));
+  const seconds = clampExposureSeconds(formData.get("seconds"));
+
+  if (!agent || !cadence) return { ok: false, error: "UNKNOWN AGENT PROFILE." };
+
+  // Resolved from the database, not trusted from the form: the select is a
+  // convenience, and this is the check that decides.
+  const target = await db.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, displayName: true, email: true, suspended: true },
+  });
+  if (!target) return { ok: false, error: "NO SUCH MEMBER ON ROSTER." };
+  if (target.id === actor.id) {
+    return { ok: false, error: "CANNOT DEPLOY AGAINST YOUR OWN TERMINAL." };
+  }
+
+  const targetName = target.displayName ?? target.email;
+  const endsAt = new Date(Date.now() + seconds * 1000);
+
+  await updateSiteConfig({
+    memeticTargetId: target.id,
+    memeticAgent: agent.slug,
+    memeticCadence: cadence.slug,
+    memeticEndsAt: endsAt,
+    memeticIssuedById: actor.id,
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.memeticDeployed,
+    actor,
+    targetType: "user",
+    targetId: target.id,
+    targetName,
+    summary: `Deployed ${agent.label} against ${targetName} for ${formatExposure(
+      seconds
+    )} at ${cadence.label}`,
+  });
+
+  // The exposure reaches the target through /api/memetic within a poll, so
+  // only this page's own readouts need refreshing.
+  revalidatePath("/admin/omega");
+  return {
+    ok: true,
+    message: `${agent.label} DEPLOYED AGAINST ${targetName.toUpperCase()} — ${formatExposure(
+      seconds
+    )}.`,
+  };
+}
+
+export async function recallMemeticAction(): Promise<void> {
+  const actor = await requireRootOwner();
+  const cfg = await getSiteConfig();
+  const live = activeMemetic(cfg);
+
+  await updateSiteConfig({ ...CLEAR_MEMETIC });
+
+  // Nothing was up: clearing a lapsed row is housekeeping, not an act worth a
+  // line in the trail.
+  if (live) {
+    const target = await db.user.findUnique({
+      where: { id: live.targetId },
+      select: { displayName: true, email: true },
+    });
+    const targetName = target?.displayName ?? target?.email ?? live.targetId;
+    await logAudit({
+      action: AUDIT_ACTIONS.memeticRecalled,
+      actor,
+      targetType: "user",
+      targetId: live.targetId,
+      targetName,
+      summary: `Recalled ${live.agent.label} from ${targetName} with ${Math.max(
+        0,
+        Math.round((live.endsAt - Date.now()) / 1000)
+      )}s remaining`,
+    });
+  }
+
+  revalidatePath("/admin/omega");
 }

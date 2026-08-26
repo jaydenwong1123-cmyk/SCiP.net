@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <!-- SCiP-2521-B // COIL. Same generator as ABYSS, tuned the other way: a
+       dense line field instead of ocelli, a longer coarse displacement, and no
+       colour at all. Pure luminance contrast is what makes this one the harshest
+       of the three on a dark terminal. -->
+  <defs>
+    <filter id="warp" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0022 0.0041" numOctaves="5" seed="43" result="coarse"/>
+      <feDisplacementMap in="SourceGraphic" in2="coarse" scale="430" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="4" seed="5" result="fine"/>
+      <feDisplacementMap in="torn" in2="fine" scale="19" xChannelSelector="G" yChannelSelector="B" result="frayed"/>
+      <feColorMatrix in="frayed" type="saturate" values="0" result="grey"/>
+      <!-- Crushes the midtones out so what survives is bone-white filament on
+           black, the way the reference plate reads. -->
+      <feComponentTransfer in="grey">
+        <feFuncR type="gamma" exponent="0.55" amplitude="1.25"/>
+        <feFuncG type="gamma" exponent="0.55" amplitude="1.25"/>
+        <feFuncB type="gamma" exponent="0.55" amplitude="1.25"/>
+      </feComponentTransfer>
+    </filter>
+
+    <pattern id="fibre" width="110" height="110" patternUnits="userSpaceOnUse">
+      <rect width="110" height="110" fill="#000000"/>
+      <g fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.95">
+        <circle cx="55" cy="55" r="7"/>
+        <circle cx="55" cy="55" r="14"/>
+        <circle cx="55" cy="55" r="21"/>
+        <circle cx="55" cy="55" r="28"/>
+        <circle cx="55" cy="55" r="35"/>
+        <circle cx="55" cy="55" r="42"/>
+        <circle cx="55" cy="55" r="49"/>
+        <circle cx="55" cy="55" r="56"/>
+      </g>
+      <g fill="none" stroke="#ffffff" stroke-width="0.7" opacity="0.7">
+        <path d="M0 55 H110"/>
+        <path d="M55 0 V110"/>
+      </g>
+      <circle cx="55" cy="55" r="3.2" fill="#ffffff"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="800" fill="#000000"/>
+  <rect x="-360" y="-360" width="1920" height="1520" fill="url(#fibre)" filter="url(#warp)"/>
+</svg>

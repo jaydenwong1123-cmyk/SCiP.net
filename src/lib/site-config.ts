@@ -27,6 +27,14 @@ export type SiteConfig = {
   quartermasterTo: string;
   // Whose gradient this is. Null alongside two empty stops.
   quartermasterSetById: string | null;
+  // MEMETIC AGENT — the one live exposure, if any. Read through
+  // lib/memetic.ts's activeMemetic() rather than field by field; a null target
+  // means nobody is under exposure whatever the rest holds.
+  memeticTargetId: string | null;
+  memeticAgent: string;
+  memeticCadence: string;
+  memeticEndsAt: Date | null;
+  memeticIssuedById: string | null;
 };
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -44,6 +52,11 @@ const DEFAULT_CONFIG: SiteConfig = {
   quartermasterFrom: "",
   quartermasterTo: "",
   quartermasterSetById: null,
+  memeticTargetId: null,
+  memeticAgent: "",
+  memeticCadence: "",
+  memeticEndsAt: null,
+  memeticIssuedById: null,
 };
 
 // Read-only fetch of the singleton config. Returns an in-memory default if the

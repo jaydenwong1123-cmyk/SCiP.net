@@ -841,6 +841,26 @@ model SiteConfig {
   // site-wide reskin — so the layout must know whose id to match against the
   // signed-in viewer before it applies. Null alongside two empty stops.
   quartermasterSetById String?
+
+  // --- MEMETIC AGENT --------------------------------------------------------
+  // One live exposure at a time, held on the singleton rather than in a table
+  // of its own: an exposure is a transient thing with a hard end, not a record
+  // worth keeping, and one row means the recall control has exactly one thing
+  // to clear. The trail of who fired what at whom lives in AuditLog.
+  //
+  // All four are set and cleared together. A null target reads as "nobody is
+  // under exposure", whatever the other columns happen to hold.
+  memeticTargetId    String?
+  // Which visual — a slug from MEMETIC_AGENTS (see lib/memetic.ts). Anything
+  // unrecognised reads as no exposure, so a stale slug cannot pin a blank
+  // overlay onto someone's screen.
+  memeticAgent       String  @default("")
+  // Cadence slug from MEMETIC_CADENCES. Same fail-closed treatment.
+  memeticCadence     String  @default("")
+  // The hard stop. The client is told this instant and ends itself on it, so an
+  // exposure expires on time even if the network drops mid-flash.
+  memeticEndsAt      DateTime?
+  memeticIssuedById  String?
 }
 
 model IncidentReport {

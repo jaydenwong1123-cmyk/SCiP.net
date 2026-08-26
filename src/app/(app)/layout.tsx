@@ -2,8 +2,10 @@ import Link from "next/link";
 import { requireUser, enforceSentinel } from "@/lib/session";
 import { clearanceLabel } from "@/lib/clearance";
 import { formatDuration } from "@/lib/hack/config";
-import { enforceMaintenance, enforceShutdown } from "@/lib/site-config";
+import { enforceMaintenance, enforceShutdown, getSiteConfig } from "@/lib/site-config";
+import { memeticFor } from "@/lib/memetic";
 import { TerminalShell } from "@/components/terminal-shell";
+import { MemeticOverlay } from "@/components/memetic-overlay";
 import { db } from "@/lib/db";
 import { getRecentNotifications, getUnreadNotificationCount } from "@/lib/notifications";
 import { messageRetentionCutoff } from "@/lib/message-retention";
@@ -24,6 +26,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   const gates = resolveGates(user);
+
+  // MEMETIC AGENT. Resolved server-side so a member who navigates mid-exposure
+  // lands with the plate already up rather than getting a free few seconds of
+  // clear screen while the overlay's first poll goes out. getSiteConfig is
+  // request-cached and the gates above already read it, so this costs nothing.
+  //
+  // Matched against user.id, which is the real account even under a "view as"
+  // simulation — the persona swap downgrades clearance, not identity.
+  const exposure = memeticFor(await getSiteConfig(), user.id);
+  const memetic = exposure
+    ? {
+        agent: exposure.agent.slug,
+        label: exposure.agent.label,
+        src: exposure.agent.src,
+        periodMs: exposure.cadence.periodMs,
+        endsAt: exposure.endsAt,
+      }
+    : null;
 
   // Badge counts for the command rail. These used to be fetched by the menu
   // page alone; the rail shows the same numbers on every route, so they moved
@@ -89,24 +109,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <TerminalShell
-      sections={visibleSections(gates)}
-      counts={badgeCounts}
-      unreadMessages={unreadMessages}
-      notifications={notifications}
-      unreadNotifications={unreadNotifications}
-      banners={banners}
-      user={{
-        displayName: user.displayName,
-        clearance: user.clearance,
-        designation: user.designation,
-        isOwner: user.isOwner,
-        isCoOwner: user.isCoOwner,
-        isAdmin: user.isAdmin,
-        isStaff: user.isStaff,
-      }}
-    >
-      {children}
-    </TerminalShell>
+    <>
+      <MemeticOverlay initial={memetic} />
+      <TerminalShell
+        sections={visibleSections(gates)}
+        counts={badgeCounts}
+        unreadMessages={unreadMessages}
+        notifications={notifications}
+        unreadNotifications={unreadNotifications}
+        banners={banners}
+        user={{
+          displayName: user.displayName,
+          clearance: user.clearance,
+          designation: user.designation,
+          isOwner: user.isOwner,
+          isCoOwner: user.isCoOwner,
+          isAdmin: user.isAdmin,
+          isStaff: user.isStaff,
+        }}
+      >
+        {children}
+      </TerminalShell>
+    </>
   );
 }
