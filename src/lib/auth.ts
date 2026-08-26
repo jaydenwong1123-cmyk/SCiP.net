@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { authConfig } from "@/lib/auth.config";
 import {
   checkRateLimit,
   recordAttempt,
@@ -20,9 +21,12 @@ async function recordFailure(email: string, ip: string) {
   ]);
 }
 
+// The full instance: session strategy, pages and callbacks come from
+// lib/auth.config (shared with the proxy), and only the database-backed
+// Credentials provider is added on top. Keep provider-free settings in the
+// shared config so the proxy and this instance can never drift apart.
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -100,18 +104,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user?.id) {
-        token.userId = user.id;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && typeof token.userId === "string") {
-        session.user.id = token.userId;
-      }
-      return session;
-    },
-  },
 });

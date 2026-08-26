@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { HACK_MAX_TIER } from "@/lib/clearance";
 import { awardTools, toolsEarnedFor, type ToolKind } from "@/lib/hack/tools";
@@ -29,20 +30,31 @@ export type ActiveHackGrant = {
 // Called from getCurrentUser on every request, so it is deliberately a single
 // narrow indexed lookup ([userId, expiresAt]) selecting four columns. Callers
 // there short-circuit it entirely for anyone already at HACK_MAX_TIER.
-export async function getActiveHackGrant(
-  userId: string
-): Promise<ActiveHackGrant | null> {
-  const grant = await db.hackGrant.findFirst({
-    where: {
-      userId,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { tier: "desc" },
-    select: { id: true, tier: true, expiresAt: true, runId: true },
-  });
-  return grant;
-}
+//
+// Memoized per request (the pattern lib/session.ts uses for getCurrentUser and
+// lib/station-counts.ts for the badges), because getCurrentUser has already
+// resolved this by the time /menu and /hack render — and both of those pages
+// then asked for it a second time to light their own status lamp. That was a
+// duplicate round trip to Turso on the two most-visited routes in the app.
+//
+// Safe to cache because every caller is a read-only render path. Nothing reads
+// this back after issuing or revoking a grant within the same request; if that
+// ever changes, that caller must query db.hackGrant directly rather than come
+// through here, since a React cache is not invalidated by a write.
+export const getActiveHackGrant = cache(
+  async (userId: string): Promise<ActiveHackGrant | null> => {
+    const grant = await db.hackGrant.findFirst({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { tier: "desc" },
+      select: { id: true, tier: true, expiresAt: true, runId: true },
+    });
+    return grant;
+  }
+);
 
 // Bank the tier a run reached. Returns the issued grant, plus any toolkit
 // countermeasures the depth paid out.
