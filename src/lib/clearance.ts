@@ -17,9 +17,16 @@ export const OWNER_CLEARANCE = 7;
 export const BROADCAST_POST_CLEARANCE = 5;
 export const MEMBER_NOTE_CLEARANCE = 5;
 export const SECURE_CHANNEL_CLEARANCE = 5;
+// Who may open a new forum topic. The forums section itself is visible to
+// everyone; this only gates creating one.
+export const FORUM_CREATE_CLEARANCE = 5;
 
 export function canAccessSecureChannel(rank: number): boolean {
   return rank >= SECURE_CHANNEL_CLEARANCE;
+}
+
+export function canCreateForum(rank: number): boolean {
+  return rank >= FORUM_CREATE_CLEARANCE;
 }
 
 // The highest rank a terminal intrusion may ever bank. Deliberately below

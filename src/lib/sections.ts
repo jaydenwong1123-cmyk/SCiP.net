@@ -94,6 +94,13 @@ export const SECTIONS: Section[] = [
     group: "operations",
   },
   {
+    base: "/forums",
+    label: "FORUMS",
+    code: "SEC-08",
+    desc: "Member discussion threads",
+    group: "operations",
+  },
+  {
     base: "/clearance-request",
     label: "CLEARANCE",
     code: "SEC-06",

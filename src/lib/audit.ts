@@ -101,6 +101,8 @@ export const AUDIT_ACTIONS = {
   // of who did it.
   memeticDeployed: "memetic.deploy",
   memeticRecalled: "memetic.recall",
+  forumCreated: "forum.create",
+  forumDeleted: "forum.delete",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -170,6 +172,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.siteBackupExported]: "BACKUP EXPORTED",
   [AUDIT_ACTIONS.memeticDeployed]: "MEMETIC AGENT DEPLOYED",
   [AUDIT_ACTIONS.memeticRecalled]: "MEMETIC AGENT RECALLED",
+  [AUDIT_ACTIONS.forumCreated]: "FORUM CREATED",
+  [AUDIT_ACTIONS.forumDeleted]: "FORUM DELETED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

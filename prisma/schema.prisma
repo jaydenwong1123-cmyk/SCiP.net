@@ -1,5 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // queryCompiler drops Prisma's Rust query engine and compiles queries in
+  // JS instead, which this deployment can do because every query already goes
+  // through the libSQL driver adapter (src/lib/db.ts) rather than the engine's
+  // own connection pool. The engine binary is ~40 MB on Vercel's Linux
+  // runtime; without it each serverless function's traced bundle drops from
+  // ~90 MB to a fraction of that, and a cold start no longer has to load it.
+  previewFeatures = ["queryCompiler", "driverAdapters"]
 }
 
 datasource db {
@@ -85,6 +92,47 @@ model User {
   hackSanctionsIssued  HackSanction[] @relation("HackSanctionIssuer")
   hackTools            HackTool[]     @relation("HackToolOwner")
   hackDrills           HackDrill[]    @relation("HackDrillOwner")
+  createdForums        Forum[]        @relation("ForumCreator")
+  forumPosts           ForumPost[]    @relation("ForumPostAuthor")
+}
+
+// A discussion topic, gated to a minimum clearance. The forum's existence is
+// visible to everyone — the section itself is unrestricted, unlike Secure
+// Channel — but only members meeting `minClearance` may open the thread or
+// post in it. Creation is restricted to L-5+ so the roster of open topics
+// doesn't sprawl unchecked; see FORUM_CREATE_CLEARANCE in lib/clearance.ts.
+model Forum {
+  id            String   @id @default(cuid())
+  title         String
+  description   String   @default("")
+  minClearance  Int      @default(1)
+  createdAt     DateTime @default(now())
+
+  creatorId String
+  creator   User   @relation("ForumCreator", fields: [creatorId], references: [id])
+
+  posts ForumPost[]
+
+  @@index([creatorId])
+  @@index([createdAt])
+}
+
+// One chat message inside a Forum thread. Readable/postable by whoever meets
+// the parent forum's minClearance — see canPostInForum() in lib/forums.ts.
+model ForumPost {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  forumId String
+  forum   Forum  @relation(fields: [forumId], references: [id])
+  authorId String?
+  author   User?  @relation("ForumPostAuthor", fields: [authorId], references: [id])
+  // Denormalized so the post survives the author's account being deleted.
+  authorName String @default("")
+
+  @@index([forumId, createdAt])
+  @@index([authorId])
 }
 
 // An IT support ticket. One table backs all three kinds because they share
