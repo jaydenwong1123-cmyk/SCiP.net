@@ -13,6 +13,7 @@ import type { AnomalyPayload } from "@/lib/hack/games/anomaly";
 import type { SignaturePayload } from "@/lib/hack/games/signature";
 import type { DaemonPayload } from "@/lib/hack/games/daemon";
 import type { MinesweeperPayload } from "@/lib/hack/games/minesweeper";
+import type { StopwatchPayload } from "@/lib/hack/games/stopwatch";
 import { Glyphs } from "./obfuscate";
 import type { RoundSignals } from "@/lib/hack/telemetry";
 
@@ -598,6 +599,107 @@ function DaemonGame({ payload, value, onChange, disabled, signals }: GameProps) 
   );
 }
 
+// Shared by both TIMING GATE ids — the L-1 and O5 cuts differ only in the
+// window their payload carries, never in how the clock is drawn or driven.
+function fmtClock(ms: number): string {
+  return (ms / 1000).toFixed(2) + "s";
+}
+
+function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProps) {
+  const p = payload as StopwatchPayload;
+
+  const [seenPayload, setSeenPayload] = useState(payload);
+  const [running, setRunning] = useState(false);
+  const [displayMs, setDisplayMs] = useState(0);
+  const startRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  // A fresh round — new payload object — resets the clock even if the last
+  // one was left running, mirroring the reveal-state reset MINESWEEPER does
+  // for the same reason: the component is reused across rounds, its local
+  // state is not.
+  if (payload !== seenPayload) {
+    setSeenPayload(payload);
+    setRunning(false);
+    setDisplayMs(0);
+    startRef.current = null;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+  }
+
+  useEffect(() => {
+    if (!running) return;
+    const tick = () => {
+      if (startRef.current !== null) {
+        setDisplayMs(performance.now() - startRef.current);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [running]);
+
+  const start = () => {
+    if (disabled || running) return;
+    signals?.pointer();
+    startRef.current = performance.now();
+    setDisplayMs(0);
+    setRunning(true);
+    onChange("");
+  };
+
+  // The only thing that ever leaves this component: the raw elapsed
+  // milliseconds between this click and START, measured entirely in the
+  // browser. grade() compares it to the hidden target server-side — same
+  // trust boundary as every other game's typed answer, just measured in
+  // time instead of characters.
+  const stop = () => {
+    if (!running || startRef.current === null) return;
+    signals?.pointer();
+    const elapsed = performance.now() - startRef.current;
+    setRunning(false);
+    setDisplayMs(elapsed);
+    onChange(String(Math.round(elapsed)));
+  };
+
+  return (
+    <div className="space-y-3">
+      <Hint>
+        STOP THE CLOCK INSIDE THE WINDOW: {fmtClock(p.windowStartMs)} –{" "}
+        {fmtClock(p.windowEndMs)}.
+      </Hint>
+      <div className={`${PANEL} hack-mono text-center text-2xl py-4`}>
+        {fmtClock(displayMs)}
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={disabled || running}
+          onClick={start}
+          className="term-button"
+        >
+          [START]
+        </button>
+        <button
+          type="button"
+          disabled={disabled || !running}
+          onClick={stop}
+          className="term-button hack-button--risk"
+        >
+          [STOP]
+        </button>
+      </div>
+      {!running && value !== "" && (
+        <p className="text-xs text-[var(--term-fg-dim)]">
+          STOPPED AT {fmtClock(Number(value))}. TRANSMIT TO GRADE, OR START
+          AGAIN TO RETRY.
+        </p>
+      )}
+    </div>
+  );
+}
+
 const RENDERERS: Record<string, (props: GameProps) => React.ReactElement> = {
   cipher: CipherGame,
   icebreaker: IcebreakerGame,
@@ -609,6 +711,8 @@ const RENDERERS: Record<string, (props: GameProps) => React.ReactElement> = {
   signature: SignatureGame,
   daemon: DaemonGame,
   minesweeper: MinesweeperGame,
+  "stopwatch-l1": StopwatchGame,
+  "stopwatch-o5": StopwatchGame,
 };
 
 // Dispatch by the id the server drew. An unknown id can only mean the server

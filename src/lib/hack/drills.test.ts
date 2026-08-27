@@ -18,19 +18,20 @@ describe("drill bands", () => {
     }
   });
 
-  it("labels bands as L-1 through L-5", () => {
+  it("labels bands as L-1 through L-O5", () => {
     expect(DRILL_BANDS.map(drillBandLabel)).toEqual([
       "L-1",
       "L-2",
       "L-3",
       "L-4",
       "L-5",
+      "L-O5",
     ]);
   });
 
   it("rejects bands outside the range", () => {
     expect(isDrillBand(0)).toBe(false);
-    expect(isDrillBand(6)).toBe(false);
+    expect(isDrillBand(7)).toBe(false);
     expect(isDrillBand(1.5)).toBe(false);
   });
 });

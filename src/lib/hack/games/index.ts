@@ -11,6 +11,7 @@ import { anomalyGame } from "./anomaly";
 import { signatureGame } from "./signature";
 import { daemonGame } from "./daemon";
 import { minesweeperGame } from "./minesweeper";
+import { stopwatchL1Game, stopwatchO5Game } from "./stopwatch";
 
 export type { HackGame, GameGeneration, GradeResult } from "./types";
 
@@ -31,6 +32,8 @@ const REGISTRY: HackGame[] = [
   signatureGame,
   daemonGame,
   minesweeperGame,
+  stopwatchL1Game,
+  stopwatchO5Game,
 ];
 
 export const HACK_GAMES: Record<string, HackGame> = Object.fromEntries(
