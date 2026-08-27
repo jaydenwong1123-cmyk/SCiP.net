@@ -53,7 +53,11 @@ export function TraceConsole({
       setError(null);
       switch (state.kind) {
         case "challenge":
-          setNotice(null);
+          // A re-issued challenge means a wrong guess that spent an attempt
+          // rather than the trace. Its feedback is the whole point of a
+          // multi-attempt game — ICE's likeness count is unguessable without
+          // it — so it replaces the notice rather than clearing it.
+          setNotice(state.feedback ?? null);
           setChallenge(state.challenge);
           break;
         case "locked":
@@ -119,6 +123,8 @@ export function TraceConsole({
             </h3>
             <span className="text-xs text-[var(--term-fg-dim)]">
               TRACE {revealLevel + 1}/{revealMax}
+              {challenge.attemptsLeft > 1 &&
+                ` · ${challenge.attemptsLeft} ATTEMPTS`}
             </span>
           </div>
           <p className="text-xs text-[var(--term-fg-dim)] leading-snug">
