@@ -15,6 +15,10 @@ import { canDeleteForum } from "@/lib/forums";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
 import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
+import {
   consumeRateLimit,
   contentLimitError,
   CONTENT_RULE,
@@ -53,6 +57,17 @@ export async function createForumAction(
       error: `YOU CANNOT SET A REQUIREMENT ABOVE YOUR OWN CLEARANCE (${clearanceLabel(
         authoringClearance(user)
       )}).`,
+    };
+  }
+
+  const redactCheck = checkRedactionAuthorization(`${title}\n${description}`, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
     };
   }
 

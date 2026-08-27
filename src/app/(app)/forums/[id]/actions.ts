@@ -5,6 +5,11 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { canAccessForum, canDeleteForumPost } from "@/lib/forums";
 import { findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import { authoringClearance } from "@/lib/clearance";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 import {
   consumeRateLimit,
   contentLimitError,
@@ -32,6 +37,17 @@ export async function postForumMessageAction(
   const body = String(formData.get("body") ?? "").trim();
   if (!body) {
     return { ok: false, error: "MESSAGE BODY IS REQUIRED." };
+  }
+
+  const redactCheck = checkRedactionAuthorization(body, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
+    };
   }
 
   const limit = await consumeRateLimit(

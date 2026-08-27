@@ -45,8 +45,8 @@ export function NewForumForm({ maxClearance }: { maxClearance: number }) {
           ))}
         </select>
         <p className="text-xs text-[var(--term-fg-dim)] mt-1">
-          THE TOPIC IS VISIBLE TO EVERYONE; ONLY MEMBERS AT THIS CLEARANCE OR
-          HIGHER MAY OPEN AND CHAT IN IT. CANNOT EXCEED YOUR OWN CLEARANCE.
+          MEMBERS BELOW THIS CLEARANCE WILL NOT SEE THIS TOPIC EXISTS. CANNOT
+          EXCEED YOUR OWN CLEARANCE.
         </p>
       </div>
       {state?.error && (

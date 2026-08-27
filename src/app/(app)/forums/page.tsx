@@ -2,6 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { canCreateForum, authoringClearance, clearanceLabel } from "@/lib/clearance";
+import {
+  renderRedacted,
+  renderRedactedName,
+  canBypassRedaction,
+} from "@/lib/redact";
 import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 
 export default async function ForumsPage() {
@@ -64,15 +69,17 @@ export default async function ForumsPage() {
                 <span className="clearance-chip text-[10px]">
                   {clearanceLabel(f.minClearance)}+
                 </span>
-                <span className="text-[var(--term-amber)]">{f.title}</span>
+                <span className="text-[var(--term-amber)]">
+                  {renderRedacted(f.title, user.clearance, canBypassRedaction(user))}
+                </span>
               </p>
               {f.description && (
                 <p className="text-sm text-[var(--term-fg-dim)]">
-                  {f.description}
+                  {renderRedacted(f.description, user.clearance, canBypassRedaction(user))}
                 </p>
               )}
               <p className="hud-recid">
-                OPENED BY {f.creator.displayName} ·{" "}
+                OPENED BY {renderRedactedName(f.creator.displayName ?? "", user)} ·{" "}
                 {f._count.posts} {f._count.posts === 1 ? "POST" : "POSTS"}
               </p>
             </Link>

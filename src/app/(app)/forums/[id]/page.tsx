@@ -4,6 +4,11 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
 import { canAccessForum, canDeleteForum, canDeleteForumPost } from "@/lib/forums";
+import {
+  renderRedacted,
+  renderRedactedName,
+  canBypassRedaction,
+} from "@/lib/redact";
 import { ForumPostForm } from "./forum-post-form";
 import { deleteForumAction } from "../actions";
 import { deleteForumPostAction } from "./actions";
@@ -47,9 +52,16 @@ export default async function ForumPage({
         FORUM · {clearanceLabel(forum.minClearance)}+ TO READ AND POST
       </HudBanner>
 
-      <StationHead code="SEC-08 // FORUM" title={forum.title.toUpperCase()}>
+      <StationHead
+        code="SEC-08 // FORUM"
+        title={renderRedacted(forum.title, user.clearance, canBypassRedaction(user))}
+      >
         <Readout label="Posts" value={posts.length} small />
-        <Readout label="Opened By" value={forum.creator.displayName} small />
+        <Readout
+          label="Opened By"
+          value={renderRedactedName(forum.creator.displayName ?? "", user)}
+          small
+        />
         <Link href="/forums" className="term-link text-sm">
           [BACK TO FORUMS]
         </Link>
@@ -64,7 +76,9 @@ export default async function ForumPage({
       </StationHead>
 
       {forum.description && (
-        <p className="text-sm text-[var(--term-fg-dim)]">{forum.description}</p>
+        <p className="text-sm text-[var(--term-fg-dim)]">
+          {renderRedacted(forum.description, user.clearance, canBypassRedaction(user))}
+        </p>
       )}
 
       <HudPanel code="01" title="POST" status={`REQUIRES ${clearanceLabel(forum.minClearance)}+`}>
@@ -94,14 +108,14 @@ export default async function ForumPage({
                   </span>
                 )}
                 <span className="text-[var(--term-amber)]">
-                  {p.author?.displayName ?? p.authorName}
+                  {renderRedactedName(p.author?.displayName ?? p.authorName, user)}
                 </span>
                 <span className="hud-recid">
                   {p.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
                 </span>
               </p>
               <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-                {p.body}
+                {renderRedacted(p.body, user.clearance, canBypassRedaction(user))}
               </pre>
               {canDeleteForumPost(user, p) && (
                 <form action={deleteForumPostAction}>
