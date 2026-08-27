@@ -16,9 +16,9 @@ import type { HackGame } from "./types";
 // Two variants, one mechanic: L-1 is forgiving on both the range and the
 // tolerance; O5 keeps the range wide but tightens the tolerance to something
 // close to the floor of human reaction time. minBand/maxBand pin each variant
-// to exactly one band rather than a window, which is what keeps the O5 cut
-// out of the live ladder entirely — config.ts never issues a stage at band 6,
-// so that variant is reachable only from the training range.
+// to exactly one band rather than a window. The O5 cut sits at band 5
+// alongside L-5 rather than a band of its own, so it shares the L-5 slot in
+// both the training range and the live stage-5 ladder.
 
 type StopwatchSolution = {
   targetMs: number;
@@ -87,18 +87,18 @@ export const stopwatchL1Game: HackGame = makeStopwatchGame({
   toleranceMs: 500,
   timeFactor: 1,
   minHumanMs: 3_000,
-  attempts: 3,
+  attempts: 1,
 });
 
 export const stopwatchO5Game: HackGame = makeStopwatchGame({
   id: "stopwatch-o5",
   label: "TIMING GATE — O5",
   brief: "START THE CLOCK. STOP IT INSIDE THE WINDOW SHOWN. NO MARGIN FOR HESITATION.",
-  band: 6,
+  band: 5,
   rangeMinMs: 3_000,
   rangeMaxMs: 45_000,
   toleranceMs: 100,
   timeFactor: 1,
   minHumanMs: 1_800,
-  attempts: 2,
+  attempts: 1,
 });

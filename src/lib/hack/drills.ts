@@ -24,12 +24,7 @@ import { eligibleGames } from "@/lib/hack/games";
 // window is checked against — NOT the `tier` a ladder stage banks. The two are
 // distinct and only incidentally overlap. Labelled with clearanceLabel() so
 // L-1..L-5 read the same here as everywhere else in the app.
-//
-// Band 6 (L-O5) is a drill-only lane: config.ts never schedules a live stage
-// at that band, so a game whose window sits there — currently just the O5 cut
-// of TIMING GATE — is reachable ONLY from the training range. That is
-// deliberate, not an oversight the ladder forgot to extend into.
-export const DRILL_BANDS = [1, 2, 3, 4, 5, 6] as const;
+export const DRILL_BANDS = [1, 2, 3, 4, 5] as const;
 
 export type DrillBand = (typeof DRILL_BANDS)[number];
 
@@ -95,7 +90,7 @@ export type DrillResult = {
 
 export const DRILL_ERRORS = {
   unknownGame: "NO SUCH DRILL IN THE REGISTRY.",
-  badBand: "SELECT A DIFFICULTY BETWEEN L-1 AND L-O5.",
+  badBand: "SELECT A DIFFICULTY BETWEEN L-1 AND L-5.",
   outOfBand: "THAT DRILL DOES NOT RUN AT THAT DIFFICULTY. PICK ANOTHER.",
   noDrill: "NO SUCH DRILL. START A NEW ONE.",
   settled: "THIS DRILL IS ALREADY GRADED. START A NEW ONE.",

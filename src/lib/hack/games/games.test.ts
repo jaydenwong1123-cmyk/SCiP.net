@@ -27,11 +27,7 @@ import { normalizeToken, normalizeList, sameSet } from "./types";
 // exists for exactly this). Many seeds per game per band, because these
 // generators branch on random draws and a single seed proves almost nothing.
 
-// Band 6 (L-O5) is a drill-only lane — no live stage ever schedules it (see
-// config.ts STAGES) — but it is still a real, gradeable band that a game can
-// declare itself eligible for, so it belongs in the same sweep as 1-5 rather
-// than a separate one the O5 cut of TIMING GATE could quietly fall outside.
-const BANDS = [1, 2, 3, 4, 5, 6];
+const BANDS = [1, 2, 3, 4, 5];
 const SEEDS_PER_BAND = 40;
 
 /**
@@ -131,12 +127,9 @@ describe("puzzle registry", () => {
     }
   });
 
-  it("has no unreachable band — every stage can issue a round, and the drill-only O5 lane has something to offer too", () => {
-    // laddersAreSatisfiable() in engine.ts asserts the live-stage subset (bands
-    // 1-5) of this at runtime; a band with no eligible game would be a stage
-    // that cannot start. Band 6 is never a live stage, but the training range
-    // still needs at least one game there or its L-O5 difficulty would be a
-    // picker option with nothing behind it.
+  it("has no unreachable band — every stage can issue a round", () => {
+    // laddersAreSatisfiable() in engine.ts asserts the same thing at runtime; a
+    // band with no eligible game would be a stage that cannot start.
     for (const band of BANDS) {
       expect(eligibleGames(band).length).toBeGreaterThan(0);
     }
@@ -146,7 +139,7 @@ describe("puzzle registry", () => {
     for (const id of GAME_IDS) {
       const game = HACK_GAMES[id]!;
       expect(game.minBand).toBeGreaterThanOrEqual(1);
-      expect(game.maxBand).toBeLessThanOrEqual(6);
+      expect(game.maxBand).toBeLessThanOrEqual(5);
       expect(game.minBand).toBeLessThanOrEqual(game.maxBand);
       expect(game.timeFactor).toBeGreaterThan(0);
       // The floor is the one anti-cheat signal nothing client-side can fake
