@@ -80,7 +80,9 @@ export const signatureGame: HackGame = {
     return {
       payload: {
         fragments: rng.shuffle([...real, ...decoys]),
-        rules: [...essential, ...extra],
+        // Shuffled: listed in derivation order the chain would read as the
+        // finished token top to bottom, handing the answer over for free.
+        rules: rng.shuffle([...essential, ...extra]),
         tokenLength: realCount * fragmentSize,
       } satisfies SignaturePayload,
       solution: { token } satisfies SignatureSolution,

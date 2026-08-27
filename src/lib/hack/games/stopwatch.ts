@@ -80,7 +80,7 @@ function makeStopwatchGame(opts: {
 export const stopwatchL1Game: HackGame = makeStopwatchGame({
   id: "stopwatch-l1",
   label: "TIMING GATE",
-  brief: "START THE CLOCK. STOP IT INSIDE THE WINDOW SHOWN.",
+  brief: "START THE CLOCK. STOP IT INSIDE THE WINDOW SHOWN. ONE STOP ONLY.",
   band: 1,
   rangeMinMs: 5_000,
   rangeMaxMs: 30_000,
@@ -92,8 +92,9 @@ export const stopwatchL1Game: HackGame = makeStopwatchGame({
 
 export const stopwatchO5Game: HackGame = makeStopwatchGame({
   id: "stopwatch-o5",
-  label: "TIMING GATE — O5",
-  brief: "START THE CLOCK. STOP IT INSIDE THE WINDOW SHOWN. NO MARGIN FOR HESITATION.",
+  label: "TIMING GATE",
+  brief:
+    "START THE CLOCK. STOP IT INSIDE THE WINDOW SHOWN. ONE STOP ONLY — NO MARGIN FOR HESITATION.",
   band: 5,
   rangeMinMs: 3_000,
   rangeMaxMs: 45_000,

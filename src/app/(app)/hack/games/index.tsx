@@ -610,6 +610,7 @@ function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProp
 
   const [seenPayload, setSeenPayload] = useState(payload);
   const [running, setRunning] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [displayMs, setDisplayMs] = useState(0);
   const startRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -621,6 +622,7 @@ function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProp
   if (payload !== seenPayload) {
     setSeenPayload(payload);
     setRunning(false);
+    setStopped(false);
     setDisplayMs(0);
     startRef.current = null;
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -640,8 +642,12 @@ function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProp
     };
   }, [running]);
 
+  // One stop per round: once the clock has been stopped the reading stands and
+  // the only move left is to transmit it. Restarting would make the tolerance
+  // meaningless, since a player could simply keep re-running until they landed
+  // inside the window.
   const start = () => {
-    if (disabled || running) return;
+    if (disabled || running || stopped) return;
     signals?.pointer();
     startRef.current = performance.now();
     setDisplayMs(0);
@@ -659,6 +665,7 @@ function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProp
     signals?.pointer();
     const elapsed = performance.now() - startRef.current;
     setRunning(false);
+    setStopped(true);
     setDisplayMs(elapsed);
     onChange(String(Math.round(elapsed)));
   };
@@ -675,7 +682,7 @@ function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProp
       <div className="flex gap-2">
         <button
           type="button"
-          disabled={disabled || running}
+          disabled={disabled || running || stopped}
           onClick={start}
           className="term-button"
         >
@@ -690,10 +697,10 @@ function StopwatchGame({ payload, value, onChange, disabled, signals }: GameProp
           [STOP]
         </button>
       </div>
-      {!running && value !== "" && (
+      {stopped && value !== "" && (
         <p className="text-xs text-[var(--term-fg-dim)]">
-          STOPPED AT {fmtClock(Number(value))}. TRANSMIT TO GRADE, OR START
-          AGAIN TO RETRY.
+          STOPPED AT {fmtClock(Number(value))}. CLOCK IS LOCKED — TRANSMIT TO
+          GRADE.
         </p>
       )}
     </div>

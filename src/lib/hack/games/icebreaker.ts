@@ -34,11 +34,12 @@ export const icebreakerGame: HackGame = {
   minHumanMs: 6000,
 
   generate(band, rng) {
-    // Longer words and a wider field as the bands climb, with the attempt
-    // budget tightening at the same time.
+    // Longer words and a wider field as the bands climb. The guess budget does
+    // NOT climb with them: five checks total at every band, so a wider field is
+    // strictly harder rather than merely longer.
     const wordLength = band <= 2 ? 6 : band === 3 ? 7 : band === 4 ? 8 : 9;
     const candidateCount = band <= 2 ? 10 : band === 3 ? 13 : band === 4 ? 16 : 20;
-    const attempts = 5 + Math.floor((wordLength - 6) / 2);
+    const attempts = 5;
 
     const pool = PASSWORD_POOL[wordLength];
     const candidates = rng.sample(pool, candidateCount);

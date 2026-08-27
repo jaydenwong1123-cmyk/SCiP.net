@@ -56,18 +56,15 @@ export const THEMES: { key: string; label: string; vars: ThemeVars }[] = [
     },
   },
   {
-    // `--term-fg-dim` was #a83232, which is only 3.10:1 against this
-    // background — below the 4.5:1 AA floor for the metadata text that uses
-    // it throughout the app. #cc5555 measures 4.88:1.
-    key: "crimson",
-    label: "CRIMSON ALERT",
+    key: "teal",
+    label: "DEEP TEAL",
     vars: {
-      "--term-bg": "#0a0202",
-      "--term-fg": "#ff5555",
-      "--term-fg-dim": "#cc5555",
-      "--term-fg-bright": "#ffb3b3",
-      "--term-border": "#cc5555",
-      "--term-glow-rgb": "255,85,85",
+      "--term-bg": "#020a07",
+      "--term-fg": "#33ffb0",
+      "--term-fg-dim": "#1e8f68",
+      "--term-fg-bright": "#aaffdc",
+      "--term-border": "#1e8f68",
+      "--term-glow-rgb": "51,255,176",
     },
   },
   {
@@ -171,7 +168,7 @@ export const THEMES: { key: string; label: string; vars: ThemeVars }[] = [
 
 export const FONTS: { key: string; label: string; stack: string }[] = [
   { key: "courier", label: "COURIER", stack: '"Courier New", ui-monospace, monospace' },
-  { key: "consolas", label: "CONSOLAS", stack: 'Consolas, "Courier New", monospace' },
+  { key: "nyt", label: "NEW YORK TIMES", stack: '"Times New Roman", Times, Georgia, serif' },
   { key: "lucida", label: "LUCIDA CONSOLE", stack: '"Lucida Console", Monaco, monospace' },
   {
     key: "system",
