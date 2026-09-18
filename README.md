@@ -107,6 +107,15 @@ The owner can also download one from `/admin/omega/backup` in the running app.
 A backup file contains password hashes, invite codes, the maintenance bypass code
 and every private message on the site. Treat it exactly like the database.
 
+## The Engine (Discord bot)
+
+The roleplay server's Discord bot runs inside this app: Discord posts every slash
+command to `/api/discord/interactions` and the route answers it, so there is no
+second process and no second host. It handles service points, a promotion ladder
+with an approval step, and a leaderboard.
+
+Setup, commands and the permission tiers are in **[docs/the-engine.md](docs/the-engine.md)**.
+
 ## How clearance works
 
 Ranks run 1–7, labeled L-1 through L-5, then L-O5, then L-OMNI (rank 7 — reserved

@@ -25,8 +25,16 @@ const PUBLIC_PATHS = ["/login", "/register", "/maintenance", "/terminated"];
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
+  // `/api/discord` is public to THIS gate and authenticated by its own means:
+  // every request Discord sends is signed with the application's Ed25519 key
+  // and rejected in the route itself if the signature does not verify. It has
+  // to sit outside the session check because the caller is Discord, which has
+  // no session and cannot follow a redirect to /login — left in, the endpoint
+  // fails verification and no command ever reaches the bot.
   const isPublic =
-    PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/api/auth");
+    PUBLIC_PATHS.includes(pathname) ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/discord");
 
   if (!req.auth && !isPublic) {
     const loginUrl = new URL("/login", req.nextUrl.origin);

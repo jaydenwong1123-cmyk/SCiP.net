@@ -16,7 +16,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:backup": "tsx prisma/backup.ts",
-    "db:backfill-personnel-expiry": "tsx prisma/backfill-personnel-expiry.ts"
+    "db:backfill-personnel-expiry": "tsx prisma/backfill-personnel-expiry.ts",
+    "bot:register": "tsx scripts/register-discord-commands.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

@@ -21,79 +21,79 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  displayName  String?
-  clearance    Int      @default(1)
-  canPostScp   Boolean  @default(false)
-  canFileIncident Boolean @default(false)
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  displayName      String?
+  clearance        Int      @default(1)
+  canPostScp       Boolean  @default(false)
+  canFileIncident  Boolean  @default(false)
   // Filing experiment logs against an anomaly. Deliberately separate from
   // canPostScp: authoring containment documentation and running tests on a
   // contained anomaly are different jobs, held by different personnel.
-  canLogTest   Boolean  @default(false)
+  canLogTest       Boolean  @default(false)
   // Rewriting another member's personnel file. Previously implied by the RAISA
   // (L-R5) designation alone; now a grant in its own right, so recordkeeping
   // duty can be handed out without also handing out a clearance designation.
-  canEditPersonnel Boolean @default(false)
-  isOwner     Boolean  @default(false)
+  canEditPersonnel Boolean  @default(false)
+  isOwner          Boolean  @default(false)
   // Co-Owner: owner-equivalent powers, held by at most MAX_CO_OWNERS members
   // at a time (see src/lib/roles.ts). Only the seeded owner can grant or
   // revoke it.
-  isCoOwner    Boolean  @default(false)
-  isAdmin      Boolean  @default(false)
-  isStaff      Boolean  @default(false)
+  isCoOwner        Boolean  @default(false)
+  isAdmin          Boolean  @default(false)
+  isStaff          Boolean  @default(false)
   // Helper: sits directly below Staff. Grants access to the General Assistance
   // ticket queue and nothing else. Only an Admin (or above) may grant it.
-  isHelper     Boolean  @default(false)
-  department   String?
+  isHelper         Boolean  @default(false)
+  department       String?
   // Optional alternate clearance designation shown instead of the numeric label
   // (e.g. "E5", which carries the same rank-6 / L-O5 access). Null = normal.
-  designation  String?
-  personalFile String   @default("")
+  designation      String?
+  personalFile     String   @default("")
   suspended        Boolean  @default(false)
   suspendedReason  String?
-  createdAt    DateTime @default(now())
+  createdAt        DateTime @default(now())
 
-  usedInvite      InviteCode?       @relation("InviteCodeUser")
-  sentMessages     Message[]         @relation("MessageSender")
-  receivedMessages Message[]         @relation("MessageRecipient")
-  scpFiles        ScpFile[]
-  broadcasts      Broadcast[]
-  incidentReports IncidentReport[]
-  secureMessages  SecureMessage[]
-  clearanceRequests ClearanceRequest[] @relation("ClearanceRequestUser")
-  reviewedRequests  ClearanceRequest[] @relation("ClearanceRequestReviewer")
-  notesAbout       MemberNote[]      @relation("MemberNoteSubject")
-  notesAuthored    MemberNote[]      @relation("MemberNoteAuthor")
-  auditEntries     AuditLog[]        @relation("AuditActor")
-  attachments      Attachment[]      @relation("AttachmentUploader")
-  revisions        Revision[]        @relation("RevisionEditor")
-  createdInvites   InviteCode[]      @relation("InviteCodeCreator")
-  inviteRedemptions InviteRedemption[] @relation("InviteRedemptionUser")
-  notifications      Notification[]      @relation("NotificationRecipient")
+  usedInvite              InviteCode?              @relation("InviteCodeUser")
+  sentMessages            Message[]                @relation("MessageSender")
+  receivedMessages        Message[]                @relation("MessageRecipient")
+  scpFiles                ScpFile[]
+  broadcasts              Broadcast[]
+  incidentReports         IncidentReport[]
+  secureMessages          SecureMessage[]
+  clearanceRequests       ClearanceRequest[]       @relation("ClearanceRequestUser")
+  reviewedRequests        ClearanceRequest[]       @relation("ClearanceRequestReviewer")
+  notesAbout              MemberNote[]             @relation("MemberNoteSubject")
+  notesAuthored           MemberNote[]             @relation("MemberNoteAuthor")
+  auditEntries            AuditLog[]               @relation("AuditActor")
+  attachments             Attachment[]             @relation("AttachmentUploader")
+  revisions               Revision[]               @relation("RevisionEditor")
+  createdInvites          InviteCode[]             @relation("InviteCodeCreator")
+  inviteRedemptions       InviteRedemption[]       @relation("InviteRedemptionUser")
+  notifications           Notification[]           @relation("NotificationRecipient")
   notificationPreferences NotificationPreference[] @relation("NotificationPreferenceUser")
-  infractionsAbout   MemberInfraction[]  @relation("InfractionSubject")
-  infractionsIssued  MemberInfraction[]  @relation("InfractionIssuer")
-  scpAccessGrantsReceived ScpAccessGrant[] @relation("ScpAccessGrantUser")
-  scpAccessGrantsIssued   ScpAccessGrant[] @relation("ScpAccessGrantGrantor")
-  scpTestLogs      ScpTestLog[]   @relation("ScpTestLogAuthor")
-  ticketsOpened    Ticket[]       @relation("TicketAuthor")
-  ticketsClosed    Ticket[]       @relation("TicketCloser")
-  ticketReplies    TicketReply[]  @relation("TicketReplyAuthor")
-  hackRuns          HackRun[]   @relation("HackRunUser")
-  hackRunsTraced    HackRun[]   @relation("HackRunTracer")
-  hackRunsClaimed   HackRun[]   @relation("HackRunClaimant")
-  hackGrants        HackGrant[] @relation("HackGrantUser")
-  hackGrantsRevoked HackGrant[] @relation("HackGrantRevoker")
-  hackDuelsDefended HackDuel[]  @relation("HackDuelDefender")
-  conductRecords    ConductRecord[] @relation("ConductSubject")
-  hackSanctions        HackSanction[] @relation("HackSanctionSubject")
-  hackSanctionsIssued  HackSanction[] @relation("HackSanctionIssuer")
-  hackTools            HackTool[]     @relation("HackToolOwner")
-  hackDrills           HackDrill[]    @relation("HackDrillOwner")
-  createdForums        Forum[]        @relation("ForumCreator")
-  forumPosts           ForumPost[]    @relation("ForumPostAuthor")
+  infractionsAbout        MemberInfraction[]       @relation("InfractionSubject")
+  infractionsIssued       MemberInfraction[]       @relation("InfractionIssuer")
+  scpAccessGrantsReceived ScpAccessGrant[]         @relation("ScpAccessGrantUser")
+  scpAccessGrantsIssued   ScpAccessGrant[]         @relation("ScpAccessGrantGrantor")
+  scpTestLogs             ScpTestLog[]             @relation("ScpTestLogAuthor")
+  ticketsOpened           Ticket[]                 @relation("TicketAuthor")
+  ticketsClosed           Ticket[]                 @relation("TicketCloser")
+  ticketReplies           TicketReply[]            @relation("TicketReplyAuthor")
+  hackRuns                HackRun[]                @relation("HackRunUser")
+  hackRunsTraced          HackRun[]                @relation("HackRunTracer")
+  hackRunsClaimed         HackRun[]                @relation("HackRunClaimant")
+  hackGrants              HackGrant[]              @relation("HackGrantUser")
+  hackGrantsRevoked       HackGrant[]              @relation("HackGrantRevoker")
+  hackDuelsDefended       HackDuel[]               @relation("HackDuelDefender")
+  conductRecords          ConductRecord[]          @relation("ConductSubject")
+  hackSanctions           HackSanction[]           @relation("HackSanctionSubject")
+  hackSanctionsIssued     HackSanction[]           @relation("HackSanctionIssuer")
+  hackTools               HackTool[]               @relation("HackToolOwner")
+  hackDrills              HackDrill[]              @relation("HackDrillOwner")
+  createdForums           Forum[]                  @relation("ForumCreator")
+  forumPosts              ForumPost[]              @relation("ForumPostAuthor")
 }
 
 // A discussion topic, gated to a minimum clearance. The forum's existence is
@@ -102,11 +102,11 @@ model User {
 // post in it. Creation is restricted to L-5+ so the roster of open topics
 // doesn't sprawl unchecked; see FORUM_CREATE_CLEARANCE in lib/clearance.ts.
 model Forum {
-  id            String   @id @default(cuid())
-  title         String
-  description   String   @default("")
-  minClearance  Int      @default(1)
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  title        String
+  description  String   @default("")
+  minClearance Int      @default(1)
+  createdAt    DateTime @default(now())
 
   creatorId String
   creator   User   @relation("ForumCreator", fields: [creatorId], references: [id])
@@ -124,12 +124,12 @@ model ForumPost {
   body      String
   createdAt DateTime @default(now())
 
-  forumId String
-  forum   Forum  @relation(fields: [forumId], references: [id])
-  authorId String?
-  author   User?  @relation("ForumPostAuthor", fields: [authorId], references: [id])
+  forumId    String
+  forum      Forum   @relation(fields: [forumId], references: [id])
+  authorId   String?
+  author     User?   @relation("ForumPostAuthor", fields: [authorId], references: [id])
   // Denormalized so the post survives the author's account being deleted.
-  authorName String @default("")
+  authorName String  @default("")
 
   @@index([forumId, createdAt])
   @@index([authorId])
@@ -143,27 +143,27 @@ model ForumPost {
 // lib/tickets.ts, so the routing rules live in one place rather than being
 // denormalized onto every row (and going stale when the rules change).
 model Ticket {
-  id        String   @id @default(cuid())
+  id         String    @id @default(cuid())
   // "general" | "bug" | "scp_access" — see TICKET_TYPES in lib/tickets.ts
-  type      String
-  subject   String
-  body      String
+  type       String
+  subject    String
+  body       String
   // "open" | "resolved" | "denied" — see TICKET_STATUSES
-  status    String   @default("open")
-  createdAt DateTime @default(now())
-  updatedAt DateTime?
-  closedAt  DateTime?
+  status     String    @default("open")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime?
+  closedAt   DateTime?
   // Closing note from the handler, shown to the requester.
-  resolution String  @default("")
+  resolution String    @default("")
 
-  authorId String
-  author   User   @relation("TicketAuthor", fields: [authorId], references: [id])
+  authorId   String
+  author     User    @relation("TicketAuthor", fields: [authorId], references: [id])
   closedById String?
-  closedBy   User?  @relation("TicketCloser", fields: [closedById], references: [id])
+  closedBy   User?   @relation("TicketCloser", fields: [closedById], references: [id])
 
   // SCP access requests only: the file being requested and for how long.
-  scpFileId      String?
-  requestedDays  Int?
+  scpFileId     String?
+  requestedDays Int?
 
   replies TicketReply[]
 
@@ -177,12 +177,12 @@ model TicketReply {
   body      String
   createdAt DateTime @default(now())
 
-  ticketId String
-  ticket   Ticket @relation(fields: [ticketId], references: [id])
-  authorId String?
-  author   User?  @relation("TicketReplyAuthor", fields: [authorId], references: [id])
+  ticketId   String
+  ticket     Ticket  @relation(fields: [ticketId], references: [id])
+  authorId   String?
+  author     User?   @relation("TicketReplyAuthor", fields: [authorId], references: [id])
   // Denormalized so the thread survives the author's account being deleted.
-  authorName String @default("")
+  authorName String  @default("")
 
   @@index([ticketId, createdAt])
 }
@@ -233,12 +233,12 @@ model MemberInfraction {
   reason    String
   createdAt DateTime @default(now())
 
-  subjectId String
-  subject   User   @relation("InfractionSubject", fields: [subjectId], references: [id])
+  subjectId  String
+  subject    User    @relation("InfractionSubject", fields: [subjectId], references: [id])
   issuerId   String?
-  issuer     User?  @relation("InfractionIssuer", fields: [issuerId], references: [id])
+  issuer     User?   @relation("InfractionIssuer", fields: [issuerId], references: [id])
   // Denormalized so the record survives the issuer's account being deleted.
-  issuerName String @default("")
+  issuerName String  @default("")
 
   @@index([subjectId])
 }
@@ -256,28 +256,28 @@ model MemberNote {
 }
 
 model InviteCode {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  active    Boolean  @default(true)
+  id            String    @id @default(cuid())
+  code          String    @unique
+  active        Boolean   @default(true)
   // Free-text label so staff can remember what a batch was minted for
   // ("winter recruitment", "MTF Nu-7 transfers").
-  note      String   @default("")
+  note          String    @default("")
   // How many registrations this code may back. 1 preserves the original
   // single-use behavior; higher values allow a shared batch code.
-  maxUses   Int      @default(1)
-  useCount  Int      @default(0)
+  maxUses       Int       @default(1)
+  useCount      Int       @default(0)
   // Recorded when staff revoke a code, so the log explains itself later.
-  revokedReason String @default("")
-  createdAt DateTime @default(now())
-  expiresAt DateTime?
+  revokedReason String    @default("")
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime?
 
   createdById String?
   createdBy   User?   @relation("InviteCodeCreator", fields: [createdById], references: [id])
 
   // First redeemer. Kept for the pre-existing one-to-one relation and the
   // "USED BY" display; the full list lives in `redemptions`.
-  usedById String?  @unique
-  usedBy   User?    @relation("InviteCodeUser", fields: [usedById], references: [id])
+  usedById String? @unique
+  usedBy   User?   @relation("InviteCodeUser", fields: [usedById], references: [id])
 
   redemptions InviteRedemption[]
 
@@ -300,34 +300,34 @@ model InviteRedemption {
 }
 
 model Message {
-  id          String   @id @default(cuid())
-  subject     String
-  body        String
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  subject   String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
   // Root message id of the conversation this message belongs to. Set to the
   // message's own id for a thread-starting message; replies inherit the root's.
-  threadId    String?
+  threadId  String?
 
   senderId    String
-  sender      User     @relation("MessageSender", fields: [senderId], references: [id])
+  sender      User   @relation("MessageSender", fields: [senderId], references: [id])
   recipientId String
-  recipient   User     @relation("MessageRecipient", fields: [recipientId], references: [id])
+  recipient   User   @relation("MessageRecipient", fields: [recipientId], references: [id])
 
   @@index([threadId])
 }
 
 model ScpFile {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   title             String
   body              String
   clearanceRequired Int
-  classification    String   @default("Safe")
-  createdAt         DateTime @default(now())
+  classification    String    @default("Safe")
+  createdAt         DateTime  @default(now())
   // Null until the document is first edited. `revisionCount` counts stored
   // prior versions, so the UI can show "REV 3" without a join.
   updatedAt         DateTime?
-  revisionCount     Int      @default(0)
+  revisionCount     Int       @default(0)
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
@@ -353,12 +353,12 @@ model ScpTestLog {
   notes     String   @default("")
   createdAt DateTime @default(now())
 
-  scpFileId String
-  scpFile   ScpFile @relation(fields: [scpFileId], references: [id])
+  scpFileId  String
+  scpFile    ScpFile @relation(fields: [scpFileId], references: [id])
   authorId   String?
-  author     User?  @relation("ScpTestLogAuthor", fields: [authorId], references: [id])
+  author     User?   @relation("ScpTestLogAuthor", fields: [authorId], references: [id])
   // Denormalized so the log survives the researcher's account being deleted.
-  authorName String @default("")
+  authorName String  @default("")
 
   @@index([scpFileId, sequence])
   @@index([authorId])
@@ -375,12 +375,12 @@ model ScpAccessGrant {
   createdAt DateTime  @default(now())
   revokedAt DateTime?
 
-  scpFileId String
-  scpFile   ScpFile @relation(fields: [scpFileId], references: [id])
-  userId    String
-  user      User    @relation("ScpAccessGrantUser", fields: [userId], references: [id])
+  scpFileId   String
+  scpFile     ScpFile @relation(fields: [scpFileId], references: [id])
+  userId      String
+  user        User    @relation("ScpAccessGrantUser", fields: [userId], references: [id])
   grantedById String?
-  grantedBy   User?  @relation("ScpAccessGrantGrantor", fields: [grantedById], references: [id])
+  grantedBy   User?   @relation("ScpAccessGrantGrantor", fields: [grantedById], references: [id])
 
   @@index([scpFileId, userId])
   @@index([userId])
@@ -394,27 +394,27 @@ model ScpAccessGrant {
 // read time — a counter-intel case file has to stay truthful after the member
 // is promoted or transferred.
 model HackRun {
-  id            String   @id @default(cuid())
+  id              String    @id @default(cuid())
   // "active" | "extracted" | "failed" | "abandoned"
-  status        String   @default("active")
+  status          String    @default("active")
   // Highest stage fully cleared, 0-5. The banked tier derives from this.
-  clearedStages Int      @default(0)
-  stage         Int      @default(1)
-  round         Int      @default(1)
+  clearedStages   Int       @default(0)
+  stage           Int       @default(1)
+  round           Int       @default(1)
   // Monotonic challenge counter. Every challenge records the cursor value it
   // was issued at, and a submission is accepted only while the two still
   // match. It never decrements, so a back-button, a refresh or a second tab
   // replaying an old nonce can never re-enter a stage already resolved — and
   // because the game for a round is drawn when that round is issued, it also
   // means the draw cannot be re-rolled.
-  cursor        Int      @default(0)
+  cursor          Int       @default(0)
   // True while the ladder waits on the EXTRACT / PUSH DEEPER decision.
-  atCheckpoint  Boolean  @default(false)
+  atCheckpoint    Boolean   @default(false)
   // Stage 5 carries a global cap on top of the per-round deadlines.
   stageDeadlineAt DateTime?
-  startedAt     DateTime @default(now())
-  endedAt       DateTime?
-  failReason    String   @default("")
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  failReason      String    @default("")
 
   // Captured at breach time, released to RAISA one field per completed trace.
   ip              String @default("")
@@ -423,12 +423,12 @@ model HackRun {
   actorDepartment String @default("")
 
   // RAISA progressive reveal: 0 = anonymous .. 4 = fully identified.
-  revealLevel      Int      @default(0)
-  traceCursor      Int      @default(0)
+  revealLevel      Int       @default(0)
+  traceCursor      Int       @default(0)
   // Backs off a failed trace so the reveal ladder cannot be brute-forced.
   traceLockedUntil DateTime?
   traceById        String?
-  traceBy          User?    @relation("HackRunTracer", fields: [traceById], references: [id])
+  traceBy          User?     @relation("HackRunTracer", fields: [traceById], references: [id])
   identifiedAt     DateTime?
 
   // RAISA's manual investigative workflow tag — "NEEDS_ACTION" |
@@ -449,7 +449,7 @@ model HackRun {
   // extraction at whatever depth was already banked. Stored on the run rather
   // than consumed at failure time so that the effect survives the tab closing
   // — the lazy abandonment sweep honours it exactly like a live failure does.
-  deadmanArmed Boolean @default(false)
+  deadmanArmed Boolean   @default(false)
   // SIGNAL SPOOF: hides this case from the desk's live-intrusion panel until
   // it lapses. It never hides the case FILE — the audit trail and the case list
   // are untouched — only the real-time board RAISA watches to catch a duel.
@@ -522,8 +522,8 @@ model HackDuel {
   attackerNonce String @unique
   defenderNonce String @unique
 
-  attackerAttemptsLeft Int @default(3)
-  defenderAttemptsLeft Int @default(3)
+  attackerAttemptsLeft Int     @default(3)
+  defenderAttemptsLeft Int     @default(3)
   // Separates a stalemate (defender tried and neither solved it -> defender
   // wins, the intrusion was contained) from a walkover (defender engaged and
   // then abandoned the tab -> attacker wins).
@@ -561,15 +561,15 @@ model HackDuel {
 // This raises READ access only. Nothing derives authoring rights, role flags
 // or redaction bypass from it; see authoringClearance() in lib/clearance.ts.
 model HackGrant {
-  id        String    @id @default(cuid())
+  id          String    @id @default(cuid())
   // 2-6. Never 7 — OWNER_CLEARANCE is what canBypassRedaction() keys off, and
   // no illicit grant may reach it.
-  tier      Int
-  expiresAt DateTime
-  createdAt DateTime  @default(now())
-  revokedAt DateTime?
+  tier        Int
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
   revokedById String?
-  revokedBy   User?   @relation("HackGrantRevoker", fields: [revokedById], references: [id])
+  revokedBy   User?     @relation("HackGrantRevoker", fields: [revokedById], references: [id])
 
   userId String
   user   User    @relation("HackGrantUser", fields: [userId], references: [id])
@@ -586,27 +586,27 @@ model HackGrant {
 // time, never selected into anything that reaches a browser. Every read that
 // feeds the client goes through publicChallenge() in lib/hack/engine.ts.
 model HackChallenge {
-  id     String  @id @default(cuid())
-  runId  String
-  run    HackRun @relation(fields: [runId], references: [id])
+  id           String    @id @default(cuid())
+  runId        String
+  run          HackRun   @relation(fields: [runId], references: [id])
   // "intrusion" (the member's ladder) | "trace" (RAISA's identification run).
   // One table because both sides run the identical engine.
-  kind   String  @default("intrusion")
-  game   String
-  stage  Int
-  round  Int
-  cursor Int
+  kind         String    @default("intrusion")
+  game         String
+  stage        Int
+  round        Int
+  cursor       Int
   // Opaque handle the client echoes back. The client never learns the run id.
-  nonce  String  @unique
+  nonce        String    @unique
   // JSON the client renders. Contains no solution material.
-  payload  String
+  payload      String
   // JSON answer key. NEVER leaves the server.
-  solution String
+  solution     String
   // Multi-guess games (ICE PASSWORD CRACK) burn attempts instead of failing
   // outright. Held here so a client that hides its own "out of attempts" UI
   // still gets refused.
-  attemptsLeft Int      @default(1)
-  issuedAt     DateTime @default(now())
+  attemptsLeft Int       @default(1)
+  issuedAt     DateTime  @default(now())
   deadlineAt   DateTime
   answeredAt   DateTime?
   correct      Boolean?
@@ -631,26 +631,26 @@ model HackChallenge {
 // officer never sees this table; what they see is HackRun.flagged, which
 // carries a marker and no identity.
 model ConductRecord {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation("ConductSubject", fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("ConductSubject", fields: [userId], references: [id])
   // "intrusion" | "trace" | "duel_attacker" | "duel_defender"
-  surface String
-  game    String
+  surface   String
+  game      String
   // The case this round belonged to. Nullable so a record outlives the case
   // being deleted from the desk rather than blocking that delete.
-  runId   String?
+  runId     String?
   // Measured from the server's own issue/delivery stamp. Unforgeable, and the
   // heaviest-weighted signal in the score.
   elapsedMs Int
   correct   Boolean
   score     Int
   // JSON array of human-readable reasons, e.g. ["SOLVED IN 3.1S (FLOOR 12.0S)"].
-  reasons   String @default("")
+  reasons   String   @default("")
   // The raw client-reported telemetry blob. UNTRUSTED — a scripted client can
   // write whatever it likes here. Kept for a human to read, dropped after 30
   // days by pruneConductSignals().
-  signals   String @default("")
+  signals   String   @default("")
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -678,20 +678,20 @@ model ConductRecord {
 // happened cannot contest it, and lib/tickets.ts carries the appeal queue this
 // pairs with.
 model HackSanction {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation("HackSanctionSubject", fields: [userId], references: [id])
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation("HackSanctionSubject", fields: [userId], references: [id])
   // "warning" | "restricted" | "blacklisted"
-  level  String
+  level     String
   // Shown to the member verbatim. A sanction with no stated reason is not
   // appealable in any meaningful sense, so the issuing form requires one.
-  reason String @default("")
+  reason    String    @default("")
   // When the sanction lapses. NULL means indefinite — permitted only for
   // "blacklisted", and only deliberately.
   expiresAt DateTime?
 
   issuedById String
-  issuedBy   User   @relation("HackSanctionIssuer", fields: [issuedById], references: [id])
+  issuedBy   User     @relation("HackSanctionIssuer", fields: [issuedById], references: [id])
   createdAt  DateTime @default(now())
 
   // Lifted early, e.g. on a successful appeal. Never deleted: the row is the
@@ -699,7 +699,7 @@ model HackSanction {
   // the same reasoning HackGrant.revokedAt follows.
   liftedAt   DateTime?
   liftedById String?
-  liftReason String @default("")
+  liftReason String    @default("")
 
   @@index([userId, createdAt])
   @@index([userId, liftedAt, expiresAt])
@@ -714,16 +714,16 @@ model HackSanction {
 //
 // See lib/hack/tools.ts for what each kind does and how they are earned.
 model HackTool {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation("HackToolOwner", fields: [userId], references: [id])
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation("HackToolOwner", fields: [userId], references: [id])
   // "recompile" | "spoof" | "ghost" | "deadman" | "stopwatch"
-  kind   String
+  kind            String
   // The run that paid out this tool, for provenance. Nullable so a tool
   // outlives its case being purged from the desk — and so a charge issued by
   // hand from the admin quartermaster can honestly say it came from no run.
   earnedFromRunId String?
-  createdAt DateTime @default(now())
+  createdAt       DateTime @default(now())
 
   // Spent. Null while the tool is still in the kit.
   usedAt      DateTime?
@@ -746,23 +746,23 @@ model HackTool {
 //
 // Nothing here is ever read by the engine, the grant ledger or the conduct log.
 model HackDrill {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation("HackDrillOwner", fields: [userId], references: [id])
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("HackDrillOwner", fields: [userId], references: [id])
   // Registry id from lib/hack/games, and the band it was generated at.
-  game   String
-  band   Int
+  game         String
+  band         Int
   // Opaque handle the client echoes back. The client never learns the row id.
-  nonce  String @unique
+  nonce        String    @unique
   // JSON the client renders. Contains no solution material.
-  payload  String
+  payload      String
   // JSON answer key. Withheld until the drill settles, then shown deliberately:
   // seeing what the puzzle wanted is the entire point of a training range, and
   // it is safe here precisely because nothing is staked on the answer. It still
   // never leaves the server while the drill is live.
-  solution String
-  attemptsLeft Int      @default(1)
-  issuedAt     DateTime @default(now())
+  solution     String
+  attemptsLeft Int       @default(1)
+  issuedAt     DateTime  @default(now())
   answeredAt   DateTime?
   correct      Boolean?
 
@@ -770,18 +770,18 @@ model HackDrill {
 }
 
 model Broadcast {
-  id        String   @id @default(cuid())
-  title     String
-  body      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime?
-  revisionCount Int  @default(0)
+  id            String    @id @default(cuid())
+  title         String
+  body          String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime?
+  revisionCount Int       @default(0)
   // Scheduling window. `publishAt` null (or in the past) means the directive
   // is live now; `expiresAt` null means it never stands down. Filtering is
   // done at query time rather than by a job, so a directive becomes visible
   // and disappears on its own without anything needing to run.
-  publishAt DateTime?
-  expiresAt DateTime?
+  publishAt     DateTime?
+  expiresAt     DateTime?
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
@@ -798,7 +798,7 @@ model Broadcast {
 // expired file stops being served the moment it lapses, whether or not the
 // sweeper has physically removed the row yet.
 model Attachment {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   // "secure" (a secure-channel transmission) | "personnel" (a member dossier).
   // See ATTACHMENT_ENTITIES in lib/attachments.ts.
   entityType String
@@ -807,7 +807,7 @@ model Attachment {
   mimeType   String
   size       Int
   data       Bytes
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
   // Null means the attachment never expires. Personnel-dossier evidence is
   // permanent; secure-channel attachments carry a real expiry.
   expiresAt  DateTime?
@@ -823,18 +823,18 @@ model Attachment {
 }
 
 model ClearanceRequest {
-  id              String    @id @default(cuid())
-  requestedLevel  Int
-  reason          String
-  status          String    @default("pending")
-  reviewNote      String?
-  createdAt       DateTime  @default(now())
-  reviewedAt      DateTime?
+  id             String    @id @default(cuid())
+  requestedLevel Int
+  reason         String
+  status         String    @default("pending")
+  reviewNote     String?
+  createdAt      DateTime  @default(now())
+  reviewedAt     DateTime?
 
   userId       String
-  user         User     @relation("ClearanceRequestUser", fields: [userId], references: [id])
+  user         User    @relation("ClearanceRequestUser", fields: [userId], references: [id])
   reviewedById String?
-  reviewedBy   User?    @relation("ClearanceRequestReviewer", fields: [reviewedById], references: [id])
+  reviewedBy   User?   @relation("ClearanceRequestReviewer", fields: [reviewedById], references: [id])
 }
 
 // Secure communications channel for L-5+ clearance. A single shared, encrypted-
@@ -851,10 +851,10 @@ model SecureMessage {
 // Single-row site configuration (id is always "singleton"). Controls the
 // owner-triggered maintenance lockdown and its bypass access code.
 model SiteConfig {
-  id                 String  @id @default("singleton")
-  maintenanceMode    Boolean @default(false)
-  bypassCode         String  @default("")
-  maintenanceMessage String  @default("")
+  id                 String    @id @default("singleton")
+  maintenanceMode    Boolean   @default(false)
+  bypassCode         String    @default("")
+  maintenanceMessage String    @default("")
   // Optional scheduled end for the lockdown. When set, the maintenance notice
   // shows a public countdown and the site unlocks itself the moment this passes
   // — no job required, the gate simply re-reads the clock on each request. Null
@@ -866,24 +866,24 @@ model SiteConfig {
   // than a mode of it: there is no bypass code, and it darkens /login too, so
   // the two must never be confusable. Only the seeded root owner can set or
   // clear it, and only they can still reach the site while it is up.
-  shutdownMode       Boolean @default(false)
-  shutdownMessage    String  @default("")
-  shutdownAt         DateTime?
+  shutdownMode    Boolean   @default(false)
+  shutdownMessage String    @default("")
+  shutdownAt      DateTime?
 
   // Two-phase arming for the destructive controls. Held here rather than in a
   // cookie or client state so the mandatory delay is enforced by the server: a
   // crafted request cannot skip a countdown it never saw.
-  omegaArmedOp       String?
-  omegaArmedAt       DateTime?
-  omegaArmedBy       String?
+  omegaArmedOp String?
+  omegaArmedAt DateTime?
+  omegaArmedBy String?
 
   // --- QUARTERMASTER BANNER -------------------------------------------------
   // Two hex stops an owner/co-owner pastes in to recolour their own background.
   // Stored normalised to `#rrggbb` (see lib/hex-color.ts) — never the raw
   // paste, since these land in a style attribute. Empty pair = no custom
   // gradient set by anyone.
-  quartermasterFrom   String  @default("")
-  quartermasterTo     String  @default("")
+  quartermasterFrom    String  @default("")
+  quartermasterTo      String  @default("")
   // Who set it. The gradient is rendered only for this one member — it is a
   // personal preference an owner-level member sets for themselves, not a
   // site-wide reskin — so the layout must know whose id to match against the
@@ -898,29 +898,29 @@ model SiteConfig {
   //
   // All four are set and cleared together. A null target reads as "nobody is
   // under exposure", whatever the other columns happen to hold.
-  memeticTargetId    String?
+  memeticTargetId   String?
   // Which visual — a slug from MEMETIC_AGENTS (see lib/memetic.ts). Anything
   // unrecognised reads as no exposure, so a stale slug cannot pin a blank
   // overlay onto someone's screen.
-  memeticAgent       String  @default("")
+  memeticAgent      String    @default("")
   // Cadence slug from MEMETIC_CADENCES. Same fail-closed treatment.
-  memeticCadence     String  @default("")
+  memeticCadence    String    @default("")
   // The hard stop. The client is told this instant and ends itself on it, so an
   // exposure expires on time even if the network drops mid-flash.
-  memeticEndsAt      DateTime?
-  memeticIssuedById  String?
+  memeticEndsAt     DateTime?
+  memeticIssuedById String?
 }
 
 model IncidentReport {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   title             String
-  location          String   @default("")
+  location          String    @default("")
   body              String
-  severity          String   @default("Minor")
-  clearanceRequired Int      @default(1)
-  createdAt         DateTime @default(now())
+  severity          String    @default("Minor")
+  clearanceRequired Int       @default(1)
+  createdAt         DateTime  @default(now())
   updatedAt         DateTime?
-  revisionCount     Int      @default(0)
+  revisionCount     Int       @default(0)
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
@@ -947,9 +947,9 @@ model Revision {
   createdAt  DateTime @default(now())
 
   editorId   String?
-  editor     User?    @relation("RevisionEditor", fields: [editorId], references: [id])
+  editor     User?   @relation("RevisionEditor", fields: [editorId], references: [id])
   // Denormalized so the history survives the editor's account being deleted.
-  editorName String   @default("")
+  editorName String  @default("")
 
   @@index([entityType, entityId, createdAt])
   @@index([editorId])
@@ -990,4 +990,157 @@ model AuthAttempt {
 
   @@index([key, createdAt])
   @@index([createdAt])
+}
+
+// --- THE ENGINE (Discord bot) -----------------------------------------------
+//
+// Everything below backs the Discord bot that runs out of
+// app/api/discord/interactions. It is deliberately a world of its own: a member
+// here is a Discord snowflake, not a site account, and nothing in this section
+// reads or writes `User`, `clearance` or `ClearanceRequest`. Someone can hold a
+// rank in the Discord server without ever registering on the site, and a
+// promotion approved by High Command changes their Discord roles only.
+//
+// The join, if it is ever wanted, is a `siteUserId` column on EngineMember and
+// a verification flow — not a shared table. Keeping them apart now is what
+// makes that later choice a choice.
+
+// Which roles and channels the bot answers to. Singleton, like SiteConfig: the
+// bot serves one guild, and one row means the setup command has exactly one
+// thing to write.
+//
+// Every id is a string with an empty default rather than a nullable column —
+// "" reads as "not configured yet" everywhere, so no call site has to
+// distinguish null from unset, and the bot fails closed on a blank.
+model EngineGuildConfig {
+  id      String @id @default("singleton")
+  guildId String @default("")
+
+  // The three permission tiers. Higher tiers inherit the lower ones, so a
+  // High Command member can also award points without also holding the staff
+  // role. See lib/engine/permissions.ts.
+  staffRoleId   String @default("") // add/remove/set points
+  commandRoleId String @default("") // approve or deny promotions
+  ownerRoleId   String @default("") // edit the rank ladder and these settings
+
+  // Optional floor for the everyday commands (/leaderboard, /points check,
+  // /promote request). Empty = any member of the server may run them. Set it to
+  // a "verified"/"personnel" role to keep the bot silent for everyone else.
+  memberRoleId String @default("")
+
+  // Where promotion requests land for review, and where approvals are
+  // announced. An empty announce channel simply skips the announcement; an
+  // empty review channel blocks /promote request with a setup reminder, since
+  // a request nobody can see is worse than no request at all.
+  reviewChannelId   String @default("")
+  announceChannelId String @default("")
+
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// A Discord member's standing. `points` is the running balance and the only
+// column the leaderboard reads — the ledger below is the history, not the
+// source of truth, so a top-15 query never has to sum anything.
+model EngineMember {
+  id        String @id @default(cuid())
+  guildId   String
+  discordId String
+
+  // Last display name seen on an interaction. Cached purely so the leaderboard
+  // can render fifteen names without fifteen REST calls; it is refreshed on
+  // every command the member touches and is never authoritative.
+  username String @default("")
+
+  points Int @default(0)
+
+  // The ladder role the bot itself last granted. Held so a promotion can strip
+  // the previous rung without guessing from the member's full role list, which
+  // may contain rank-shaped roles the bot never issued.
+  rankRoleId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([guildId, discordId])
+  @@index([guildId, points])
+}
+
+// Append-only record of every point change: who moved what, for whom, and why.
+//
+// Not folded into AuditLog, which requires a site User as its actor. The actor
+// here is a Discord snowflake with no account behind it, and a nullable actor
+// on the site's audit trail would weaken a table whose whole value is that the
+// actor is known.
+model EnginePointEntry {
+  id        String @id @default(cuid())
+  guildId   String
+  discordId String
+
+  delta   Int
+  // Balance AFTER this entry was applied. Stored rather than derived so
+  // /points history reads correctly even beside a manual /points set, which
+  // is not expressible as a delta from the row before it.
+  balance Int
+  reason  String @default("")
+
+  // Discord id of the staff member who made the change; "system" for anything
+  // the bot did on its own.
+  actorId String
+
+  createdAt DateTime @default(now())
+
+  @@index([guildId, discordId, createdAt])
+}
+
+// One rung of the promotion ladder: a Discord role and the points it costs.
+//
+// There is no explicit ordering column. The ladder IS the point thresholds
+// sorted ascending, which means a rung can be repriced with one edit and can
+// never disagree with its own position.
+model EngineRank {
+  id      String @id @default(cuid())
+  guildId String
+  roleId  String
+  label   String
+  points  Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, roleId])
+  @@index([guildId, points])
+}
+
+// A member asking to move up a rung, and High Command's answer.
+model EnginePromotionRequest {
+  id        String @id @default(cuid())
+  guildId   String
+  discordId String
+  username  String @default("")
+
+  // Role ids, not EngineRank ids: a rung can be deleted from the ladder while
+  // an old request still names it, and the decision record should survive that.
+  fromRoleId String?
+  toRoleId   String
+  toLabel    String  @default("")
+
+  // Balance at the moment of asking. A decision is reviewed against what the
+  // member had when they asked, not what they have when it is read.
+  pointsAtRequest Int
+
+  // pending | approved | denied | cancelled
+  status String @default("pending")
+
+  // The review-channel message carrying the embed and its buttons, so a
+  // decision can edit the original in place instead of leaving a live pair of
+  // buttons behind.
+  messageId String?
+
+  reviewerId String?
+  reason     String  @default("")
+
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+
+  @@index([guildId, status])
+  @@index([guildId, discordId, status])
 }
