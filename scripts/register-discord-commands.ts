@@ -1,5 +1,16 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import { COMMANDS } from "../src/lib/discord/command-defs";
+
+// Load .env.local FIRST, then .env.
+//
+// Next.js reads .env.local automatically and gives it precedence, but plain
+// dotenv only reads .env — so a script that used `dotenv/config` alone would
+// report the Discord secrets as missing even though they were sitting in the
+// file the setup guide tells you to put them in. dotenv never overwrites a
+// variable that is already set, so loading in this order reproduces Next's
+// precedence exactly.
+dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 // Upload The Engine's command set to Discord.
 //

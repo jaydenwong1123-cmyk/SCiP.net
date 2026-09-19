@@ -187,10 +187,43 @@ something is wrong; see Troubleshooting.
 
 ---
 
-## Part 6 — Upload the slash commands
+## Part 6 — Invite the bot to your server
+
+1. In the left sidebar, click **OAuth2**.
+2. Scroll to **OAuth2 URL Generator**.
+3. Under **Scopes**, tick:
+   - ☑ `bot`
+   - ☑ `applications.commands`
+4. A **Bot Permissions** box now appears below. Tick:
+   - ☑ **Manage Roles** — so it can give people their rank
+   - ☑ **View Channels**
+   - ☑ **Send Messages** — so it can post promotion requests
+   - ☑ **Embed Links** — so those posts render properly
+5. At the very bottom, a **Generated URL** appears. Click **Copy**.
+6. Paste it into your browser's address bar and press Enter.
+7. Choose your server from the dropdown → **Continue** → **Authorize**.
+
+**Shortcut:** instead of all that, paste this straight into your browser,
+replacing `YOUR_APP_ID` with the App ID from Notepad:
+
+```
+https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=268454912&scope=bot%20applications.commands
+```
+
+✅ **You should see** The Engine appear in your server's member list, greyed out
+as though offline. **That is normal and correct** — this kind of bot never shows
+as "online" because it holds no permanent connection. It still works.
+
+---
+
+## Part 7 — Upload the slash commands
 
 Discord keeps its own list of what commands exist. Deploying your site does not
 update that list — this command does.
+
+**This only works once the bot is in your server** (Part 6). The commands are
+registered *to that server*, so Discord refuses with "Missing Access" if the bot
+has not joined it yet.
 
 In your terminal, in the project folder:
 
@@ -215,7 +248,7 @@ npm run bot:register
 
 ---
 
-## Part 7 — Connect Discord to your website
+## Part 8 — Connect Discord to your website
 
 1. Go back to <https://discord.com/developers/applications> and click **The Engine**.
 2. On **General Information**, scroll to **Interactions Endpoint URL**.
@@ -228,35 +261,6 @@ npm run bot:register
 ✅ **You should see** a green confirmation. Discord tests the URL before it will
 accept it, so **if it saves, Parts 3–5 are definitely correct.** If it refuses,
 see Troubleshooting — do not continue until this saves.
-
----
-
-## Part 8 — Invite the bot to your server
-
-1. In the left sidebar, click **OAuth2**.
-2. Scroll to **OAuth2 URL Generator**.
-3. Under **Scopes**, tick:
-   - ☑ `bot`
-   - ☑ `applications.commands`
-4. A **Bot Permissions** box now appears below. Tick:
-   - ☑ **Manage Roles** — so it can give people their rank
-   - ☑ **View Channels**
-   - ☑ **Send Messages** — so it can post promotion requests
-   - ☑ **Embed Links** — so those posts render properly
-5. At the very bottom, a **Generated URL** appears. Click **Copy**.
-6. Paste it into your browser's address bar and press Enter.
-7. Choose your server from the dropdown → **Continue** → **Authorize**.
-
-**Shortcut:** instead of steps 1–5 you can paste this straight into your browser,
-replacing `YOUR_APP_ID` with the App ID from Notepad:
-
-```
-https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=268454912&scope=bot%20applications.commands
-```
-
-✅ **You should see** The Engine appear in your server's member list, greyed out
-as though offline. **That is normal and correct** — this kind of bot never shows
-as "online" because it holds no permanent connection. It still works.
 
 ---
 
@@ -461,6 +465,7 @@ without also holding the staff role. Refusals are always private to whoever trie
 |---|---|---|
 | **"This interaction failed"** | Your website didn't answer, or answered wrongly | Check the Vercel deployment finished. Check `DISCORD_PUBLIC_KEY` on Vercel exactly matches the developer site. |
 | **Discord won't save the Interactions Endpoint URL** | Discord's test request was rejected | The URL must end in `/api/discord/interactions`; the site must have been deployed *after* you added the environment variables; `DISCORD_PUBLIC_KEY` must be correct. |
+| **`npm run bot:register` says "Missing Access" (50001)** | The bot has not joined the server | Do Part 6 first — commands register *to a server*, so the bot must already be in it. |
 | **Commands don't appear when I type `/`** | The command list was never uploaded | Run `npm run bot:register`, then fully restart Discord (Ctrl+R). |
 | **"The application did not respond"** | Your site took more than 3 seconds | Usually a one-off cold start — try again. If it keeps happening, say so and the replies can be switched to the deferred style. |
 | **"Discord refused the role change…"** on approval | The bot's role is too low | Part 9 — drag The Engine above the rank roles. |
