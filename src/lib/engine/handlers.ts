@@ -18,7 +18,10 @@ import { getEngineConfig, saveEngineConfig, type EngineConfig } from "./config";
 import {
   leaderboardEmbed,
   mention,
+  ordinal,
+  panel,
   parseCustomId,
+  points as fmtPoints,
   promotionEmbed,
   roleMention,
   rungLabel,
@@ -151,10 +154,10 @@ async function handlePoints(
     const position = await rankPosition(guildId, target);
 
     const fields = [
-      { name: "Points", value: `**${points}**`, inline: true },
+      { name: "Points", value: `**${fmtPoints(points)}**`, inline: true },
       {
         name: "Standing",
-        value: position ? `#${position}` : "Unranked",
+        value: position ? ordinal(position) : "Unranked",
         inline: true,
       },
       { name: "Rank", value: rungLabel(where.current), inline: false },
@@ -178,12 +181,10 @@ async function handlePoints(
 
     return reply({
       embeds: [
-        {
-          title: self ? "YOUR SERVICE RECORD" : "SERVICE RECORD",
-          description: mention(target),
+        panel(self ? "Your Service Record" : "Service Record", mention(target), {
           color: COLOR.neutral,
           fields,
-        },
+        }),
       ],
     });
   }
@@ -206,16 +207,18 @@ async function handlePoints(
     const lines = entries.map((e) => {
       const sign = e.delta > 0 ? `+${e.delta}` : `${e.delta}`;
       const when = `<t:${Math.floor(e.createdAt.getTime() / 1000)}:R>`;
-      const why = e.reason ? ` — ${e.reason}` : "";
-      return `\`${sign.padStart(4, " ")}\` → **${e.balance}** · ${mention(e.actorId)} ${when}${why}`;
+      const why = e.reason ? `\n-# ${e.reason}` : "";
+      return `\`${sign.padStart(5, " ")}\`  ·  **${fmtPoints(e.balance)}**  ·  ${mention(e.actorId)}  ·  ${when}${why}`;
     });
+    const header = "-# CHANGE · BALANCE · BY · WHEN";
     return reply({
       embeds: [
-        {
-          title: "POINT HISTORY",
-          description: `${mention(target)}\n\n${lines.join("\n")}`,
+        panel("Point History", `${mention(target)}\n\n${header}\n${lines.join("\n")}`, {
           color: COLOR.neutral,
-        },
+          footer: {
+            text: `Last ${entries.length} change${entries.length === 1 ? "" : "s"}`,
+          },
+        }),
       ],
     });
   }
@@ -293,17 +296,16 @@ async function handlePromote(
     const open = await pendingRequests(guildId, 15);
     if (open.length === 0) return text("No promotion requests are waiting.");
     const lines = open.map(
-      (r) =>
-        `• ${mention(r.discordId)} → **${r.toLabel}** (${r.pointsAtRequest} pts) <t:${Math.floor(r.createdAt.getTime() / 1000)}:R>`
+      (r, i) =>
+        `${ordinal(i + 1)}  ${mention(r.discordId)}  ·  **${r.toLabel}**  ·  ${fmtPoints(r.pointsAtRequest)} pts  ·  <t:${Math.floor(r.createdAt.getTime() / 1000)}:R>`
     );
+    const header = "-# PERSONNEL · REQUESTED RANK · POINTS · FILED";
     return reply({
       embeds: [
-        {
-          title: "PENDING PROMOTION REQUESTS",
-          description: lines.join("\n"),
+        panel("Pending Promotion Requests", `${header}\n${lines.join("\n")}`, {
           color: COLOR.pending,
-          footer: { text: "Decide them on the embeds in the review channel." },
-        },
+          footer: { text: "Decide them on the panels in the review channel." },
+        }),
       ],
     });
   }
@@ -417,24 +419,26 @@ async function postAnnouncement(
 
   if (!title && !body) return text("Nothing to post — it was empty.");
 
+  const style = {
+    color: ANNOUNCE_COLOURS[colour] ?? COLOR.info,
+    footer: footer ? { text: footer } : undefined,
+    timestamp: new Date().toISOString(),
+  };
   const posted = await createMessage(channelId, {
     embeds: [
-      {
-        title: title || undefined,
-        description: body || undefined,
-        color: ANNOUNCE_COLOURS[colour] ?? COLOR.info,
-        footer: footer ? { text: footer } : undefined,
-        timestamp: new Date().toISOString(),
-      },
+      title ? panel(title, body || undefined, style) : { description: body, ...style },
     ],
   });
 
   if (!posted.ok) {
-    // Almost always the bot lacking View Channel / Send Messages / Embed Links
-    // in that one channel, which is worth saying rather than "failed".
-    return text(
-      `That could not be posted to <#${channelId}>: ${posted.error} — check The Engine can view that channel and send messages with embeds in it.`
-    );
+    // The advice depends on the failure. A missing token is a deployment
+    // problem and no amount of fiddling with channel permissions will fix it —
+    // sending someone to the wrong place to look costs more than the error
+    // message saves.
+    const hint = posted.status === 0
+      ? " — this is a deployment problem, not a channel one: check DISCORD_BOT_TOKEN in the hosting environment and redeploy."
+      : " — check The Engine can view that channel and send messages with embeds in it.";
+    return text(`That could not be posted to <#${channelId}>: ${posted.error}${hint}`);
   }
 
   return text(`Posted to <#${channelId}>.`);
@@ -492,15 +496,15 @@ async function handleEngine(
     }
     const lines = ladder.map(
       (r, i) =>
-        `\`${String(i + 1).padStart(2, " ")}.\` ${roleMention(r.roleId)} — **${r.label}** · ${r.points} pts`
+        `${ordinal(i + 1)}  **${r.label}**  ·  ${roleMention(r.roleId)}  ·  ${fmtPoints(r.points)} pts`
     );
+    const header = "-# RUNG · RANK · ROLE · REQUIRED";
     return reply({
       embeds: [
-        {
-          title: "PROMOTION LADDER",
-          description: `${lines.join("\n")}\n\n_Members advance one rung at a time._`,
+        panel("Promotion Ladder", `${header}\n${lines.join("\n")}`, {
           color: COLOR.info,
-        },
+          footer: { text: "Members advance one rung at a time." },
+        }),
       ],
     });
   }
@@ -536,8 +540,7 @@ function settingsEmbed(config: EngineConfig): Embed {
     if (!value) return "_not set_";
     return kind === "role" ? roleMention(value) : `<#${value}>`;
   };
-  return {
-    title: "THE ENGINE — CONFIGURATION",
+  return panel("Configuration", undefined, {
     color: COLOR.info,
     fields: [
       {
@@ -576,7 +579,7 @@ function settingsEmbed(config: EngineConfig): Embed {
     footer: {
       text: "Server administrators always keep access, so the bot cannot lock itself out.",
     },
-  };
+  });
 }
 
 // --- buttons and the denial modal -------------------------------------------

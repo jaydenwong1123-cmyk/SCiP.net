@@ -35,6 +35,35 @@ export function rungLabel(rung: Rung | null): string {
   return rung ? `${rung.label} (${roleMention(rung.roleId)})` : "Unranked";
 }
 
+/** Small bold line Discord draws above the heading on every panel. */
+export const EYEBROW = "THE ENGINE";
+
+/**
+ * Build a panel: eyebrow, large heading, body.
+ *
+ * Discord cannot size an embed's `title` — it is fixed at roughly body text —
+ * but a markdown `#` heading at the top of the description renders about twice
+ * as large. So every panel leaves `title` empty and puts its name in the
+ * description instead, with the bot's name as the eyebrow above it.
+ */
+export function panel(
+  heading: string,
+  body?: string,
+  rest: Omit<Embed, "title" | "description" | "author"> = {}
+): Embed {
+  return {
+    author: { name: EYEBROW },
+    description: body ? `# ${heading}\n${body}` : `# ${heading}`,
+    ...rest,
+  };
+}
+
+/** A fixed-width position marker — `01`, `02` … — so a column of them lines up. */
+export const ordinal = (n: number) => `\`${String(n).padStart(2, "0")}\``;
+
+/** Thousands-separated point total. */
+export const points = (n: number) => n.toLocaleString("en-US");
+
 export type ReviewEmbedInput = {
   requestId: string;
   discordId: string;
@@ -57,7 +86,7 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
 
   const fields = [
     { name: "Personnel", value: mention(input.discordId), inline: true },
-    { name: "Points", value: `${input.points}`, inline: true },
+    { name: "Points", value: points(input.points), inline: true },
     { name: "\u200b", value: "\u200b", inline: true },
     { name: "Current rank", value: rungLabel(input.from), inline: true },
     { name: "Requested rank", value: rungLabel(input.to), inline: true },
@@ -76,20 +105,18 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
   }
 
   const heading: Record<ReviewEmbedInput["status"], string> = {
-    pending: "PROMOTION REQUEST — AWAITING REVIEW",
-    approved: "PROMOTION REQUEST — APPROVED",
-    denied: "PROMOTION REQUEST — DENIED",
-    cancelled: "PROMOTION REQUEST — WITHDRAWN",
+    pending: "Promotion Request",
+    approved: "Promotion Approved",
+    denied: "Promotion Denied",
+    cancelled: "Promotion Withdrawn",
   };
 
-  return {
-    title: heading[input.status],
-    description: `**${input.username}** has requested advancement.`,
+  return panel(heading[input.status], `**${input.username}** has requested advancement.`, {
     color,
     fields,
     footer: { text: `Request ${input.requestId}` },
     timestamp: new Date().toISOString(),
-  };
+  });
 }
 
 /** Approve/Deny. Omitted entirely once a request is decided, so a decided
@@ -116,27 +143,27 @@ export function promotionButtons(requestId: string): MessageComponent[] {
   ];
 }
 
-export const MEDALS = ["🥇", "🥈", "🥉"];
-
 export function leaderboardEmbed(
   rows: { discordId: string; username: string; points: number }[],
   viewer?: { position: number | null; points: number }
 ): Embed {
-  const lines = rows.map((row, i) => {
-    const place = MEDALS[i] ?? `\`${String(i + 1).padStart(2, " ")}.\``;
-    return `${place} ${mention(row.discordId)} — **${row.points}**`;
-  });
+  // One line per member: a fixed-width position, the mention, and the total
+  // right after a thin separator. No medals — a service record reads the same
+  // for first place as for fifteenth.
+  const lines = rows.map(
+    (row, i) => `${ordinal(i + 1)}  ${mention(row.discordId)}  ·  **${points(row.points)}**`
+  );
 
-  const description = lines.length
-    ? lines.join("\n")
+  const header = "-# POSITION · PERSONNEL · POINTS";
+  const body = lines.length
+    ? `${header}\n${lines.join("\n")}`
     : "_No personnel have been awarded points yet._";
 
-  const embed: Embed = {
-    title: "SERVICE RECORD — TOP 15",
-    description,
-    color: COLOR.info,
-    footer: { text: "The Engine" },
-  };
+  const embed = panel("Service Record", body, {
+    color: COLOR.neutral,
+    footer: { text: `Top ${Math.max(rows.length, 15)} by service points` },
+    timestamp: new Date().toISOString(),
+  });
 
   // Shown only to someone who is not already in the table — repeating a
   // member's own position back at them when they are sitting at #3 is noise.
@@ -144,7 +171,7 @@ export function leaderboardEmbed(
     embed.fields = [
       {
         name: "Your standing",
-        value: `#${viewer.position} — **${viewer.points}** points`,
+        value: `${ordinal(viewer.position)}  ·  **${points(viewer.points)}** points`,
         inline: false,
       },
     ];

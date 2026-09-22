@@ -111,6 +111,8 @@ export type Interaction = {
 };
 
 export type Embed = {
+  /** Small bold line above everything else; used as an eyebrow label. */
+  author?: { name: string; icon_url?: string };
   title?: string;
   description?: string;
   color?: number;

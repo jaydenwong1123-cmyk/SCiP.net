@@ -7,7 +7,13 @@ import {
 } from "@/lib/discord/rest";
 import { COLOR } from "@/lib/discord/types";
 import type { EngineConfig } from "./config";
-import { mention, promotionButtons, promotionEmbed, rungLabel } from "./embeds";
+import {
+  mention,
+  panel,
+  promotionButtons,
+  promotionEmbed,
+  rungLabel,
+} from "./embeds";
 import { getMember } from "./points";
 import { getLadder, positionOf, type Rung } from "./ranks";
 
@@ -189,13 +195,15 @@ export async function approveRequest(
   if (config.announceChannelId) {
     await createMessage(config.announceChannelId, {
       embeds: [
-        {
-          title: "PROMOTION — EFFECTIVE IMMEDIATELY",
-          description: `${mention(request.discordId)} has been advanced to **${request.toLabel}**.`,
-          color: COLOR.approved,
-          footer: { text: "By order of High Command" },
-          timestamp: new Date().toISOString(),
-        },
+        panel(
+          "Promotion",
+          `${mention(request.discordId)} has been advanced to **${request.toLabel}**, effective immediately.`,
+          {
+            color: COLOR.approved,
+            footer: { text: "By order of High Command" },
+            timestamp: new Date().toISOString(),
+          }
+        ),
       ],
     });
   }

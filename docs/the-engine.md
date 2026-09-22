@@ -136,25 +136,40 @@ long value inside the quotes and no spaces around the `=`.
 
 ✅ **You should see** all four listed on that page when you are done.
 
-### ⚠️ While you are on this page — check one existing variable
+### ⚠️ Spell the names exactly
 
-Find **`DATABASE_URL`** in that same list. If it is marked **Sensitive**, the
-bot's database tables will *not* be created when you deploy, and every command
-will fail with a database error — even though the deploy reports success.
+The code looks for these four names character for character. A typo means the
+value is simply not there, and the bot reports it as unset:
 
-**If it says Sensitive**, do one of these:
+```
+DISCORD_APP_ID
+DISCORD_PUBLIC_KEY
+DISCORD_BOT_TOKEN      <- TOKEN, not TOEKN
+DISCORD_GUILD_ID
+```
 
-- **Easiest:** delete `DATABASE_URL` and add it again with the *Sensitive* box
-  left unticked; or
-- run the migration by hand from your terminal before deploying:
-  ```powershell
-  $env:DATABASE_URL="libsql://...your turso url..."
-  $env:TURSO_AUTH_TOKEN="...your turso token..."
-  npm run db:deploy
-  ```
+Only two of them matter to the live site: `DISCORD_PUBLIC_KEY` (to verify each
+request came from Discord) and `DISCORD_BOT_TOKEN` (to grant roles and post
+messages). The other two are used by `npm run bot:register`, which runs on your
+own machine.
 
-This is a quirk of this project that predates the bot — it is explained in the
-[README](../README.md#applying-schema-changes-to-production).
+### ⚠️ Vercel only picks up variables on the NEXT deployment
+
+Adding or fixing a variable does **not** affect the deployment already running.
+After changing one, redeploy — from the dashboard (Deployments → ⋯ → Redeploy)
+or with `npx vercel redeploy <url> --target production`.
+
+This is the most common reason a fix "doesn't work": the value is right in the
+dashboard, but the running code was built before it existed.
+
+> **On `DATABASE_URL` being marked Sensitive:** the project README warns that a
+> Sensitive `DATABASE_URL` is hidden from the build, so migrations silently miss
+> production. That was *not* the behaviour observed when this bot was deployed —
+> the build log showed the migration applying to the real Turso database with
+> `DATABASE_URL` marked Sensitive. Worth knowing the failure exists, but check
+> the build log before acting on it: if `prisma migrate deploy` reports
+> "migration(s) have been applied", production got them.
+
 
 ---
 
@@ -366,7 +381,7 @@ Run these in order:
 1. `/points add user:@yourself amount:150 reason:testing`
    → ✅ "Awarded **150** points…"
 2. `/leaderboard`
-   → ✅ a public embed with you at 🥇
+   → ✅ a public panel headed **Service Record** with you at position `01`
 3. `/points check`
    → ✅ your points, standing, rank, and what the next rank needs
 4. `/promote request`
@@ -469,7 +484,8 @@ without also holding the staff role. Refusals are always private to whoever trie
 | **Commands don't appear when I type `/`** | The command list was never uploaded | Run `npm run bot:register`, then fully restart Discord (Ctrl+R). |
 | **"The application did not respond"** | Your site took more than 3 seconds | Usually a one-off cold start — try again. If it keeps happening, say so and the replies can be switched to the deferred style. |
 | **"Discord refused the role change…"** on approval | The bot's role is too low | Part 9 — drag The Engine above the rank roles. |
-| **A database error on every command** | The `Engine*` tables aren't in production | The `DATABASE_URL`-marked-Sensitive problem in Part 4. |
+| **"DISCORD_BOT_TOKEN is not set"** | The variable is missing, misspelled, or the deployment predates it | Check the spelling in Vercel (Part 4), then **redeploy** — env changes need a new deployment. |
+| **A database error on every command** | The `Engine*` tables aren't in production | Check the build log for "migration(s) have been applied". If not, run `npm run db:deploy` against the production `DATABASE_URL`. |
 | **The bot shows as offline** | Nothing is wrong | This kind of bot is always greyed out. It still works. |
 | **"You do not have clearance…"** | Working as designed | Run `/engine settings` — you may not hold the role assigned to that tier. |
 
