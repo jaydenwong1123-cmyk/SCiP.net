@@ -293,6 +293,7 @@ in the role list. So The Engine's role must be **above every rank role**.
 ```
    Owner               ← your staff roles can stay above
    High Command
+   High Rank
  ┌──────────────────┐
  │ The Engine       │  ← must be ABOVE every rank it hands out
  └──────────────────┘
@@ -325,11 +326,13 @@ Set these:
 | Option | Pick | What it controls |
 |---|---|---|
 | `staff_role` | your staff/NCO role | who can award and remove points |
-| `high_command_role` | your high rank role | who can approve promotions |
+| `high_rank_role` | your high rank role | who can approve promotions |
+| `high_command_role` | your high command role | who can post announcements |
 | `owner_role` | your owner/admin role | who can edit ranks and settings |
 | `review_channel` | e.g. `#promotions` | where requests appear for approval |
 | `announce_channel` | e.g. `#announcements` | optional — where approvals are announced |
 | `member_role` | leave empty for now | optional — see below |
+| `points_webhook` | a webhook URL | optional — posts every point change publicly (see below) |
 
 Press Enter.
 
@@ -340,6 +343,20 @@ anything you skipped shown as *not set*.
 > their points, see the leaderboard, and request a promotion. Set it to a role
 > and *only* people with that role can use even those basic commands. That is the
 > "only people I choose can use the bot" lock, and it is optional.
+
+> **About `points_webhook` (the public points log):** in Discord, open the
+> channel you want the log in → **Edit Channel → Integrations → Webhooks → New
+> Webhook**. Name it (e.g. `SSF Points`), give it an avatar, click **Copy Webhook
+> URL**, and paste that into `points_webhook`. From then on every
+> `/points add`, `/points remove` and `/points set` posts a line there:
+>
+> **SSF POINTS | POINTS SYSTEM**
+> Added `5 points` to @member. They now have `7 points`.
+>
+> with who made the change and the reason underneath in small text. Nobody gets
+> pinged. To stop it, run `/engine setup points_webhook:off`. If the webhook is
+> ever deleted, the points still change and the staff member is told the log
+> failed.
 
 > **Worried about locking yourself out?** You can't. Anyone with Discord's
 > **Administrator** permission always keeps full access to the bot, whatever
@@ -364,13 +381,37 @@ Add your ranks, cheapest first. For each one:
 The order is worked out from the points, so you can add them in any order, and
 reprice any rank later by running `rank add` again with the same role.
 
+### Ranks that need an application
+
+Some ranks should need a written application **as well as** the points. Add
+`application:True` to the rank:
+
+```
+/engine rank add role:@Site Director points:500 application:True
+```
+
+To ask your own questions instead of the defaults, add `questions`, separated
+with `|` (up to 5, each 45 characters or fewer — Discord's form limits):
+
+```
+/engine rank add role:@Site Director points:500 questions:Why do you want this rank?|What have you led?|How active are you?
+```
+
+Giving `questions` switches the application on by itself. To switch it off
+again: `/engine rank add role:@Site Director points:500 application:False`.
+Re-pricing a rank without mentioning `application` leaves it as it was.
+
+The default questions are *Why do you want this rank?*, *What have you done to
+earn it?*, and *Anything else High Rank should know?*.
+
 Check it:
 
 ```
 /engine rank list
 ```
 
-✅ **You should see** your ranks numbered 1, 2, 3 from cheapest to dearest.
+✅ **You should see** your ranks numbered 1, 2, 3 from cheapest to dearest, with
+`+ application` after any rank that needs one.
 
 ---
 
@@ -387,7 +428,7 @@ Run these in order:
 4. `/promote request`
    → ✅ "Request filed…" **and** an embed appears in your review channel with a
    green **Approve** and a red **Deny** button
-5. Click **Approve** (from an account holding the High Command role)
+5. Click **Approve** (from an account holding the High Rank role)
    → ✅ the rank role appears on the member, and the embed turns green naming who
    approved it
 
@@ -397,8 +438,8 @@ Then tidy up after the test: `/points set user:@yourself amount:0`
 
 ## Posting announcements
 
-High Command can post a formatted embed through the bot, so official notices come
-from The Engine rather than from a person's account.
+High Command (and Owner) can post a formatted embed through the bot, so official
+notices come from The Engine rather than from a person's account.
 
 ```
 /announce channel:#announcements colour:Red — alert
@@ -440,11 +481,16 @@ channel's own permission overrides, not just the server-wide ones.
    have enough points for the **next rank up**, one step at a time. Points alone
    never promote anybody.
 2. An embed appears in your review channel with **Approve** / **Deny**. Only High
-   Command (and admins) can press them; anyone else gets a private refusal.
+   Rank (and admins) can press them; anyone else gets a private refusal.
 3. **Approve** → the bot adds the new rank role, removes the old one, and turns
    the embed green. The role arriving is how the member finds out.
 4. **Deny** → a box opens for a reason, which is recorded on the embed in red.
-5. The buttons vanish once decided, so nobody can approve the same request twice
+5. **Ranks that need an application:** in step 1 the member must still have the
+   points first. Once they do, `/promote request` opens a form with the rank's
+   questions instead of filing straight away. When they submit it, the review
+   embed is headed **Rank Application** and shows every answer, and High Rank
+   approves or denies it with the same buttons.
+6. The buttons vanish once decided, so nobody can approve the same request twice
    by scrolling back to it.
 
 A member's rank is whatever role **the bot** last gave them. A rank you handed
@@ -464,12 +510,13 @@ approved promotion.
 | `/points check [user]` | anyone |
 | `/leaderboard` — top 15 | anyone |
 | `/promote request` | anyone |
-| `/promote list` — what is awaiting review | High Command |
+| `/promote list` — what is awaiting review | High Rank |
 | `/announce channel [colour]` — post an embed | High Command |
-| `/engine rank add / remove / list` | Owner |
+| `/engine rank add role points [label] [application] [questions]` | Owner |
+| `/engine rank remove / list` | Owner |
 | `/engine setup`, `/engine settings` | Owner |
 
-Higher tiers can do everything the lower ones can — High Command can award points
+Higher tiers can do everything the lower ones can — High Rank can award points
 without also holding the staff role. Refusals are always private to whoever tried.
 
 ---

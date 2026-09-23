@@ -14,6 +14,12 @@ import {
   promotionEmbed,
   rungLabel,
 } from "./embeds";
+import {
+  collectAnswers,
+  decodeAnswers,
+  encodeAnswers,
+  type Answer,
+} from "./applications";
 import { getMember } from "./points";
 import { getLadder, positionOf, type Rung } from "./ranks";
 
@@ -21,7 +27,7 @@ import { getLadder, positionOf, type Rung } from "./ranks";
 //
 //   /promote request -> eligibility is checked HERE, not in the command
 //   handler -> an embed with Approve/Deny lands in the review channel ->
-//   High Command decides -> the bot performs the role swap and edits the
+//   High Rank decides -> the bot performs the role swap and edits the
 //   original embed in place.
 //
 // The decision, not the request, is what moves a role. The bot never promotes
@@ -29,7 +35,15 @@ import { getLadder, positionOf, type Rung } from "./ranks";
 
 export type RequestOutcome =
   | { ok: true; requestId: string; to: Rung }
-  | { ok: false; message: string };
+  | { ok: false; message: string }
+  /** Eligible on points, but the rank needs an application: show the form. */
+  | { ok: false; apply: Rung };
+
+/** A submitted application form: the rank it was opened for, and its fields. */
+export type ApplicationForm = {
+  roleId: string;
+  field: (name: string) => string;
+};
 
 /**
  * Open a promotion request.
@@ -42,7 +56,8 @@ export async function createRequest(
   config: EngineConfig,
   guildId: string,
   discordId: string,
-  username: string
+  username: string,
+  form?: ApplicationForm
 ): Promise<RequestOutcome> {
   if (!config.reviewChannelId) {
     return {
@@ -68,7 +83,7 @@ export async function createRequest(
     return {
       ok: false,
       message:
-        "You already have a promotion request awaiting review. High Command will get to it.",
+        "You already have a promotion request awaiting review. High Rank will get to it.",
     };
   }
 
@@ -89,6 +104,25 @@ export async function createRequest(
     };
   }
 
+  // Points are checked FIRST, so nobody writes an application for a rank they
+  // cannot yet reach. Everything above is re-checked when the form comes back:
+  // it is a fresh interaction, and the ladder or their balance may have moved.
+  let answers: Answer[] = [];
+  if (where.next.requiresApplication) {
+    if (!form) return { ok: false, apply: where.next };
+    if (form.roleId !== where.next.roleId) {
+      return {
+        ok: false,
+        message:
+          "The rank ladder changed while you were filling in the form, so it was not filed. Run /promote request again.",
+      };
+    }
+    answers = collectAnswers(where.next, form.field);
+    if (answers.some((x) => !x.a)) {
+      return { ok: false, message: "Every question needs an answer." };
+    }
+  }
+
   const request = await db.enginePromotionRequest.create({
     data: {
       guildId,
@@ -98,6 +132,7 @@ export async function createRequest(
       toRoleId: where.next.roleId,
       toLabel: where.next.label,
       pointsAtRequest: points,
+      application: encodeAnswers(answers),
     },
   });
 
@@ -111,6 +146,7 @@ export async function createRequest(
         to: where.next,
         points,
         status: "pending",
+        answers,
       }),
     ],
     components: promotionButtons(request.id),
@@ -200,7 +236,7 @@ export async function approveRequest(
           `${mention(request.discordId)} has been advanced to **${request.toLabel}**, effective immediately.`,
           {
             color: COLOR.approved,
-            footer: { text: "By order of High Command" },
+            footer: { text: "By order of High Rank" },
             timestamp: new Date().toISOString(),
           }
         ),
@@ -267,6 +303,8 @@ export async function refreshRequestMessage(
     roleId: request.toRoleId,
     label: request.toLabel,
     points: request.pointsAtRequest,
+    requiresApplication: !!request.application,
+    applicationQuestions: "",
   };
 
   await editMessage(config.reviewChannelId, request.messageId, {
@@ -281,6 +319,7 @@ export async function refreshRequestMessage(
         status: request.status as "approved" | "denied" | "cancelled",
         reviewerId: request.reviewerId,
         reason: request.reason,
+        answers: decodeAnswers(request.application),
       }),
     ],
     components: [],

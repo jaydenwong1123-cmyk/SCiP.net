@@ -124,7 +124,7 @@ export const COMMANDS = [
     options: [
       {
         name: "request",
-        description: "Ask High Command to advance you to the next rank",
+        description: "Ask High Rank to advance you to the next rank",
         type: OptionType.SubCommand,
       },
       {
@@ -150,8 +150,14 @@ export const COMMANDS = [
             required: false,
           },
           {
-            name: "high_command_role",
+            name: "high_rank_role",
             description: "May approve or deny promotions",
+            type: OptionType.Role,
+            required: false,
+          },
+          {
+            name: "high_command_role",
+            description: "May post announcements",
             type: OptionType.Role,
             required: false,
           },
@@ -179,6 +185,14 @@ export const COMMANDS = [
               "Restrict the everyday commands to this role (optional)",
             type: OptionType.Role,
             required: false,
+          },
+          {
+            name: "points_webhook",
+            description:
+              "Webhook URL that point changes are posted to publicly (\"off\" to stop)",
+            type: OptionType.String,
+            required: false,
+            max_length: 200,
           },
         ],
       },
@@ -216,6 +230,21 @@ export const COMMANDS = [
                 type: OptionType.String,
                 required: false,
                 max_length: 60,
+              },
+              {
+                name: "application",
+                description:
+                  "Also require a written application (default: unchanged)",
+                type: OptionType.Boolean,
+                required: false,
+              },
+              {
+                name: "questions",
+                description:
+                  "Application questions, separated by | (max 5, 45 chars each)",
+                type: OptionType.String,
+                required: false,
+                max_length: 300,
               },
             ],
           },

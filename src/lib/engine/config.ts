@@ -9,21 +9,25 @@ const SINGLETON = "singleton";
 export type EngineConfig = {
   guildId: string;
   staffRoleId: string;
-  commandRoleId: string;
+  highRankRoleId: string;
+  highCommandRoleId: string;
   ownerRoleId: string;
   memberRoleId: string;
   reviewChannelId: string;
   announceChannelId: string;
+  pointsWebhookUrl: string;
 };
 
 export const EMPTY_CONFIG: EngineConfig = {
   guildId: "",
   staffRoleId: "",
-  commandRoleId: "",
+  highRankRoleId: "",
+  highCommandRoleId: "",
   ownerRoleId: "",
   memberRoleId: "",
   reviewChannelId: "",
   announceChannelId: "",
+  pointsWebhookUrl: "",
 };
 
 export async function getEngineConfig(): Promise<EngineConfig> {
@@ -34,11 +38,13 @@ export async function getEngineConfig(): Promise<EngineConfig> {
   return {
     guildId: row.guildId,
     staffRoleId: row.staffRoleId,
-    commandRoleId: row.commandRoleId,
+    highRankRoleId: row.highRankRoleId,
+    highCommandRoleId: row.highCommandRoleId,
     ownerRoleId: row.ownerRoleId,
     memberRoleId: row.memberRoleId,
     reviewChannelId: row.reviewChannelId,
     announceChannelId: row.announceChannelId,
+    pointsWebhookUrl: row.pointsWebhookUrl,
   };
 }
 
@@ -59,10 +65,22 @@ export async function saveEngineConfig(
   return {
     guildId: row.guildId,
     staffRoleId: row.staffRoleId,
-    commandRoleId: row.commandRoleId,
+    highRankRoleId: row.highRankRoleId,
+    highCommandRoleId: row.highCommandRoleId,
     ownerRoleId: row.ownerRoleId,
     memberRoleId: row.memberRoleId,
     reviewChannelId: row.reviewChannelId,
     announceChannelId: row.announceChannelId,
+    pointsWebhookUrl: row.pointsWebhookUrl,
   };
+}
+
+/**
+ * Is this a Discord webhook URL? Checked on the way in so a pasted channel link
+ * or a typo is refused at setup, rather than failing silently on every award.
+ */
+export function isWebhookUrl(value: string): boolean {
+  return /^https:\/\/(?:(?:canary|ptb)\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(
+    value.trim()
+  );
 }

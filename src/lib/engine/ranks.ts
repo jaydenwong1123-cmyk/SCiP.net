@@ -16,6 +16,10 @@ export type Rung = {
   roleId: string;
   label: string;
   points: number;
+  /** Needs a written application as well as the points. */
+  requiresApplication: boolean;
+  /** Raw question list, one per line; "" means the defaults. */
+  applicationQuestions: string;
 };
 
 export type LadderPosition = {
@@ -78,20 +82,37 @@ export async function getLadder(guildId: string): Promise<Rung[]> {
     roleId: r.roleId,
     label: r.label,
     points: r.points,
+    requiresApplication: r.requiresApplication,
+    applicationQuestions: r.applicationQuestions,
   }));
 }
 
-/** Add a rung, or reprice/rename one that already exists for this role. */
+/**
+ * Add a rung, or reprice/rename one that already exists for this role.
+ *
+ * The application settings are only touched when passed, so repricing a rank
+ * with a plain `/engine rank add role points` does not quietly switch its
+ * application off.
+ */
 export async function upsertRung(
   guildId: string,
   roleId: string,
   label: string,
-  points: number
+  points: number,
+  application: { required?: boolean; questions?: string } = {}
 ) {
+  const extra = {
+    ...(application.required !== undefined && {
+      requiresApplication: application.required,
+    }),
+    ...(application.questions !== undefined && {
+      applicationQuestions: application.questions,
+    }),
+  };
   return db.engineRank.upsert({
     where: { guildId_roleId: { guildId, roleId } },
-    create: { guildId, roleId, label, points: Math.max(0, points) },
-    update: { label, points: Math.max(0, points) },
+    create: { guildId, roleId, label, points: Math.max(0, points), ...extra },
+    update: { label, points: Math.max(0, points), ...extra },
   });
 }
 

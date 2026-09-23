@@ -12,15 +12,27 @@ import {
   type MessageComponent,
   type MessagePayload,
 } from "@/lib/discord/types";
-import { createMessage } from "@/lib/discord/rest";
+import { createMessage, executeWebhook } from "@/lib/discord/rest";
 import { db } from "@/lib/db";
-import { getEngineConfig, saveEngineConfig, type EngineConfig } from "./config";
+import {
+  getEngineConfig,
+  isWebhookUrl,
+  saveEngineConfig,
+  type EngineConfig,
+} from "./config";
+import {
+  MAX_QUESTIONS,
+  applicationModal,
+  decodeAnswers,
+  parseQuestions,
+} from "./applications";
 import {
   leaderboardEmbed,
   mention,
   ordinal,
   panel,
   parseCustomId,
+  pointsLogEmbed,
   points as fmtPoints,
   promotionEmbed,
   roleMention,
@@ -167,8 +179,8 @@ async function handlePoints(
       fields.push({
         name: "Next rank",
         value: where.eligible
-          ? `**${where.next.label}** — eligible now. Run \`/promote request\`.`
-          : `**${where.next.label}** — ${where.shortfall} more point${where.shortfall === 1 ? "" : "s"} needed.`,
+          ? `**${where.next.label}** — eligible now. Run \`/promote request\`${where.next.requiresApplication ? " to apply" : ""}.`
+          : `**${where.next.label}** — ${where.shortfall} more point${where.shortfall === 1 ? "" : "s"} needed${where.next.requiresApplication ? ", then an application" : ""}.`,
         inline: false,
       });
     } else if (where.current) {
@@ -233,21 +245,58 @@ async function handlePoints(
 
   if (path === "set") {
     const result = await setPoints({ ...common, total: amount });
+    const logged = await logPoints(config, {
+      kind: "set",
+      discordId: target,
+      ...result,
+      actorId: actor.id,
+      reason,
+    });
     return text(
-      `Set ${mention(target)} to **${result.after}** points (was ${result.before}).`
+      `Set ${mention(target)} to **${result.after}** points (was ${result.before}).${logged}`
     );
   }
 
   const delta = path === "remove" ? -amount : amount;
   const result = await adjustPoints({ ...common, delta });
+  const logged = await logPoints(config, {
+    kind: delta >= 0 ? "add" : "remove",
+    discordId: target,
+    ...result,
+    actorId: actor.id,
+    reason,
+  });
 
   const note = result.clamped
     ? ` (they only had ${result.before}, so the balance stopped at 0)`
     : "";
   const verb = delta >= 0 ? "Awarded" : "Removed";
   return text(
-    `${verb} **${Math.abs(result.delta)}** point${Math.abs(result.delta) === 1 ? "" : "s"} ${delta >= 0 ? "to" : "from"} ${mention(target)}${note}. New total: **${result.after}**.`
+    `${verb} **${Math.abs(result.delta)}** point${Math.abs(result.delta) === 1 ? "" : "s"} ${delta >= 0 ? "to" : "from"} ${mention(target)}${note}. New total: **${result.after}**.${logged}`
   );
+}
+
+/**
+ * Post a point change to the public log webhook, if one is configured.
+ *
+ * Returns a note to append to the staff member's reply — empty on success or
+ * when there is no log — so a broken webhook is noticed by the person who can
+ * fix it, without undoing the change itself: the points have already moved.
+ */
+async function logPoints(
+  config: EngineConfig,
+  change: Parameters<typeof pointsLogEmbed>[0]
+): Promise<string> {
+  if (!config.pointsWebhookUrl) return "";
+  // A removal from an empty balance, or a set to the same total, changed
+  // nothing — announcing it publicly would only be noise.
+  if (change.delta === 0) return "";
+  const posted = await executeWebhook(config.pointsWebhookUrl, {
+    embeds: [pointsLogEmbed(change)],
+  });
+  return posted.ok
+    ? ""
+    : `\n-# The public points log could not be posted: ${posted.error} Re-run \`/engine setup points_webhook\` with a fresh webhook URL.`;
 }
 
 // --- /leaderboard -----------------------------------------------------------
@@ -290,8 +339,8 @@ async function handlePromote(
   const actor = actorOf(interaction);
 
   if (path === "list") {
-    if (!hasTier(interaction.member, config, Tier.Command)) {
-      return refuse(Tier.Command);
+    if (!hasTier(interaction.member, config, Tier.HighRank)) {
+      return refuse(Tier.HighRank);
     }
     const open = await pendingRequests(guildId, 15);
     if (open.length === 0) return text("No promotion requests are waiting.");
@@ -312,9 +361,13 @@ async function handlePromote(
 
   // path === "request"
   const result = await createRequest(config, guildId, actor.id, actor.name);
-  if (!result.ok) return text(result.message);
+  if (!result.ok) {
+    // Enough points for a rank that also needs an application: the answer to
+    // the command is the form, and the request is filed when it comes back.
+    return "apply" in result ? applicationModal(result.apply) : text(result.message);
+  }
   return text(
-    `Request filed. High Command has been asked to advance you to **${result.to.label}**. If they approve it, the role will simply appear on you.`
+    `Request filed. High Rank has been asked to advance you to **${result.to.label}**. If they approve it, the role will simply appear on you.`
   );
 }
 
@@ -346,8 +399,8 @@ function handleAnnounce(
   config: EngineConfig,
   opts: Opts
 ): InteractionResponse {
-  if (!hasTier(interaction.member, config, Tier.Command)) {
-    return refuse(Tier.Command, "post announcements");
+  if (!hasTier(interaction.member, config, Tier.HighCommand)) {
+    return refuse(Tier.HighCommand, "post announcements");
   }
 
   const channelId = id(opts, "channel");
@@ -459,7 +512,8 @@ async function handleEngine(
     const patch: Partial<EngineConfig> = { guildId };
     const map: [string, keyof EngineConfig][] = [
       ["staff_role", "staffRoleId"],
-      ["high_command_role", "commandRoleId"],
+      ["high_rank_role", "highRankRoleId"],
+      ["high_command_role", "highCommandRoleId"],
       ["owner_role", "ownerRoleId"],
       ["member_role", "memberRoleId"],
       ["review_channel", "reviewChannelId"],
@@ -472,6 +526,21 @@ async function handleEngine(
         patch[field] = value;
         changed += 1;
       }
+    }
+    // The webhook is a pasted URL, not a picked role, so it is validated here;
+    // "off" clears it.
+    const webhook = str(opts, "points_webhook").trim();
+    if (webhook) {
+      if (webhook.toLowerCase() === "off") {
+        patch.pointsWebhookUrl = "";
+      } else if (isWebhookUrl(webhook)) {
+        patch.pointsWebhookUrl = webhook;
+      } else {
+        return text(
+          "That is not a Discord webhook URL. In the channel's settings go to **Integrations → Webhooks → New Webhook → Copy Webhook URL**, and paste that. Nothing was saved."
+        );
+      }
+      changed += 1;
     }
     if (changed === 0) {
       return text(
@@ -496,14 +565,14 @@ async function handleEngine(
     }
     const lines = ladder.map(
       (r, i) =>
-        `${ordinal(i + 1)}  **${r.label}**  ·  ${roleMention(r.roleId)}  ·  ${fmtPoints(r.points)} pts`
+        `${ordinal(i + 1)}  **${r.label}**  ·  ${roleMention(r.roleId)}  ·  ${fmtPoints(r.points)} pts${r.requiresApplication ? " + application" : ""}`
     );
-    const header = "-# RUNG · RANK · ROLE · REQUIRED";
+    const header = "-# RANK · ROLE · REQUIRED";
     return reply({
       embeds: [
         panel("Promotion Ladder", `${header}\n${lines.join("\n")}`, {
           color: COLOR.info,
-          footer: { text: "Members advance one rung at a time." },
+          footer: { text: "Members advance one rank at a time." },
         }),
       ],
     });
@@ -516,9 +585,28 @@ async function handleEngine(
       str(opts, "label") ||
       interaction.data?.resolved?.roles?.[roleId]?.name ||
       "Rank";
-    await upsertRung(guildId, roleId, label, points);
+    const rawQuestions = str(opts, "questions");
+    const questions = parseQuestions(rawQuestions);
+    // Supplying questions implies the rank wants an application; an explicit
+    // `application: False` still wins, so questions can be kept on file while
+    // the requirement is switched off.
+    const flag = opts.get("application");
+    const required =
+      typeof flag === "boolean" ? flag : questions.length ? true : undefined;
+    const saved = await upsertRung(guildId, roleId, label, points, {
+      required,
+      questions: rawQuestions ? questions.join("\n") : undefined,
+    });
+
+    const clipped =
+      rawQuestions.split("|").filter((q) => q.trim()).length > MAX_QUESTIONS
+        ? ` Only the first ${MAX_QUESTIONS} questions were kept — a Discord form holds no more.`
+        : "";
+    const gate = saved.requiresApplication
+      ? ` Members also need an **application**, which High Rank reviews with the request.${clipped}`
+      : "";
     return text(
-      `**${label}** (${roleMention(roleId)}) now sits at **${points}** points. Check the order with \`/engine rank list\`.`
+      `**${label}** (${roleMention(roleId)}) now sits at **${points}** points.${gate} Check the order with \`/engine rank list\`.`
     );
   }
 
@@ -549,8 +637,13 @@ function settingsEmbed(config: EngineConfig): Embed {
         inline: true,
       },
       {
+        name: "High Rank role",
+        value: `${show(config.highRankRoleId, "role")}\n_approves promotions_`,
+        inline: true,
+      },
+      {
         name: "High Command role",
-        value: `${show(config.commandRoleId, "role")}\n_approves promotions_`,
+        value: `${show(config.highCommandRoleId, "role")}\n_posts announcements_`,
         inline: true,
       },
       {
@@ -566,6 +659,13 @@ function settingsEmbed(config: EngineConfig): Embed {
       {
         name: "Announcements",
         value: show(config.announceChannelId, "channel"),
+        inline: true,
+      },
+      {
+        name: "Points log",
+        value: config.pointsWebhookUrl
+          ? "Webhook set\n_every point change is posted publicly_"
+          : "_not set — point changes are not announced_",
         inline: true,
       },
       {
@@ -593,8 +693,8 @@ async function handleComponent(
   const parsed = parseCustomId(interaction.data?.custom_id ?? "");
   if (!parsed || parsed.area !== "promo") return text("Unknown control.");
 
-  if (!hasTier(interaction.member, config, Tier.Command)) {
-    return refuse(Tier.Command);
+  if (!hasTier(interaction.member, config, Tier.HighRank)) {
+    return refuse(Tier.HighRank);
   }
 
   const actor = actorOf(interaction);
@@ -643,21 +743,43 @@ async function handleModal(
   const parsed = parseCustomId(interaction.data?.custom_id ?? "");
   if (!parsed) return text("Unknown form.");
 
-  // Both forms the bot opens — the denial reason and the announcement composer
-  // — are High Command work, so the check is hoisted. It is repeated here
-  // rather than trusted from the command that opened the modal: a submission is
-  // a fresh interaction, and roles can have changed in between.
-  if (!hasTier(interaction.member, config, Tier.Command)) {
-    return refuse(
-      Tier.Command,
-      parsed.area === "say" ? "post announcements" : undefined
-    );
-  }
-
   const field = (name: string) =>
     interaction.data?.components
       ?.flatMap((row) => row.components)
       .find((c) => c.custom_id === name)?.value ?? "";
+
+  // engine:apply:submit:<roleId> — a rank application. Open to any member (the
+  // base gate in handleInteraction already ran); createRequest re-checks the
+  // points and the ladder, since both may have moved while the form was open.
+  if (parsed.area === "apply") {
+    const actor = actorOf(interaction);
+    const result = await createRequest(
+      config,
+      interaction.guild_id ?? "",
+      actor.id,
+      actor.name,
+      { roleId: parsed.id, field }
+    );
+    if (!result.ok) {
+      return text(
+        "apply" in result
+          ? "Your application could not be read. Run /promote request again."
+          : result.message
+      );
+    }
+    return text(
+      `Application filed. High Rank will review it for **${result.to.label}**. If they approve it, the role will simply appear on you.`
+    );
+  }
+
+  // The other forms are gated by the tier that opened them: the denial reason
+  // is High Rank's job, the announcement composer is High Command's. The check
+  // is made here rather than trusted from the command that opened the modal: a
+  // submission is a fresh interaction, and roles can have changed in between.
+  const required = parsed.area === "say" ? Tier.HighCommand : Tier.HighRank;
+  if (!hasTier(interaction.member, config, required)) {
+    return refuse(required, parsed.area === "say" ? "post announcements" : undefined);
+  }
 
   // engine:say:<colour>:<channelId> — the announcement composer.
   if (parsed.area === "say") {
@@ -703,6 +825,8 @@ async function refreshedEmbed(
     roleId: request.toRoleId,
     label: request.toLabel,
     points: request.pointsAtRequest,
+    requiresApplication: !!request.application,
+    applicationQuestions: "",
   };
 
   return {
@@ -719,6 +843,7 @@ async function refreshedEmbed(
           status: request.status as "approved" | "denied",
           reviewerId: request.reviewerId,
           reason: request.reason,
+          answers: decodeAnswers(request.application),
         }),
       ],
       // Buttons are dropped, so a decided request cannot be decided twice by

@@ -5,6 +5,7 @@ import {
   type Embed,
   type MessageComponent,
 } from "@/lib/discord/types";
+import type { Answer } from "./applications";
 import type { Rung } from "./ranks";
 
 // Everything the bot renders. Kept apart from the logic so an embed can be
@@ -74,6 +75,8 @@ export type ReviewEmbedInput = {
   status: "pending" | "approved" | "denied" | "cancelled";
   reviewerId?: string | null;
   reason?: string;
+  /** Application answers, for a rank that requires one. */
+  answers?: Answer[];
 };
 
 export function promotionEmbed(input: ReviewEmbedInput): Embed {
@@ -93,6 +96,10 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
     { name: "\u200b", value: "\u200b", inline: true },
   ];
 
+  for (const { q, a } of input.answers ?? []) {
+    fields.push({ name: q, value: a || "_no answer_", inline: false });
+  }
+
   if (input.status !== "pending" && input.reviewerId) {
     fields.push({
       name: input.status === "approved" ? "Approved by" : "Denied by",
@@ -104,14 +111,19 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
     fields.push({ name: "Reason", value: input.reason, inline: false });
   }
 
+  const applied = (input.answers?.length ?? 0) > 0;
+  const noun = applied ? "Application" : "Promotion";
   const heading: Record<ReviewEmbedInput["status"], string> = {
-    pending: "Promotion Request",
-    approved: "Promotion Approved",
-    denied: "Promotion Denied",
-    cancelled: "Promotion Withdrawn",
+    pending: applied ? "Rank Application" : "Promotion Request",
+    approved: `${noun} Approved`,
+    denied: `${noun} Denied`,
+    cancelled: `${noun} Withdrawn`,
   };
+  const intro = applied
+    ? `**${input.username}** has applied for **${input.to.label}**.`
+    : `**${input.username}** has requested advancement.`;
 
-  return panel(heading[input.status], `**${input.username}** has requested advancement.`, {
+  return panel(heading[input.status], intro, {
     color,
     fields,
     footer: { text: `Request ${input.requestId}` },
@@ -178,4 +190,44 @@ export function leaderboardEmbed(
   }
 
   return embed;
+}
+
+/** Heading on every public points-log post. */
+export const POINTS_LOG_TITLE = "SSF POINTS | POINTS SYSTEM";
+
+const pts = (n: number) => `\`${points(n)} point${n === 1 ? "" : "s"}\``;
+
+/**
+ * The public line posted to the points webhook when a balance changes:
+ *
+ *   Added `5 points` to @member. They now have `7 points`.
+ *
+ * with who made the change, and why, underneath in small text.
+ */
+export function pointsLogEmbed(input: {
+  kind: "add" | "remove" | "set";
+  discordId: string;
+  delta: number;
+  before: number;
+  after: number;
+  actorId: string;
+  reason?: string;
+}): Embed {
+  const who = mention(input.discordId);
+  const amount = Math.abs(input.delta);
+  const line =
+    input.kind === "set"
+      ? `Set ${who} to ${pts(input.after)}. They had ${pts(input.before)}.`
+      : input.kind === "add"
+        ? `Added ${pts(amount)} to ${who}. They now have ${pts(input.after)}.`
+        : `Removed ${pts(amount)} from ${who}. They now have ${pts(input.after)}.`;
+
+  const by = `-# By ${mention(input.actorId)}${input.reason ? ` · ${input.reason}` : ""}`;
+
+  return {
+    title: POINTS_LOG_TITLE,
+    description: `${line}\n${by}`,
+    color: COLOR.neutral,
+    timestamp: new Date().toISOString(),
+  };
 }

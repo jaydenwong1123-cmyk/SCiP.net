@@ -16,7 +16,8 @@ const CONFIG: EngineConfig = {
   ...EMPTY_CONFIG,
   guildId: "g1",
   staffRoleId: "role-staff",
-  commandRoleId: "role-command",
+  highRankRoleId: "role-highrank",
+  highCommandRoleId: "role-highcommand",
   ownerRoleId: "role-owner",
 };
 
@@ -31,7 +32,8 @@ const ADMIN_BITS = "8"; // ADMINISTRATOR
 describe("tierOf", () => {
   it("reads each configured role as its own tier", () => {
     expect(tierOf(member(["role-staff"]), CONFIG)).toBe(Tier.Staff);
-    expect(tierOf(member(["role-command"]), CONFIG)).toBe(Tier.Command);
+    expect(tierOf(member(["role-highrank"]), CONFIG)).toBe(Tier.HighRank);
+    expect(tierOf(member(["role-highcommand"]), CONFIG)).toBe(Tier.HighCommand);
     expect(tierOf(member(["role-owner"]), CONFIG)).toBe(Tier.Owner);
   });
 
@@ -90,14 +92,18 @@ describe("isGuildAdmin", () => {
 
 describe("hasTier", () => {
   it("lets a higher tier do a lower tier's work", () => {
-    const command = member(["role-command"]);
-    expect(hasTier(command, CONFIG, Tier.Staff)).toBe(true);
-    expect(hasTier(command, CONFIG, Tier.Command)).toBe(true);
-    expect(hasTier(command, CONFIG, Tier.Owner)).toBe(false);
+    const highCommand = member(["role-highcommand"]);
+    expect(hasTier(highCommand, CONFIG, Tier.Staff)).toBe(true);
+    expect(hasTier(highCommand, CONFIG, Tier.HighRank)).toBe(true);
+    expect(hasTier(highCommand, CONFIG, Tier.HighCommand)).toBe(true);
+    expect(hasTier(highCommand, CONFIG, Tier.Owner)).toBe(false);
   });
 
   it("does not let a lower tier reach up", () => {
-    expect(hasTier(member(["role-staff"]), CONFIG, Tier.Command)).toBe(false);
+    expect(hasTier(member(["role-staff"]), CONFIG, Tier.HighRank)).toBe(false);
+    expect(hasTier(member(["role-highrank"]), CONFIG, Tier.HighCommand)).toBe(
+      false
+    );
   });
 });
 

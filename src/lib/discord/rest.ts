@@ -125,6 +125,42 @@ export async function editMessage(
   });
 }
 
+/**
+ * Post through a channel webhook.
+ *
+ * Needs no bot token — the URL is its own credential — and posts under the
+ * webhook's name and avatar as set in Discord, not the bot's. Same no-throw
+ * contract as everything else here.
+ */
+export async function executeWebhook(
+  url: string,
+  payload: MessagePayload
+): Promise<RestResult> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowed_mentions: { parse: [] }, ...payload }),
+      cache: "no-store",
+    });
+    if (res.ok) return { ok: true, status: res.status };
+    const text = await res.text();
+    let message = `Discord returned ${res.status}.`;
+    try {
+      message = (JSON.parse(text) as { message?: string }).message ?? message;
+    } catch {
+      // Non-JSON error body; keep the status line.
+    }
+    return { ok: false, status: res.status, error: message };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      error: err instanceof Error ? err.message : "Network error.",
+    };
+  }
+}
+
 /** Overwrite this guild's command set. Used by scripts/register-discord-commands.ts. */
 export async function putGuildCommands(
   applicationId: string,

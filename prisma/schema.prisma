@@ -999,7 +999,7 @@ model AuthAttempt {
 // here is a Discord snowflake, not a site account, and nothing in this section
 // reads or writes `User`, `clearance` or `ClearanceRequest`. Someone can hold a
 // rank in the Discord server without ever registering on the site, and a
-// promotion approved by High Command changes their Discord roles only.
+// promotion approved by High Rank changes their Discord roles only.
 //
 // The join, if it is ever wanted, is a `siteUserId` column on EngineMember and
 // a verification flow — not a shared table. Keeping them apart now is what
@@ -1016,12 +1016,13 @@ model EngineGuildConfig {
   id      String @id @default("singleton")
   guildId String @default("")
 
-  // The three permission tiers. Higher tiers inherit the lower ones, so a
-  // High Command member can also award points without also holding the staff
-  // role. See lib/engine/permissions.ts.
-  staffRoleId   String @default("") // add/remove/set points
-  commandRoleId String @default("") // approve or deny promotions
-  ownerRoleId   String @default("") // edit the rank ladder and these settings
+  // The permission tiers. Higher tiers inherit the lower ones, so an Owner
+  // can also award points without also holding the staff role. See
+  // lib/engine/permissions.ts.
+  staffRoleId       String @default("") // add/remove/set points
+  highRankRoleId    String @default("") // approve or deny promotions
+  highCommandRoleId String @default("") // post announcements
+  ownerRoleId       String @default("") // edit the rank ladder and these settings
 
   // Optional floor for the everyday commands (/leaderboard, /points check,
   // /promote request). Empty = any member of the server may run them. Set it to
@@ -1034,6 +1035,11 @@ model EngineGuildConfig {
   // a request nobody can see is worse than no request at all.
   reviewChannelId   String @default("")
   announceChannelId String @default("")
+
+  // Discord webhook URL that every point change is posted to publicly. Empty =
+  // no public log. Held here rather than in an env var so an owner can point it
+  // at a different channel from inside Discord with /engine setup.
+  pointsWebhookUrl String @default("")
 
   updatedAt DateTime @default(now()) @updatedAt
 }
@@ -1104,13 +1110,21 @@ model EngineRank {
   label   String
   points  Int
 
+  // A rank that needs a written application on top of the points. The member
+  // still has to meet `points`; the application is an extra gate, not a
+  // replacement for it.
+  requiresApplication Boolean @default(false)
+  // The questions asked, one per line (at most five — a Discord modal's limit).
+  // Empty = the default questions in lib/engine/applications.ts.
+  applicationQuestions String @default("")
+
   createdAt DateTime @default(now())
 
   @@unique([guildId, roleId])
   @@index([guildId, points])
 }
 
-// A member asking to move up a rung, and High Command's answer.
+// A member asking to move up a rung, and High Rank's answer.
 model EnginePromotionRequest {
   id        String @id @default(cuid())
   guildId   String
@@ -1126,6 +1140,10 @@ model EnginePromotionRequest {
   // Balance at the moment of asking. A decision is reviewed against what the
   // member had when they asked, not what they have when it is read.
   pointsAtRequest Int
+
+  // The member's application for a rank that requires one, as a JSON array of
+  // { q, a }. Empty for an ordinary points-only request.
+  application String @default("")
 
   // pending | approved | denied | cancelled
   status String @default("pending")

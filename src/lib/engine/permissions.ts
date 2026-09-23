@@ -3,23 +3,26 @@ import type { EngineConfig } from "./config";
 
 // WHO MAY DO WHAT.
 //
-// Three configurable tiers, each inheriting everything below it:
+// Four configurable tiers, each inheriting everything below it:
 //
-//   OWNER    — edits the rank ladder and the bot's settings
-//   COMMAND  — approves and denies promotion requests  (High Command)
-//   STAFF    — awards and removes points
-//   MEMBER   — checks their own points, sees the leaderboard, asks to be promoted
+//   OWNER         — edits the rank ladder and the bot's settings
+//   HIGH COMMAND  — posts announcements
+//   HIGH RANK     — approves and denies promotion requests
+//   STAFF         — awards and removes points
+//   MEMBER        — checks their own points, sees the leaderboard, asks to be
+//                    promoted
 //
-// Inheritance is the point: High Command should not need the staff role pinned
-// on as well just to award a point. A tier whose role is unconfigured is simply
+// Inheritance is the point: Owner should not need the staff role pinned on as
+// well just to award a point. A tier whose role is unconfigured is simply
 // unreachable through roles — it does not silently fall open.
 
 export const Tier = {
   None: 0,
   Member: 1,
   Staff: 2,
-  Command: 3,
-  Owner: 4,
+  HighRank: 3,
+  HighCommand: 4,
+  Owner: 5,
 } as const;
 
 export type TierValue = (typeof Tier)[keyof typeof Tier];
@@ -28,7 +31,8 @@ export const TIER_LABEL: Record<TierValue, string> = {
   [Tier.None]: "not authorised",
   [Tier.Member]: "Member",
   [Tier.Staff]: "Staff",
-  [Tier.Command]: "High Command",
+  [Tier.HighRank]: "High Rank",
+  [Tier.HighCommand]: "High Command",
   [Tier.Owner]: "Owner",
 };
 
@@ -68,7 +72,8 @@ export function tierOf(
   const has = (id: string) => id !== "" && roles.has(id);
 
   if (has(config.ownerRoleId)) return Tier.Owner;
-  if (has(config.commandRoleId)) return Tier.Command;
+  if (has(config.highCommandRoleId)) return Tier.HighCommand;
+  if (has(config.highRankRoleId)) return Tier.HighRank;
   if (has(config.staffRoleId)) return Tier.Staff;
 
   // The base tier. An unset memberRoleId means "everyone in the server", which
@@ -103,7 +108,8 @@ export function refusalFor(required: TierValue, action?: string): string {
     [Tier.None]: "use this bot",
     [Tier.Member]: "use this bot",
     [Tier.Staff]: "adjust points",
-    [Tier.Command]: "review promotions",
+    [Tier.HighRank]: "review promotions",
+    [Tier.HighCommand]: "post announcements",
     [Tier.Owner]: "change The Engine's configuration",
   };
   return `You do not have clearance to ${action ?? what[required]}. This is limited to ${TIER_LABEL[required]}.`;
