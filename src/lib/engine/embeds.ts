@@ -88,8 +88,8 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
 
   const fields = [
     { name: "Personnel", value: mention(input.discordId), inline: true },
-    { name: "Points", value: points(input.points), inline: true },
-    { name: "\u200b", value: "\u200b", inline: true },
+    { name: "Points held", value: points(input.points), inline: true },
+    { name: "Points required", value: points(input.to.points), inline: true },
     { name: "Current rank", value: rungLabel(input.from), inline: true },
     { name: "Requested rank", value: rungLabel(input.to), inline: true },
     { name: "\u200b", value: "\u200b", inline: true },
