@@ -5,7 +5,6 @@ import {
   type Embed,
   type MessageComponent,
 } from "@/lib/discord/types";
-import type { Answer } from "./applications";
 import type { Rung } from "./ranks";
 
 // Everything the bot renders. Kept apart from the logic so an embed can be
@@ -75,8 +74,8 @@ export type ReviewEmbedInput = {
   status: "pending" | "approved" | "denied" | "cancelled";
   reviewerId?: string | null;
   reason?: string;
-  /** Application answers, for a rank that requires one. */
-  answers?: Answer[];
+  /** The application form link, for a rank that requires one. */
+  applicationUrl?: string;
 };
 
 export function promotionEmbed(input: ReviewEmbedInput): Embed {
@@ -96,8 +95,12 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
     { name: "\u200b", value: "\u200b", inline: true },
   ];
 
-  for (const { q, a } of input.answers ?? []) {
-    fields.push({ name: q, value: a || "_no answer_", inline: false });
+  if (input.applicationUrl) {
+    fields.push({
+      name: "Application",
+      value: `Submitted via the [application form](${input.applicationUrl}). Check its responses for ${mention(input.discordId)} before deciding.`,
+      inline: false,
+    });
   }
 
   if (input.status !== "pending" && input.reviewerId) {
@@ -111,7 +114,7 @@ export function promotionEmbed(input: ReviewEmbedInput): Embed {
     fields.push({ name: "Reason", value: input.reason, inline: false });
   }
 
-  const applied = (input.answers?.length ?? 0) > 0;
+  const applied = !!input.applicationUrl;
   const noun = applied ? "Application" : "Promotion";
   const heading: Record<ReviewEmbedInput["status"], string> = {
     pending: applied ? "Rank Application" : "Promotion Request",
@@ -193,7 +196,7 @@ export function leaderboardEmbed(
 }
 
 /** Heading on every public points-log post. */
-export const POINTS_LOG_TITLE = "SSF POINTS | POINTS SYSTEM";
+export const POINTS_LOG_TITLE = "CI POINT | POINTS SYSTEM";
 
 const pts = (n: number) => `\`${points(n)} point${n === 1 ? "" : "s"}\``;
 

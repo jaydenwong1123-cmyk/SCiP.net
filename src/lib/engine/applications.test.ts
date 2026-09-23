@@ -1,70 +1,36 @@
 import { describe, it, expect } from "vitest";
-import {
-  DEFAULT_QUESTIONS,
-  MAX_LABEL,
-  collectAnswers,
-  decodeAnswers,
-  encodeAnswers,
-  parseQuestions,
-  questionsFor,
-} from "./applications";
+import { applicationPrompt, applyDoneId, isFormUrl } from "./applications";
 import { isWebhookUrl } from "./config";
 import { pointsLogEmbed } from "./embeds";
 import type { Rung } from "./ranks";
 
-const rung = (applicationQuestions = ""): Rung => ({
+const FORM = "https://docs.google.com/forms/d/e/abc/viewform";
+
+const rung: Rung = {
   id: "id",
   roleId: "r1",
   label: "Site Director",
   points: 500,
   requiresApplication: true,
-  applicationQuestions,
-});
+  applicationUrl: FORM,
+};
 
-describe("parseQuestions", () => {
-  it("splits on | and drops blanks", () => {
-    expect(parseQuestions(" Why? | | What have you done? ")).toEqual([
-      "Why?",
-      "What have you done?",
-    ]);
-  });
-
-  it("keeps at most five, each short enough for a modal label", () => {
-    const parsed = parseQuestions(
-      ["a", "b", "c", "d", "e", "f", "x".repeat(80)].join("|")
-    );
-    expect(parsed).toEqual(["a", "b", "c", "d", "e"]);
-    expect(parseQuestions("x".repeat(80))[0].length).toBe(MAX_LABEL);
-  });
-
-  it("reads back the newline-separated stored form", () => {
-    expect(parseQuestions("One\nTwo")).toEqual(["One", "Two"]);
+describe("isFormUrl", () => {
+  it("accepts https links and refuses anything else", () => {
+    expect(isFormUrl(FORM)).toBe(true);
+    expect(isFormUrl("https://forms.gle/abc123")).toBe(true);
+    expect(isFormUrl("http://forms.gle/abc123")).toBe(false);
+    expect(isFormUrl("forms.gle/abc123")).toBe(false);
+    expect(isFormUrl("true")).toBe(false);
   });
 });
 
-describe("questionsFor", () => {
-  it("falls back to the defaults when none are set", () => {
-    expect(questionsFor(rung())).toEqual(DEFAULT_QUESTIONS);
-    expect(questionsFor(rung("Only this"))).toEqual(["Only this"]);
-  });
-});
-
-describe("answers", () => {
-  it("pairs each question with its field and round-trips", () => {
-    const answers = collectAnswers(rung("A|B"), (name) =>
-      name === "q0" ? " yes " : "no"
-    );
-    expect(answers).toEqual([
-      { q: "A", a: "yes" },
-      { q: "B", a: "no" },
-    ]);
-    expect(decodeAnswers(encodeAnswers(answers))).toEqual(answers);
-  });
-
-  it("decodes an empty or corrupt column to no answers", () => {
-    expect(decodeAnswers("")).toEqual([]);
-    expect(decodeAnswers("{not json")).toEqual([]);
-    expect(encodeAnswers([])).toBe("");
+describe("applicationPrompt", () => {
+  it("links the form and offers the submitted button for that rank", () => {
+    const buttons = applicationPrompt(rung).components?.[0].components ?? [];
+    expect(buttons[0].url).toBe(FORM);
+    expect(buttons[0].custom_id).toBeUndefined();
+    expect(buttons[1].custom_id).toBe(applyDoneId("r1"));
   });
 });
 
@@ -91,7 +57,7 @@ describe("pointsLogEmbed", () => {
       after: 7,
       actorId: "9",
     });
-    expect(embed.title).toBe("SSF POINTS | POINTS SYSTEM");
+    expect(embed.title).toBe("CI POINT | POINTS SYSTEM");
     expect(embed.description).toContain(
       "Added `5 points` to <@42>. They now have `7 points`."
     );

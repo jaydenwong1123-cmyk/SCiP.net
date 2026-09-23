@@ -16,10 +16,10 @@ export type Rung = {
   roleId: string;
   label: string;
   points: number;
-  /** Needs a written application as well as the points. */
+  /** Needs an application as well as the points. */
   requiresApplication: boolean;
-  /** Raw question list, one per line; "" means the defaults. */
-  applicationQuestions: string;
+  /** Link to the application form; "" when there is none. */
+  applicationUrl: string;
 };
 
 export type LadderPosition = {
@@ -83,7 +83,7 @@ export async function getLadder(guildId: string): Promise<Rung[]> {
     label: r.label,
     points: r.points,
     requiresApplication: r.requiresApplication,
-    applicationQuestions: r.applicationQuestions,
+    applicationUrl: r.applicationUrl,
   }));
 }
 
@@ -99,16 +99,14 @@ export async function upsertRung(
   roleId: string,
   label: string,
   points: number,
-  application: { required?: boolean; questions?: string } = {}
+  /** A form link to require an application, "" to stop requiring one,
+   *  undefined to leave it as it is. */
+  applicationUrl?: string
 ) {
-  const extra = {
-    ...(application.required !== undefined && {
-      requiresApplication: application.required,
-    }),
-    ...(application.questions !== undefined && {
-      applicationQuestions: application.questions,
-    }),
-  };
+  const extra =
+    applicationUrl === undefined
+      ? {}
+      : { applicationUrl, requiresApplication: applicationUrl !== "" };
   return db.engineRank.upsert({
     where: { guildId_roleId: { guildId, roleId } },
     create: { guildId, roleId, label, points: Math.max(0, points), ...extra },

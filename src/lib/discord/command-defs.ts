@@ -232,16 +232,9 @@ export const COMMANDS = [
                 max_length: 60,
               },
               {
-                name: "application",
+                name: "form",
                 description:
-                  "Also require a written application (default: unchanged)",
-                type: OptionType.Boolean,
-                required: false,
-              },
-              {
-                name: "questions",
-                description:
-                  "Application questions, separated by | (max 5, 45 chars each)",
+                  "Application form link (Google Form) to also require one; \"off\" to stop",
                 type: OptionType.String,
                 required: false,
                 max_length: 300,

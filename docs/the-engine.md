@@ -346,11 +346,11 @@ anything you skipped shown as *not set*.
 
 > **About `points_webhook` (the public points log):** in Discord, open the
 > channel you want the log in → **Edit Channel → Integrations → Webhooks → New
-> Webhook**. Name it (e.g. `SSF Points`), give it an avatar, click **Copy Webhook
+> Webhook**. Name it (e.g. `CI Point`), give it an avatar, click **Copy Webhook
 > URL**, and paste that into `points_webhook`. From then on every
 > `/points add`, `/points remove` and `/points set` posts a line there:
 >
-> **SSF POINTS | POINTS SYSTEM**
+> **CI POINT | POINTS SYSTEM**
 > Added `5 points` to @member. They now have `7 points`.
 >
 > with who made the change and the reason underneath in small text. Nobody gets
@@ -383,26 +383,21 @@ reprice any rank later by running `rank add` again with the same role.
 
 ### Ranks that need an application
 
-Some ranks should need a written application **as well as** the points. Add
-`application:True` to the rank:
+Some ranks should need an application **as well as** the points. Make a Google
+Form for it, then give the rank the form's link:
+
+1. In Google Forms, build the form. **Add a question asking for their Discord
+   username** — the bot cannot see who filled the form in, so reviewers match
+   responses by that name.
+2. Click **Send → 🔗 (link) → Copy**.
+3. Run:
 
 ```
-/engine rank add role:@Site Director points:500 application:True
+/engine rank add role:@Site Director points:500 form:https://forms.gle/xxxxxxxx
 ```
 
-To ask your own questions instead of the defaults, add `questions`, separated
-with `|` (up to 5, each 45 characters or fewer — Discord's form limits):
-
-```
-/engine rank add role:@Site Director points:500 questions:Why do you want this rank?|What have you led?|How active are you?
-```
-
-Giving `questions` switches the application on by itself. To switch it off
-again: `/engine rank add role:@Site Director points:500 application:False`.
-Re-pricing a rank without mentioning `application` leaves it as it was.
-
-The default questions are *Why do you want this rank?*, *What have you done to
-earn it?*, and *Anything else High Rank should know?*.
+To stop requiring an application: `form:off`. Re-pricing a rank without
+mentioning `form` leaves its form as it was.
 
 Check it:
 
@@ -485,11 +480,13 @@ channel's own permission overrides, not just the server-wide ones.
 3. **Approve** → the bot adds the new rank role, removes the old one, and turns
    the embed green. The role arriving is how the member finds out.
 4. **Deny** → a box opens for a reason, which is recorded on the embed in red.
-5. **Ranks that need an application:** in step 1 the member must still have the
-   points first. Once they do, `/promote request` opens a form with the rank's
-   questions instead of filing straight away. When they submit it, the review
-   embed is headed **Rank Application** and shows every answer, and High Rank
-   approves or denies it with the same buttons.
+5. **Ranks that need an application:** the member must still have the points
+   first. Once they do, `/promote request` replies (privately) with an **Open
+   application form** button and an **I've submitted it** button. Nothing
+   reaches High Rank until they press the second one. The review panel is then
+   headed **Rank Application** and links the form — reviewers check its
+   responses (in Google Forms, the **Responses** tab) before approving or
+   denying with the same buttons.
 6. The buttons vanish once decided, so nobody can approve the same request twice
    by scrolling back to it.
 
@@ -512,7 +509,7 @@ approved promotion.
 | `/promote request` | anyone |
 | `/promote list` — what is awaiting review | High Rank |
 | `/announce channel [colour]` — post an embed | High Command |
-| `/engine rank add role points [label] [application] [questions]` | Owner |
+| `/engine rank add role points [label] [form]` | Owner |
 | `/engine rank remove / list` | Owner |
 | `/engine setup`, `/engine settings` | Owner |
 

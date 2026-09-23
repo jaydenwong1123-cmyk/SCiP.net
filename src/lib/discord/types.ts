@@ -50,6 +50,8 @@ export const ButtonStyle = {
   Secondary: 2,
   Success: 3,
   Danger: 4,
+  /** Opens `url` in the browser; carries no custom_id and sends no interaction. */
+  Link: 5,
 } as const;
 
 /** Discord's `ADMINISTRATOR` permission bit (1 << 3), as a BigInt.
@@ -129,6 +131,7 @@ export type MessageComponent = {
   style?: number;
   label?: string;
   custom_id?: string;
+  url?: string;
   emoji?: { name: string };
   disabled?: boolean;
   placeholder?: string;

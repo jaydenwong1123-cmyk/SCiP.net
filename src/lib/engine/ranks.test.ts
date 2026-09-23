@@ -15,7 +15,7 @@ const rung = (roleId: string, label: string, points: number): Rung => ({
   label,
   points,
   requiresApplication: false,
-  applicationQuestions: "",
+  applicationUrl: "",
 });
 
 const LADDER = [

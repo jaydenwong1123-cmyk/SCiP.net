@@ -20,12 +20,7 @@ import {
   saveEngineConfig,
   type EngineConfig,
 } from "./config";
-import {
-  MAX_QUESTIONS,
-  applicationModal,
-  decodeAnswers,
-  parseQuestions,
-} from "./applications";
+import { applicationPrompt, isFormUrl } from "./applications";
 import {
   leaderboardEmbed,
   mention,
@@ -362,9 +357,11 @@ async function handlePromote(
   // path === "request"
   const result = await createRequest(config, guildId, actor.id, actor.name);
   if (!result.ok) {
-    // Enough points for a rank that also needs an application: the answer to
-    // the command is the form, and the request is filed when it comes back.
-    return "apply" in result ? applicationModal(result.apply) : text(result.message);
+    // Enough points for a rank that also needs an application: the answer is
+    // the form's link, and the request is filed when they say they sent it.
+    return "apply" in result
+      ? reply(applicationPrompt(result.apply))
+      : text(result.message);
   }
   return text(
     `Request filed. High Rank has been asked to advance you to **${result.to.label}**. If they approve it, the role will simply appear on you.`
@@ -585,25 +582,24 @@ async function handleEngine(
       str(opts, "label") ||
       interaction.data?.resolved?.roles?.[roleId]?.name ||
       "Rank";
-    const rawQuestions = str(opts, "questions");
-    const questions = parseQuestions(rawQuestions);
-    // Supplying questions implies the rank wants an application; an explicit
-    // `application: False` still wins, so questions can be kept on file while
-    // the requirement is switched off.
-    const flag = opts.get("application");
-    const required =
-      typeof flag === "boolean" ? flag : questions.length ? true : undefined;
-    const saved = await upsertRung(guildId, roleId, label, points, {
-      required,
-      questions: rawQuestions ? questions.join("\n") : undefined,
-    });
+    // `form` is a link to require an application, "off" to stop requiring
+    // one; leaving it out keeps whatever the rank had, so a plain reprice does
+    // not quietly drop its application.
+    const form = str(opts, "form").trim();
+    let applicationUrl: string | undefined;
+    if (form.toLowerCase() === "off") applicationUrl = "";
+    else if (form) {
+      if (!isFormUrl(form)) {
+        return text(
+          "That is not a link. Paste the form's full address, starting with `https://` — in Google Forms, **Send → 🔗 link → Copy**. Nothing was saved."
+        );
+      }
+      applicationUrl = form;
+    }
+    const saved = await upsertRung(guildId, roleId, label, points, applicationUrl);
 
-    const clipped =
-      rawQuestions.split("|").filter((q) => q.trim()).length > MAX_QUESTIONS
-        ? ` Only the first ${MAX_QUESTIONS} questions were kept — a Discord form holds no more.`
-        : "";
     const gate = saved.requiresApplication
-      ? ` Members also need an **application**, which High Rank reviews with the request.${clipped}`
+      ? ` Members also need to fill in the [application form](${saved.applicationUrl}) before their request reaches High Rank.`
       : "";
     return text(
       `**${label}** (${roleMention(roleId)}) now sits at **${points}** points.${gate} Check the order with \`/engine rank list\`.`
@@ -691,6 +687,33 @@ async function handleComponent(
   config: EngineConfig
 ): Promise<InteractionResponse> {
   const parsed = parseCustomId(interaction.data?.custom_id ?? "");
+
+  // engine:apply:done:<roleId> — "I've submitted it" on an application prompt.
+  // Any member may press it (the base gate in handleInteraction already ran);
+  // createRequest re-checks the points and the ladder, since both may have
+  // moved while they were off filling in the form.
+  if (parsed?.area === "apply" && parsed.verb === "done") {
+    const actor = actorOf(interaction);
+    const result = await createRequest(
+      config,
+      interaction.guild_id ?? "",
+      actor.id,
+      actor.name,
+      parsed.id
+    );
+    // Replace the prompt in place, so its buttons cannot be pressed twice.
+    const message =
+      result.ok
+        ? `Application filed. High Rank will review it for **${result.to.label}**. If they approve it, the role will simply appear on you.`
+        : "apply" in result
+          ? "Something went wrong filing that. Run /promote request again."
+          : result.message;
+    return {
+      type: InteractionResponseType.UpdateMessage,
+      data: { content: message, embeds: [], components: [] },
+    };
+  }
+
   if (!parsed || parsed.area !== "promo") return text("Unknown control.");
 
   if (!hasTier(interaction.member, config, Tier.HighRank)) {
@@ -748,34 +771,11 @@ async function handleModal(
       ?.flatMap((row) => row.components)
       .find((c) => c.custom_id === name)?.value ?? "";
 
-  // engine:apply:submit:<roleId> — a rank application. Open to any member (the
-  // base gate in handleInteraction already ran); createRequest re-checks the
-  // points and the ladder, since both may have moved while the form was open.
-  if (parsed.area === "apply") {
-    const actor = actorOf(interaction);
-    const result = await createRequest(
-      config,
-      interaction.guild_id ?? "",
-      actor.id,
-      actor.name,
-      { roleId: parsed.id, field }
-    );
-    if (!result.ok) {
-      return text(
-        "apply" in result
-          ? "Your application could not be read. Run /promote request again."
-          : result.message
-      );
-    }
-    return text(
-      `Application filed. High Rank will review it for **${result.to.label}**. If they approve it, the role will simply appear on you.`
-    );
-  }
-
-  // The other forms are gated by the tier that opened them: the denial reason
-  // is High Rank's job, the announcement composer is High Command's. The check
-  // is made here rather than trusted from the command that opened the modal: a
-  // submission is a fresh interaction, and roles can have changed in between.
+  // Both forms the bot opens are gated by the tier that opened them: the
+  // denial reason is High Rank's job, the announcement composer is High
+  // Command's. The check is made here rather than trusted from the command
+  // that opened the modal: a submission is a fresh interaction, and roles can
+  // have changed in between.
   const required = parsed.area === "say" ? Tier.HighCommand : Tier.HighRank;
   if (!hasTier(interaction.member, config, required)) {
     return refuse(required, parsed.area === "say" ? "post announcements" : undefined);
@@ -826,7 +826,7 @@ async function refreshedEmbed(
     label: request.toLabel,
     points: request.pointsAtRequest,
     requiresApplication: !!request.application,
-    applicationQuestions: "",
+    applicationUrl: request.application,
   };
 
   return {
@@ -843,7 +843,7 @@ async function refreshedEmbed(
           status: request.status as "approved" | "denied",
           reviewerId: request.reviewerId,
           reason: request.reason,
-          answers: decodeAnswers(request.application),
+          applicationUrl: request.application,
         }),
       ],
       // Buttons are dropped, so a decided request cannot be decided twice by

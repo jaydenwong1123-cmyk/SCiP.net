@@ -1110,13 +1110,12 @@ model EngineRank {
   label   String
   points  Int
 
-  // A rank that needs a written application on top of the points. The member
-  // still has to meet `points`; the application is an extra gate, not a
-  // replacement for it.
+  // A rank that needs an application on top of the points. The member still
+  // has to meet `points`; the application is an extra gate, not a replacement
+  // for it. Set together with applicationUrl — see lib/engine/applications.ts.
   requiresApplication Boolean @default(false)
-  // The questions asked, one per line (at most five — a Discord modal's limit).
-  // Empty = the default questions in lib/engine/applications.ts.
-  applicationQuestions String @default("")
+  // Link to the application form (a Google Form). "" = no application.
+  applicationUrl      String  @default("")
 
   createdAt DateTime @default(now())
 
@@ -1141,8 +1140,9 @@ model EnginePromotionRequest {
   // member had when they asked, not what they have when it is read.
   pointsAtRequest Int
 
-  // The member's application for a rank that requires one, as a JSON array of
-  // { q, a }. Empty for an ordinary points-only request.
+  // The application form link the member was sent to, for a rank that needs
+  // one; the answers themselves live in the form's responses. Empty for an
+  // ordinary points-only request.
   application String @default("")
 
   // pending | approved | denied | cancelled

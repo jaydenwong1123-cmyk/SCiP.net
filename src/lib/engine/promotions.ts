@@ -14,12 +14,6 @@ import {
   promotionEmbed,
   rungLabel,
 } from "./embeds";
-import {
-  collectAnswers,
-  decodeAnswers,
-  encodeAnswers,
-  type Answer,
-} from "./applications";
 import { getMember } from "./points";
 import { getLadder, positionOf, type Rung } from "./ranks";
 
@@ -36,14 +30,8 @@ import { getLadder, positionOf, type Rung } from "./ranks";
 export type RequestOutcome =
   | { ok: true; requestId: string; to: Rung }
   | { ok: false; message: string }
-  /** Eligible on points, but the rank needs an application: show the form. */
+  /** Eligible on points, but the rank needs an application: send the form. */
   | { ok: false; apply: Rung };
-
-/** A submitted application form: the rank it was opened for, and its fields. */
-export type ApplicationForm = {
-  roleId: string;
-  field: (name: string) => string;
-};
 
 /**
  * Open a promotion request.
@@ -57,7 +45,9 @@ export async function createRequest(
   guildId: string,
   discordId: string,
   username: string,
-  form?: ApplicationForm
+  /** Set when the member says they have submitted the application form for
+   *  this rank (the role id the form was offered for). */
+  appliedFor?: string
 ): Promise<RequestOutcome> {
   if (!config.reviewChannelId) {
     return {
@@ -104,24 +94,22 @@ export async function createRequest(
     };
   }
 
-  // Points are checked FIRST, so nobody writes an application for a rank they
-  // cannot yet reach. Everything above is re-checked when the form comes back:
-  // it is a fresh interaction, and the ladder or their balance may have moved.
-  let answers: Answer[] = [];
-  if (where.next.requiresApplication) {
-    if (!form) return { ok: false, apply: where.next };
-    if (form.roleId !== where.next.roleId) {
+  // Points are checked FIRST, so nobody fills in an application for a rank
+  // they cannot yet reach. Everything above is re-checked when they press
+  // "I've submitted it": that is a fresh interaction, possibly much later, and
+  // the ladder or their balance may have moved in between.
+  if (where.next.requiresApplication && where.next.applicationUrl) {
+    if (!appliedFor) return { ok: false, apply: where.next };
+    if (appliedFor !== where.next.roleId) {
       return {
         ok: false,
         message:
-          "The rank ladder changed while you were filling in the form, so it was not filed. Run /promote request again.",
+          "The rank ladder changed since you were sent the form, so nothing was filed. Run /promote request again.",
       };
     }
-    answers = collectAnswers(where.next, form.field);
-    if (answers.some((x) => !x.a)) {
-      return { ok: false, message: "Every question needs an answer." };
-    }
   }
+  const applicationUrl =
+    appliedFor && where.next.requiresApplication ? where.next.applicationUrl : "";
 
   const request = await db.enginePromotionRequest.create({
     data: {
@@ -132,7 +120,7 @@ export async function createRequest(
       toRoleId: where.next.roleId,
       toLabel: where.next.label,
       pointsAtRequest: points,
-      application: encodeAnswers(answers),
+      application: applicationUrl,
     },
   });
 
@@ -146,7 +134,7 @@ export async function createRequest(
         to: where.next,
         points,
         status: "pending",
-        answers,
+        applicationUrl,
       }),
     ],
     components: promotionButtons(request.id),
@@ -304,7 +292,7 @@ export async function refreshRequestMessage(
     label: request.toLabel,
     points: request.pointsAtRequest,
     requiresApplication: !!request.application,
-    applicationQuestions: "",
+    applicationUrl: request.application,
   };
 
   await editMessage(config.reviewChannelId, request.messageId, {
@@ -319,7 +307,7 @@ export async function refreshRequestMessage(
         status: request.status as "approved" | "denied" | "cancelled",
         reviewerId: request.reviewerId,
         reason: request.reason,
-        answers: decodeAnswers(request.application),
+        applicationUrl: request.application,
       }),
     ],
     components: [],
