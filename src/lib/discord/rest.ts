@@ -11,6 +11,11 @@ import type { MessagePayload } from "./types";
 //      member as a sentence they can act on, not a 500 and a silent embed.
 //   2. The token is read per call, never captured at module load, so a rotated
 //      secret takes effect on the next invocation.
+//
+// More than one bot is served from this app, each with its own Discord
+// application and token. discordRest() binds the calls to one bot's token
+// variable; the plain named exports below are The Engine's, bound to
+// DISCORD_BOT_TOKEN, so its code never has to know the factory exists.
 
 const API = "https://discord.com/api/v10";
 
@@ -22,13 +27,14 @@ export type RestResult<T = unknown> = {
 };
 
 async function request<T>(
+  tokenVar: string,
   method: string,
   path: string,
   body?: unknown
 ): Promise<RestResult<T>> {
-  const token = process.env.DISCORD_BOT_TOKEN;
+  const token = process.env[tokenVar];
   if (!token) {
-    return { ok: false, status: 0, error: "DISCORD_BOT_TOKEN is not set." };
+    return { ok: false, status: 0, error: `${tokenVar} is not set.` };
   }
 
   try {
@@ -65,65 +71,99 @@ async function request<T>(
 }
 
 /**
- * Grant a role.
+ * The token-bearing calls, bound to one bot.
  *
- * The failure worth naming is 403: Discord refuses to let a bot hand out a role
- * positioned at or above its own highest role, which is the single most common
- * reason a correctly built promotion command appears to do nothing. The message
- * is rewritten so the reviewer sees the fix rather than "Missing Permissions".
+ * `tokenVar` names the environment variable holding that bot's token, and
+ * `botName` is how refusals refer to it — the fix for a 403 is to move THAT
+ * bot's role, and naming the wrong bot sends someone to the wrong role.
  */
-export async function addRole(
-  guildId: string,
-  userId: string,
-  roleId: string
-): Promise<RestResult> {
-  const res = await request(
-    "PUT",
-    `/guilds/${guildId}/members/${userId}/roles/${roleId}`
-  );
-  if (!res.ok && res.status === 403) {
-    return {
-      ...res,
-      error:
-        "Discord refused the role change. Move The Engine's role ABOVE the rank roles in Server Settings → Roles, and make sure it has Manage Roles.",
-    };
-  }
-  return res;
+export function discordRest(tokenVar: string, botName: string) {
+  const call = <T>(method: string, path: string, body?: unknown) =>
+    request<T>(tokenVar, method, path, body);
+
+  return {
+    /**
+     * Grant a role.
+     *
+     * The failure worth naming is 403: Discord refuses to let a bot hand out a
+     * role positioned at or above its own highest role, which is the single
+     * most common reason a correctly built promotion command appears to do
+     * nothing. The message is rewritten so the reviewer sees the fix rather
+     * than "Missing Permissions".
+     */
+    async addRole(
+      guildId: string,
+      userId: string,
+      roleId: string
+    ): Promise<RestResult> {
+      const res = await call(
+        "PUT",
+        `/guilds/${guildId}/members/${userId}/roles/${roleId}`
+      );
+      if (!res.ok && res.status === 403) {
+        return {
+          ...res,
+          error: `Discord refused the role change. Move ${botName}'s role ABOVE the rank roles in Server Settings → Roles, and make sure it has Manage Roles.`,
+        };
+      }
+      return res;
+    },
+
+    async removeRole(
+      guildId: string,
+      userId: string,
+      roleId: string
+    ): Promise<RestResult> {
+      return call("DELETE", `/guilds/${guildId}/members/${userId}/roles/${roleId}`);
+    },
+
+    async createMessage(
+      channelId: string,
+      payload: MessagePayload
+    ): Promise<RestResult<{ id: string }>> {
+      return call<{ id: string }>("POST", `/channels/${channelId}/messages`, {
+        // Mentions render as mentions but never ping by default; a promotion
+        // embed naming three roles should not notify all three.
+        allowed_mentions: { parse: [] },
+        ...payload,
+      });
+    },
+
+    async editMessage(
+      channelId: string,
+      messageId: string,
+      payload: MessagePayload
+    ): Promise<RestResult> {
+      return call("PATCH", `/channels/${channelId}/messages/${messageId}`, {
+        allowed_mentions: { parse: [] },
+        ...payload,
+      });
+    },
+
+    /** Overwrite this guild's command set. */
+    async putGuildCommands(
+      applicationId: string,
+      guildId: string,
+      commands: unknown[]
+    ): Promise<RestResult<unknown[]>> {
+      return call<unknown[]>(
+        "PUT",
+        `/applications/${applicationId}/guilds/${guildId}/commands`,
+        commands
+      );
+    },
+  };
 }
 
-export async function removeRole(
-  guildId: string,
-  userId: string,
-  roleId: string
-): Promise<RestResult> {
-  return request(
-    "DELETE",
-    `/guilds/${guildId}/members/${userId}/roles/${roleId}`
-  );
-}
-
-export async function createMessage(
-  channelId: string,
-  payload: MessagePayload
-): Promise<RestResult<{ id: string }>> {
-  return request<{ id: string }>("POST", `/channels/${channelId}/messages`, {
-    // Mentions render as mentions but never ping by default; a promotion embed
-    // naming three roles should not notify all three.
-    allowed_mentions: { parse: [] },
-    ...payload,
-  });
-}
-
-export async function editMessage(
-  channelId: string,
-  messageId: string,
-  payload: MessagePayload
-): Promise<RestResult> {
-  return request("PATCH", `/channels/${channelId}/messages/${messageId}`, {
-    allowed_mentions: { parse: [] },
-    ...payload,
-  });
-}
+// The Engine's bindings.
+const engine = discordRest("DISCORD_BOT_TOKEN", "The Engine");
+export const {
+  addRole,
+  removeRole,
+  createMessage,
+  editMessage,
+  putGuildCommands,
+} = engine;
 
 /**
  * Post through a channel webhook.
@@ -159,17 +199,4 @@ export async function executeWebhook(
       error: err instanceof Error ? err.message : "Network error.",
     };
   }
-}
-
-/** Overwrite this guild's command set. Used by scripts/register-discord-commands.ts. */
-export async function putGuildCommands(
-  applicationId: string,
-  guildId: string,
-  commands: unknown[]
-): Promise<RestResult<unknown[]>> {
-  return request<unknown[]>(
-    "PUT",
-    `/applications/${applicationId}/guilds/${guildId}/commands`,
-    commands
-  );
 }

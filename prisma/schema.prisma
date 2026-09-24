@@ -1162,3 +1162,161 @@ model EnginePromotionRequest {
   @@index([guildId, status])
   @@index([guildId, discordId, status])
 }
+
+// ============================================================================
+// THE COUNCIL — the second Discord bot, for the divisional server.
+//
+// Same shape as The Engine's tables, but a member climbs one of several
+// ladders (a "division") rather than one. Divisions are fixed in code — see
+// lib/council/divisions.ts — so they are plain strings here. Nothing below
+// references an Engine table or a site account.
+// ============================================================================
+
+// Server-wide settings. The division-specific ones live in
+// CouncilDivisionConfig.
+model CouncilGuildConfig {
+  id      String @id @default("singleton")
+  guildId String @default("")
+
+  // The two handpicked tiers above every division. Neither sits on a ladder:
+  // they are permission roles, handed out by hand.
+  handsRoleId   String @default("") // Hands of the O5 — full control
+  scarletRoleId String @default("") // Scarlet Representative — reviews anywhere
+
+  // Optional floor for the everyday commands. Empty = everyone in the server.
+  memberRoleId String @default("")
+
+  announceChannelId String @default("")
+  pointsWebhookUrl  String @default("")
+
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// Per-division roles and channels.
+model CouncilDivisionConfig {
+  id       String @id @default(cuid())
+  guildId  String
+  division String
+
+  // The division's HR: approves its promotions, assigns members to it, and
+  // awards its points. A subdivision is also reviewed by its parent's HR.
+  reviewerRoleId  String @default("")
+  // Awards and removes points in this division only.
+  staffRoleId     String @default("")
+  // Where this division's promotion requests are posted. Empty falls back to
+  // the parent division's channel.
+  reviewChannelId String @default("")
+  // Optional role worn by everyone in the division, granted on assignment.
+  divisionRoleId  String @default("")
+
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([guildId, division])
+}
+
+// One rung of one division's ladder.
+model CouncilRank {
+  id       String @id @default(cuid())
+  guildId  String
+  division String
+  roleId   String
+  label    String
+  points   Int
+  // LR | MR | HR — display grouping only; order comes from `points`.
+  band     String @default("")
+
+  requiresApplication Boolean @default(false)
+  applicationUrl      String  @default("")
+
+  createdAt DateTime @default(now())
+
+  // A role belongs to one ladder only.
+  @@unique([guildId, roleId])
+  @@index([guildId, division, points])
+}
+
+// Which division a member is in now. Their points and rank in each division
+// they have served in are kept in CouncilStanding.
+model CouncilMember {
+  id        String  @id @default(cuid())
+  guildId   String
+  discordId String
+  username  String  @default("")
+  division  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([guildId, discordId])
+}
+
+// A member's points and rank in one division. Kept when they transfer out, so
+// returning to a division restores where they were.
+model CouncilStanding {
+  id         String  @id @default(cuid())
+  guildId    String
+  discordId  String
+  division   String
+  username   String  @default("")
+  points     Int     @default(0)
+  // The ladder role the bot last granted in this division.
+  rankRoleId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([guildId, discordId, division])
+  @@index([guildId, division, points])
+}
+
+model CouncilPointEntry {
+  id        String @id @default(cuid())
+  guildId   String
+  discordId String
+  division  String
+
+  delta   Int
+  balance Int
+  reason  String @default("")
+  actorId String
+
+  createdAt DateTime @default(now())
+
+  @@index([guildId, discordId, division, createdAt])
+}
+
+model CouncilPromotionRequest {
+  id        String @id @default(cuid())
+  guildId   String
+  discordId String
+  username  String @default("")
+
+  // The division the member is in, and the division of the rank requested.
+  // They differ only when a subdivision's top rung feeds into its parent.
+  division   String
+  toDivision String
+
+  fromRoleId String?
+  toRoleId   String
+  toLabel    String  @default("")
+
+  pointsAtRequest Int
+  application     String @default("")
+
+  // pending | approved | denied | cancelled
+  status String @default("pending")
+
+  // Where the review embed was posted, so it can be edited after the fact
+  // even if the division's review channel has since been changed.
+  channelId String?
+  messageId String?
+
+  reviewerId String?
+  reason     String  @default("")
+
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+
+  @@index([guildId, status])
+  @@index([guildId, discordId, status])
+}

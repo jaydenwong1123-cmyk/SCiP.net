@@ -22,11 +22,11 @@ export type Rung = {
   applicationUrl: string;
 };
 
-export type LadderPosition = {
+export type LadderPosition<R extends Rung = Rung> = {
   /** The rung the member currently holds, or null if unranked. */
-  current: Rung | null;
+  current: R | null;
   /** The rung immediately above, or null if they are at the top. */
-  next: Rung | null;
+  next: R | null;
   /** Do they have the points for `next`? False when `next` is null. */
   eligible: boolean;
   /** Points still needed for `next`; 0 when eligible or at the top. */
@@ -34,7 +34,7 @@ export type LadderPosition = {
 };
 
 /** Sort a ladder into climbing order. */
-export function sortLadder(rungs: Rung[]): Rung[] {
+export function sortLadder<R extends Rung>(rungs: R[]): R[] {
   return [...rungs].sort((a, b) => a.points - b.points);
 }
 
@@ -48,11 +48,11 @@ export function sortLadder(rungs: Rung[]): Rung[] {
  * `/points set` and one manual role change, unlike the alternative of the bot
  * guessing at someone's rank from a role list it did not write.
  */
-export function positionOf(
-  rungs: Rung[],
+export function positionOf<R extends Rung>(
+  rungs: R[],
   points: number,
   currentRoleId: string | null
-): LadderPosition {
+): LadderPosition<R> {
   const ladder = sortLadder(rungs);
   const index = currentRoleId
     ? ladder.findIndex((r) => r.roleId === currentRoleId)

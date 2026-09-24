@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import { COMMANDS } from "../src/lib/discord/command-defs";
+import { COUNCIL_COMMANDS } from "../src/lib/council/command-defs";
 
 // Load .env.local FIRST, then .env.
 //
@@ -12,9 +13,10 @@ import { COMMANDS } from "../src/lib/discord/command-defs";
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
-// Upload The Engine's command set to Discord.
+// Upload a bot's command set to Discord.
 //
-//   npm run bot:register
+//   npm run bot:register       The Engine   (DISCORD_* variables)
+//   npm run council:register   The Council  (COUNCIL_* variables)
 //
 // WHY THIS IS A SCRIPT AND NOT PART OF THE APP. Discord stores the command list
 // itself — the names, the options, the pickers members see — separately from
@@ -32,29 +34,43 @@ dotenv.config();
 
 const API = "https://discord.com/api/v10";
 
+// Each bot is its own Discord application with its own set of variables.
+const BOTS = {
+  engine: { tag: "engine", prefix: "DISCORD", commands: COMMANDS },
+  council: { tag: "council", prefix: "COUNCIL", commands: COUNCIL_COMMANDS },
+} as const;
+
+const choice = (process.argv[2] ?? "engine") as keyof typeof BOTS;
+if (!(choice in BOTS)) {
+  console.error(`unknown bot "${choice}" — expected one of: ${Object.keys(BOTS).join(", ")}`);
+  process.exit(1);
+}
+const bot = BOTS[choice];
+const tag = `[${bot.tag}]`;
+
 async function main() {
-  const appId = process.env.DISCORD_APP_ID;
-  const guildId = process.env.DISCORD_GUILD_ID;
-  const token = process.env.DISCORD_BOT_TOKEN;
+  const appId = process.env[`${bot.prefix}_APP_ID`];
+  const guildId = process.env[`${bot.prefix}_GUILD_ID`];
+  const token = process.env[`${bot.prefix}_BOT_TOKEN`];
 
   const missing = [
-    ["DISCORD_APP_ID", appId],
-    ["DISCORD_GUILD_ID", guildId],
-    ["DISCORD_BOT_TOKEN", token],
+    [`${bot.prefix}_APP_ID`, appId],
+    [`${bot.prefix}_GUILD_ID`, guildId],
+    [`${bot.prefix}_BOT_TOKEN`, token],
   ]
     .filter(([, value]) => !value)
     .map(([name]) => name);
 
   if (missing.length > 0) {
     console.error(
-      `[engine] missing environment variable(s): ${missing.join(", ")}\n` +
-        "[engine] set them in .env.local — see .env.example for where each one comes from."
+      `${tag} missing environment variable(s): ${missing.join(", ")}\n` +
+        `${tag} set them in .env.local — see .env.example for where each one comes from.`
     );
     process.exit(1);
   }
 
   console.log(
-    `[engine] registering ${COMMANDS.length} top-level commands for guild ${guildId}`
+    `${tag} registering ${bot.commands.length} top-level commands for guild ${guildId}`
   );
 
   const res = await fetch(
@@ -65,7 +81,7 @@ async function main() {
         Authorization: `Bot ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(COMMANDS),
+      body: JSON.stringify(bot.commands),
     }
   );
 
@@ -75,7 +91,7 @@ async function main() {
     // Discord's validation errors are deeply nested and genuinely useful — the
     // path in them names the exact option that was rejected — so print the
     // whole thing rather than a summary.
-    console.error(`[engine] Discord rejected the command set (${res.status}):`);
+    console.error(`${tag} Discord rejected the command set (${res.status}):`);
     try {
       console.error(JSON.stringify(JSON.parse(body), null, 2));
     } catch {
@@ -85,13 +101,13 @@ async function main() {
   }
 
   const registered = JSON.parse(body) as { name: string }[];
-  for (const command of registered) console.log(`[engine]   /${command.name}`);
+  for (const command of registered) console.log(`${tag}   /${command.name}`);
   console.log(
-    `[engine] done. ${registered.length} commands are live in that server now.`
+    `${tag} done. ${registered.length} commands are live in that server now.`
   );
 }
 
 main().catch((err) => {
-  console.error("[engine] registration failed:", err);
+  console.error(`${tag} registration failed:`, err);
   process.exit(1);
 });
