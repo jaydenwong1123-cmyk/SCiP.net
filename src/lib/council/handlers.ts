@@ -34,6 +34,7 @@ import {
   type DivisionKey,
 } from "./divisions";
 import {
+  activeShiftsEmbed,
   applicationPrompt,
   leaderboardEmbed,
   mention,
@@ -44,6 +45,10 @@ import {
   pointsLogEmbed,
   roleMention,
   rungLabel,
+  shiftAdminButtons,
+  shiftButtons,
+  shiftDeleteConfirm,
+  shiftEmbed,
 } from "./embeds";
 import { assignDivision, currentDivision, removeFromDivision } from "./membership";
 import {
@@ -73,6 +78,20 @@ import {
   refreshRequestMessage,
   renderRequest,
 } from "./promotions";
+import { formatDuration, parseMinutes } from "./shift-points";
+import {
+  activeShifts,
+  addShiftTime,
+  deleteShift,
+  endShift,
+  getActiveShift,
+  setShiftTime,
+  shiftSeconds,
+  shiftTotals,
+  startShift,
+  togglePause,
+  type EndedShift,
+} from "./shifts";
 
 // THE COUNCIL'S DISPATCHER.
 //
@@ -103,6 +122,13 @@ function reply(
 
 const text = (content: string, ephemeral = true) =>
   reply({ content }, { ephemeral });
+
+/** Redraw the message a button or modal came from. Content is cleared unless
+ *  the payload sets it, so an old status line never lingers. */
+const update = (payload: MessagePayload): InteractionResponse => ({
+  type: InteractionResponseType.UpdateMessage,
+  data: { content: "", ...payload },
+});
 
 /** Refusals are always private. */
 const refuse = (what: string, who: string) =>
@@ -141,7 +167,7 @@ function route(options: InteractionOption[] | undefined): {
 const str = (opts: Opts, name: string, fallback = "") =>
   typeof opts.get(name) === "string" ? (opts.get(name) as string) : fallback;
 
-const int = (opts: Opts, name: string, fallback = 0) =>
+const num = (opts: Opts, name: string, fallback = 0) =>
   typeof opts.get(name) === "number" ? (opts.get(name) as number) : fallback;
 
 const id = (opts: Opts, name: string): string => str(opts, name);
@@ -242,7 +268,7 @@ async function handlePoints(
   }
 
   if (path === "history") {
-    const entries = await pointHistory(guildId, target, division, int(opts, "limit", 10));
+    const entries = await pointHistory(guildId, target, division, num(opts, "limit", 10));
     if (entries.length === 0) {
       return text(
         `No point changes on record for ${mention(target)} in ${divisionLabel(division)}.`
@@ -272,7 +298,7 @@ async function handlePoints(
   }
 
   const reason = str(opts, "reason");
-  const amount = int(opts, "amount");
+  const amount = num(opts, "amount");
   const common = {
     guildId,
     discordId: target,
@@ -475,6 +501,264 @@ async function handleDivision(
   return text(out.ok ? `${mention(target)}: ${out.message}` : out.message);
 }
 
+// --- /shift -----------------------------------------------------------------
+
+async function handleShift(
+  ctx: Ctx,
+  path: string,
+  opts: Opts
+): Promise<InteractionResponse> {
+  if (path === "manage") {
+    return reply(await shiftPanel(ctx, actorOf(ctx.interaction).id, false));
+  }
+
+  if (path === "active") {
+    const now = new Date();
+    const rows = (await activeShifts(ctx.guildId)).map((shift) => ({
+      discordId: shift.discordId,
+      division: shift.division,
+      seconds: shiftSeconds(shift, now),
+      paused: !!shift.pausedAt,
+    }));
+    return reply({ embeds: [activeShiftsEmbed(rows)] }, { ephemeral: false });
+  }
+
+  // path === "admin"
+  const target = id(opts, "user");
+  if (!target) return text("No member was given.");
+  const refused = await shiftAuthority(ctx, target);
+  if (refused) return refused;
+  return reply(await shiftPanel(ctx, target, true));
+}
+
+/** The panel for one member's shift: their own (/shift manage) or HR's view. */
+async function shiftPanel(
+  ctx: Ctx,
+  discordId: string,
+  admin: boolean,
+  content?: string
+): Promise<MessagePayload> {
+  const [active, totals, division] = await Promise.all([
+    getActiveShift(ctx.guildId, discordId),
+    shiftTotals(ctx.guildId, discordId),
+    currentDivision(ctx.guildId, discordId),
+  ]);
+  return {
+    content,
+    embeds: [
+      shiftEmbed({
+        discordId,
+        active,
+        seconds: active ? shiftSeconds(active) : 0,
+        totals,
+        division,
+      }),
+    ],
+    components: admin
+      ? shiftAdminButtons(discordId, active)
+      : shiftButtons(discordId, active),
+  };
+}
+
+/**
+ * Null when the actor may run /shift admin on this member: HR of the division
+ * the shift is in (or the member's division, when they are off shift), and
+ * Scarlet and Hands everywhere.
+ */
+async function shiftAuthority(
+  ctx: Ctx,
+  target: string
+): Promise<InteractionResponse | null> {
+  const active = await getActiveShift(ctx.guildId, target);
+  const division =
+    active && isDivision(active.division)
+      ? active.division
+      : await currentDivision(ctx.guildId, target);
+  if (division) {
+    return canReview(ctx.member, ctx.config, ctx.divisions, division)
+      ? null
+      : refuse(`manage ${divisionLabel(division)} shifts`, hrOf(division));
+  }
+  return isScarlet(ctx.member, ctx.config)
+    ? null
+    : refuse(
+        "manage the shifts of members outside a division",
+        "Scarlet Representatives and the Hands of the O5"
+      );
+}
+
+async function beginShift(ctx: Ctx, discordId: string, username: string) {
+  const division = await currentDivision(ctx.guildId, discordId);
+  if (!division) {
+    return {
+      ok: false as const,
+      message:
+        "Only members of a division can go on shift: the points need somewhere to go. Division HR assigns one with `/division assign`.",
+    };
+  }
+  return startShift(ctx.guildId, discordId, username, division);
+}
+
+/** "…shift ended after …", with where the points went. Posts the public log. */
+async function endedLine(ctx: Ctx, whose: string, ended: EndedShift): Promise<string> {
+  const length = `**${formatDuration(ended.seconds)}**`;
+  if (!ended.paid || !ended.division) {
+    return `${whose} shift ended after ${length}. Shifts under 10 minutes earn no points.`;
+  }
+  const logged = await logPoints(ctx.config, {
+    kind: "add",
+    division: ended.division,
+    discordId: ended.shift.discordId,
+    ...ended.paid,
+    actorId: actorOf(ctx.interaction).id,
+    reason: ended.reason,
+  });
+  const n = ended.paid.delta;
+  return `${whose} shift ended after ${length}: **${fmtPoints(n)}** point${n === 1 ? "" : "s"} paid into ${divisionLabel(ended.division)}. New total: **${fmtPoints(ended.paid.after)}**.${logged}`;
+}
+
+/** Start / Pause / End on a member's own panel. */
+async function handleShiftButton(
+  ctx: Ctx,
+  verb: string,
+  owner: string
+): Promise<InteractionResponse> {
+  const actor = actorOf(ctx.interaction);
+  if (actor.id !== owner) {
+    return text("That panel belongs to someone else. Run `/shift manage` for your own.");
+  }
+  const panelWith = async (content: string) =>
+    update(await shiftPanel(ctx, actor.id, false, content));
+
+  if (verb === "start") {
+    const started = await beginShift(ctx, actor.id, actor.name);
+    return panelWith(started.ok ? "You are on shift. The clock is running." : started.message);
+  }
+  if (verb === "pause") {
+    const toggled = await togglePause(ctx.guildId, actor.id);
+    if (!toggled.ok) return panelWith(toggled.message);
+    return panelWith(
+      toggled.shift.pausedAt
+        ? "On break. The clock is stopped until you press Resume."
+        : "Back on shift. The clock is running again."
+    );
+  }
+  if (verb === "end") {
+    const ended = await endShift(ctx.guildId, actor.id, actor.id);
+    return panelWith(ended.ok ? await endedLine(ctx, "Your", ended.shift) : ended.message);
+  }
+  return text("Unknown control.");
+}
+
+function minutesModal(verb: "addtime" | "settime", target: string): InteractionResponse {
+  const adding = verb === "addtime";
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `council:shiftadm:${verb}:${target}`,
+      title: adding ? "Add time to their shift" : "Set their shift time",
+      components: [
+        {
+          type: ComponentType.ActionRow,
+          components: [
+            {
+              type: ComponentType.TextInput,
+              custom_id: "minutes",
+              label: adding ? "Time to add" : "Their shift should read",
+              style: 1,
+              required: true,
+              max_length: 20,
+              placeholder: "90, 1h30m or 1:30",
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+/** HR's buttons on /shift admin. Authority is checked again on every press. */
+async function handleShiftAdminButton(
+  ctx: Ctx,
+  verb: string,
+  target: string
+): Promise<InteractionResponse> {
+  const refused = await shiftAuthority(ctx, target);
+  if (refused) return refused;
+  const who = mention(target);
+  const panelWith = async (content?: string) =>
+    update(await shiftPanel(ctx, target, true, content));
+
+  switch (verb) {
+    case "panel":
+      return panelWith();
+    case "start": {
+      const started = await beginShift(ctx, target, "");
+      return panelWith(started.ok ? `Started a shift for ${who}.` : started.message);
+    }
+    case "end": {
+      const ended = await endShift(ctx.guildId, target, actorOf(ctx.interaction).id);
+      return panelWith(ended.ok ? await endedLine(ctx, `${who}'s`, ended.shift) : ended.message);
+    }
+    case "add":
+      return minutesModal("addtime", target);
+    case "set":
+      return minutesModal("settime", target);
+    case "delete": {
+      const shift = await getActiveShift(ctx.guildId, target);
+      if (!shift) return panelWith("They are not on shift.");
+      return update({
+        content: `Delete ${who}'s current shift (**${formatDuration(shiftSeconds(shift))}** so far)? It is thrown away and **no points** are paid.`,
+        embeds: [],
+        components: shiftDeleteConfirm(target),
+      });
+    }
+    case "deleteyes": {
+      const deleted = await deleteShift(ctx.guildId, target);
+      return panelWith(
+        deleted.ok
+          ? `Deleted ${who}'s shift of ${formatDuration(shiftSeconds(deleted.shift))}. No points were paid.`
+          : deleted.message
+      );
+    }
+    default:
+      return text("Unknown control.");
+  }
+}
+
+/** The Add time / Set time forms from /shift admin. */
+async function handleShiftTimeModal(
+  ctx: Ctx,
+  verb: string,
+  target: string,
+  typed: string
+): Promise<InteractionResponse> {
+  const refused = await shiftAuthority(ctx, target);
+  if (refused) return refused;
+  const panelWith = async (content: string) =>
+    update(await shiftPanel(ctx, target, true, content));
+
+  const minutes = parseMinutes(typed);
+  if (minutes === null) {
+    return panelWith(
+      `"${typed.trim().slice(0, 20)}" is not a length of time. Use minutes (\`90\`), \`1h30m\` or \`1:30\`, up to one week. Nothing was changed.`
+    );
+  }
+  const shown = formatDuration(minutes * 60);
+  if (verb === "addtime") {
+    if (minutes === 0) return panelWith("Nothing to add.");
+    const added = await addShiftTime(ctx.guildId, target, minutes);
+    return panelWith(added.ok ? `Added ${shown} to ${mention(target)}'s shift.` : added.message);
+  }
+  if (verb !== "settime") return text("Unknown form.");
+  const set = await setShiftTime(ctx.guildId, target, minutes);
+  return panelWith(
+    set.ok
+      ? `${mention(target)}'s shift now reads ${shown}. It keeps running from there.`
+      : set.message
+  );
+}
+
 // --- /announce --------------------------------------------------------------
 
 const ANNOUNCE_COLOURS: Record<string, number> = {
@@ -662,7 +946,7 @@ async function handleCouncil(
     if (roleId === ctx.config.handsRoleId || roleId === ctx.config.scarletRoleId) {
       return text("Hands of the O5 and Scarlet Representative are handpicked and cannot be put on a ladder.");
     }
-    const points = int(opts, "points");
+    const points = num(opts, "points");
     const label =
       str(opts, "label") ||
       interaction.data?.resolved?.roles?.[roleId]?.name ||
@@ -787,6 +1071,11 @@ async function handleComponent(ctx: Ctx): Promise<InteractionResponse> {
     };
   }
 
+  if (parsed?.area === "shift") return handleShiftButton(ctx, parsed.verb, parsed.id);
+  if (parsed?.area === "shiftadm") {
+    return handleShiftAdminButton(ctx, parsed.verb, parsed.id);
+  }
+
   if (!parsed || parsed.area !== "promo") return text("Unknown control.");
 
   const request = await getRequest(parsed.id);
@@ -848,6 +1137,10 @@ async function handleModal(ctx: Ctx): Promise<InteractionResponse> {
       return refuse("post announcements", "Scarlet Representatives and the Hands of the O5");
     }
     return postAnnouncement(parsed.id, parsed.verb, field);
+  }
+
+  if (parsed.area === "shiftadm") {
+    return handleShiftTimeModal(ctx, parsed.verb, parsed.id, field("minutes"));
   }
 
   if (parsed.area !== "promo" || parsed.verb !== "denyreason") {
@@ -921,6 +1214,8 @@ export async function handleInteraction(
       return handlePromote(ctx, path, opts);
     case "division":
       return handleDivision(ctx, path, opts);
+    case "shift":
+      return handleShift(ctx, path, opts);
     case "announce":
       return handleAnnounce(ctx, opts);
     case "council":

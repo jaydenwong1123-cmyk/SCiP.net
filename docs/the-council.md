@@ -57,7 +57,7 @@ returns **401**. See Part 5 of the-engine.md for the exact command.
    ```
    npm run council:register
    ```
-   ✅ You should see `/points /leaderboard /promote /division /announce /council` listed.
+   ✅ You should see `/points /leaderboard /promote /division /shift /announce /council` listed.
 3. **Connect it:** in the developer portal, open The Council → General Information →
    **Interactions Endpoint URL** →
    `https://YOURDOMAIN/api/discord/council/interactions` → Save.
@@ -175,6 +175,39 @@ they are ever moved back, the bot restores both.
 `/division info user:@someone` shows their current division and their standing in
 every division they have served in.
 
+### Shifts
+
+Members earn points for time on duty as well as from awards. Only members in a
+division can go on shift, and the points are paid into the division they started
+the shift in.
+
+- **`/shift manage`** opens your shift panel, with **Start**, **Pause** (it becomes
+  **Resume** while you are on break) and **End**. Time on break does not count.
+  The panel also shows your all-time shift count, total and average time, and the
+  points your shifts have earned.
+- **`/shift active`** lists everyone on shift now and how long they have been on.
+- **`/shift admin user:@someone`** opens the same panel for HR, with **Start**,
+  **End**, **Add time**, **Set time** and **Delete**. Time can be typed as `90`,
+  `1h30m` or `1:30`. Deleting throws the shift away without paying any points, and
+  asks you to confirm first.
+
+When a shift ends, its length is turned into points:
+
+| Time on shift | Points |
+|---|---|
+| Under 10 minutes | 0 |
+| 10 – 17 minutes | ½ |
+| 18 – 35 minutes | 1 |
+| 36 – 54 minutes | 2 |
+| 55 – 60 minutes | 4 |
+| Past an hour | 4, plus 1 for every 10 more minutes (a block counts from its 8th minute), plus a bonus 2 once a second full hour is served |
+
+So 70 minutes is 5 points and 2 hours is 12. Shift payouts appear in `/points
+history` and the public points log like any other award.
+
+Because of the half point, points can be decimals. `/points add`, `remove` and
+`set` accept them too (for example `amount:0.5`).
+
 ---
 
 ## Command reference
@@ -190,6 +223,9 @@ every division they have served in.
 | `/division assign user division` | That division's HR (and the old division's HR, for a transfer), Scarlet, Hands |
 | `/division remove user` | Their division's HR, Scarlet, Hands |
 | `/division info [user]` | Anyone |
+| `/shift manage` | Anyone in a division |
+| `/shift active` | Anyone |
+| `/shift admin user` | Their division's HR, Scarlet, Hands |
 | `/announce channel [colour]` | Scarlet, Hands |
 | `/council setup`, `/council division`, `/council rank …`, `/council settings` | Hands |
 
@@ -214,6 +250,8 @@ Problems specific to The Council:
 | [`src/lib/council/divisions.ts`](../src/lib/council/divisions.ts) | The five divisions and how they connect |
 | [`src/lib/council/permissions.ts`](../src/lib/council/permissions.ts) | Who can act in which division |
 | [`src/lib/council/ranks.ts`](../src/lib/council/ranks.ts) | The ladders and the Enforcers/Legislators → Judicial step |
+| [`src/lib/council/shift-points.ts`](../src/lib/council/shift-points.ts) | How shift time turns into points. Change the table here |
+| [`src/lib/council/shifts.ts`](../src/lib/council/shifts.ts) | Starting, pausing, adjusting and ending shifts |
 | [`src/lib/council/command-defs.ts`](../src/lib/council/command-defs.ts) | The command list. Edit it, then run `npm run council:register` |
 
 The tables are all prefixed `Council` and are separate from The Engine's.

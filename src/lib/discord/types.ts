@@ -37,6 +37,8 @@ export const OptionType = {
   User: 6,
   Channel: 7,
   Role: 8,
+  /** Like Integer, but decimals are allowed. */
+  Number: 10,
 } as const;
 
 export const ComponentType = {

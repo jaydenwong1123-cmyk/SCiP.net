@@ -16,10 +16,12 @@ const userOption = {
   required: true,
 };
 
+// Number, not Integer: a short shift pays half a point, so HR needs to be
+// able to correct by halves too.
 const amountOption = {
   name: "amount",
   description: "How many points",
-  type: OptionType.Integer,
+  type: OptionType.Number,
   required: true,
   min_value: 0,
 };
@@ -138,6 +140,28 @@ export const COUNCIL_COMMANDS = [
         description: "A member's division and their standing in each division",
         type: OptionType.SubCommand,
         options: [{ ...userOption, required: false }],
+      },
+    ],
+  },
+  {
+    name: "shift",
+    description: "The shift timer. Ending a shift pays points for the time served",
+    options: [
+      {
+        name: "manage",
+        description: "Start, pause or end your shift",
+        type: OptionType.SubCommand,
+      },
+      {
+        name: "active",
+        description: "Everyone on shift right now, and for how long",
+        type: OptionType.SubCommand,
+      },
+      {
+        name: "admin",
+        description: "Start, end, delete or change the time of a member's shift (HR)",
+        type: OptionType.SubCommand,
+        options: [userOption],
       },
     ],
   },

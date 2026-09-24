@@ -6,9 +6,12 @@ import {
   type MessageComponent,
   type MessagePayload,
 } from "@/lib/discord/types";
+import type { CouncilShift } from "@prisma/client";
 import { mention, ordinal, points, roleMention } from "@/lib/engine/embeds";
 import { divisionLabel, type DivisionKey } from "./divisions";
 import type { CouncilRung } from "./ranks";
+import { formatDuration } from "./shift-points";
+import type { ShiftTotals } from "./shifts";
 
 // Everything The Council renders. Same visual language as The Engine's panels
 // (lib/engine/embeds.ts) — large heading, small eyebrow — with the division
@@ -249,4 +252,145 @@ export function pointsLogEmbed(input: {
     color: COLOR.neutral,
     timestamp: new Date().toISOString(),
   };
+}
+
+// --- shifts -----------------------------------------------------------------
+
+const unix = (date: Date) => Math.floor(date.getTime() / 1000);
+
+export type ShiftPanelInput = {
+  discordId: string;
+  active: CouncilShift | null;
+  /** Time on the live shift, in seconds. */
+  seconds: number;
+  totals: ShiftTotals;
+  /** The member's division, for the shift type when they are off shift. */
+  division: DivisionKey | null;
+};
+
+/** The /shift manage and /shift admin panel: the live shift, then the record. */
+export function shiftEmbed(input: ShiftPanelInput): Embed {
+  const { active, totals } = input;
+  const fields: NonNullable<Embed["fields"]> = [];
+
+  if (active) {
+    const status = active.pausedAt
+      ? `On Break (since <t:${unix(active.pausedAt)}:R>)`
+      : "On Shift";
+    fields.push({
+      name: "Current Shift",
+      value:
+        `**Status**: ${status}\n` +
+        `**Started**: <t:${unix(active.startedAt)}:R>\n` +
+        `**Time on shift**: ${formatDuration(input.seconds)}` +
+        (active.adjustSeconds !== 0 ? "\n-# Includes a correction by HR." : ""),
+      inline: false,
+    });
+  }
+
+  fields.push({
+    name: "All Time Information",
+    value:
+      `**Shift Count**: ${totals.count}\n` +
+      `**Total Duration**: ${formatDuration(totals.totalSeconds)}\n` +
+      `**Average Duration**: ${formatDuration(totals.averageSeconds)}\n` +
+      `**Points Earned**: ${points(totals.points)}`,
+    inline: false,
+  });
+
+  const heading = !active ? "Shift Panel" : active.pausedAt ? "On Break" : "Shift Started";
+  const color = !active ? COLOR.neutral : active.pausedAt ? COLOR.pending : COLOR.approved;
+  const type = active?.division ?? input.division;
+  return panel(heading, mention(input.discordId), {
+    color,
+    fields,
+    footer: { text: `Shift Type: ${divisionLabel(type)}` },
+  });
+}
+
+const button = (
+  style: number,
+  label: string,
+  custom_id: string,
+  disabled = false
+): MessageComponent => ({ type: ComponentType.Button, style, label, custom_id, disabled });
+
+/** Start / Pause (or Resume) / End, for the member's own panel. */
+export function shiftButtons(discordId: string, active: CouncilShift | null): MessageComponent[] {
+  const on = !!active;
+  return [
+    {
+      type: ComponentType.ActionRow,
+      components: [
+        button(ButtonStyle.Success, "Start", customId("shift", "start", discordId), on),
+        button(
+          ButtonStyle.Primary,
+          active?.pausedAt ? "Resume" : "Pause",
+          customId("shift", "pause", discordId),
+          !on
+        ),
+        button(ButtonStyle.Danger, "End", customId("shift", "end", discordId), !on),
+      ],
+    },
+  ];
+}
+
+/** HR's controls over someone else's shift. */
+export function shiftAdminButtons(discordId: string, active: CouncilShift | null): MessageComponent[] {
+  const on = !!active;
+  const id = (verb: string) => customId("shiftadm", verb, discordId);
+  return [
+    {
+      type: ComponentType.ActionRow,
+      components: [
+        button(ButtonStyle.Success, "Start", id("start"), on),
+        button(ButtonStyle.Danger, "End", id("end"), !on),
+        button(ButtonStyle.Secondary, "Add time", id("add"), !on),
+        button(ButtonStyle.Secondary, "Set time", id("set"), !on),
+        button(ButtonStyle.Danger, "Delete", id("delete"), !on),
+      ],
+    },
+  ];
+}
+
+/** The second press a delete needs. */
+export function shiftDeleteConfirm(discordId: string): MessageComponent[] {
+  return [
+    {
+      type: ComponentType.ActionRow,
+      components: [
+        button(ButtonStyle.Danger, "Delete shift", customId("shiftadm", "deleteyes", discordId)),
+        button(ButtonStyle.Secondary, "Cancel", customId("shiftadm", "panel", discordId)),
+      ],
+    },
+  ];
+}
+
+export type ActiveShiftRow = {
+  discordId: string;
+  division: string;
+  seconds: number;
+  paused: boolean;
+};
+
+/** Longest /shift active list; one embed holds about this many lines. */
+export const ACTIVE_SHIFTS_SHOWN = 40;
+
+export function activeShiftsEmbed(rows: ActiveShiftRow[]): Embed {
+  const lines = rows
+    .slice(0, ACTIVE_SHIFTS_SHOWN)
+    .map(
+      (row) =>
+        `${mention(row.discordId)}  ·  ${divisionLabel(row.division)}  ·  **${formatDuration(row.seconds)}**${row.paused ? "  ·  _on break_" : ""}`
+    );
+  const more = rows.length - lines.length;
+  const header = "-# PERSONNEL · SHIFT TYPE · TIME ON SHIFT";
+  const body = lines.length
+    ? `${header}\n${lines.join("\n")}${more > 0 ? `\n-# …and ${more} more.` : ""}`
+    : "_Nobody is on shift._";
+  return panel("On Shift", body, {
+    color: rows.length ? COLOR.approved : COLOR.neutral,
+    footer: { text: `${rows.length} on shift` },
+    timestamp: new Date().toISOString(),
+  });
 }

@@ -1258,7 +1258,8 @@ model CouncilStanding {
   discordId  String
   division   String
   username   String  @default("")
-  points     Int     @default(0)
+  // Fractional: a short shift is worth half a point (lib/council/shift-points.ts).
+  points     Float   @default(0)
   // The ladder role the bot last granted in this division.
   rankRoleId String?
 
@@ -1275,8 +1276,8 @@ model CouncilPointEntry {
   discordId String
   division  String
 
-  delta   Int
-  balance Int
+  delta   Float
+  balance Float
   reason  String @default("")
   actorId String
 
@@ -1300,7 +1301,7 @@ model CouncilPromotionRequest {
   toRoleId   String
   toLabel    String  @default("")
 
-  pointsAtRequest Int
+  pointsAtRequest Float
   application     String @default("")
 
   // pending | approved | denied | cancelled
@@ -1319,4 +1320,42 @@ model CouncilPromotionRequest {
 
   @@index([guildId, status])
   @@index([guildId, discordId, status])
+}
+
+// One stint on duty (/shift). Live while `endedAt` is null. Nothing ticks: the
+// running time is worked out from these timestamps whenever it is shown, which
+// is all a serverless bot can do anyway — see lib/council/shifts.ts.
+model CouncilShift {
+  id        String @id @default(cuid())
+  guildId   String
+  discordId String
+  username  String @default("")
+  // The division the member was in when the shift started. Shown as the shift
+  // type, and the division whose points the shift pays out in.
+  division  String
+
+  // "<guildId>:<discordId>" while the shift is live, null once it has ended.
+  // Unique, so a member can never have two live shifts at once — even from a
+  // double-pressed Start button.
+  activeKey String? @unique
+
+  startedAt     DateTime  @default(now())
+  // Set while the member is on break.
+  pausedAt      DateTime?
+  // Finished breaks, in seconds.
+  breakSeconds  Int       @default(0)
+  // HR corrections from /shift admin (add or set time), in seconds. Negative
+  // when a set took time away.
+  adjustSeconds Int       @default(0)
+
+  // Frozen when the shift ends.
+  endedAt         DateTime?
+  durationSeconds Int?
+  pointsAwarded   Float?
+  endedById       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([guildId, discordId, endedAt])
+  @@index([guildId, endedAt])
 }
