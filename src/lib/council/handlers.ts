@@ -508,8 +508,13 @@ async function handleShift(
   path: string,
   opts: Opts
 ): Promise<InteractionResponse> {
+  // The panels are posted in the open so the channel can see who is on duty.
+  // The buttons still only answer their owner (or HR, on the admin panel), and
+  // refusals stay private.
   if (path === "manage") {
-    return reply(await shiftPanel(ctx, actorOf(ctx.interaction).id, false));
+    return reply(await shiftPanel(ctx, actorOf(ctx.interaction).id, false), {
+      ephemeral: false,
+    });
   }
 
   if (path === "active") {
@@ -528,7 +533,7 @@ async function handleShift(
   if (!target) return text("No member was given.");
   const refused = await shiftAuthority(ctx, target);
   if (refused) return refused;
-  return reply(await shiftPanel(ctx, target, true));
+  return reply(await shiftPanel(ctx, target, true), { ephemeral: false });
 }
 
 /** The panel for one member's shift: their own (/shift manage) or HR's view. */
@@ -557,6 +562,8 @@ async function shiftPanel(
     components: admin
       ? shiftAdminButtons(discordId, active)
       : shiftButtons(discordId, active),
+    // Public now: "Started a shift for @someone" should not ping them.
+    allowed_mentions: { parse: [] },
   };
 }
 
