@@ -61,9 +61,6 @@ export function shiftPoints(minutes: number): number {
 
 export const DOUBLE_POINTS = 2;
 
-/** Longest window one /shift double start may open: 48 hours. */
-export const MAX_DOUBLE_MINUTES = 48 * 60;
-
 /** What a shift ending at `at` is multiplied by. */
 export function shiftMultiplier(doublePointsUntil: Date | null, at: Date): number {
   return doublePointsUntil && doublePointsUntil.getTime() > at.getTime()
@@ -90,9 +87,12 @@ export const MAX_ADJUST_MINUTES = 7 * 24 * 60;
 
 /**
  * Minutes typed into the /shift admin time boxes: "90", "1h30m", "1h 30m",
- * "2h", "45m" or "1:30". Null when it is none of those or is out of range.
+ * "2h", "45m" or "1:30". Null when it is none of those or is over `max`.
  */
-export function parseMinutes(input: string): number | null {
+export function parseMinutes(
+  input: string,
+  max: number = MAX_ADJUST_MINUTES
+): number | null {
   const value = input.trim().toLowerCase().replace(/\s+/g, "");
   let minutes: number | null = null;
 
@@ -108,5 +108,5 @@ export function parseMinutes(input: string): number | null {
     }
   }
 
-  return minutes !== null && minutes <= MAX_ADJUST_MINUTES ? minutes : null;
+  return minutes !== null && minutes <= max ? minutes : null;
 }

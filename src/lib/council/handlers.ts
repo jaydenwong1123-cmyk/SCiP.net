@@ -90,7 +90,6 @@ import {
   renderRequest,
 } from "./promotions";
 import {
-  MAX_DOUBLE_MINUTES,
   formatDuration,
   parseMinutes,
   shiftMultiplier,
@@ -661,13 +660,22 @@ async function handleDoublePoints(
   }
 
   const typed = str(opts, "duration");
-  const minutes = parseMinutes(typed);
-  if (minutes === null || minutes < 1 || minutes > MAX_DOUBLE_MINUTES) {
+  // No upper limit, only one that keeps the end a real date the database can
+  // store (before the year 10000).
+  const minutes = parseMinutes(typed, Infinity);
+  const until =
+    minutes === null ? null : new Date(now.getTime() + minutes * 60_000);
+  if (
+    minutes === null ||
+    minutes < 1 ||
+    !until ||
+    Number.isNaN(until.getTime()) ||
+    until.getUTCFullYear() > 9999
+  ) {
     return text(
-      `"${typed.trim().slice(0, 20)}" is not a length between 1 minute and ${MAX_DOUBLE_MINUTES / 60} hours. Use minutes (\`90\`), \`2h\`, \`1h30m\` or \`1:30\`. Nothing was changed.`
+      `"${typed.trim().slice(0, 20)}" is not a length of at least 1 minute. Use minutes (\`90\`), \`2h\`, \`1h30m\` or \`1:30\`. Nothing was changed.`
     );
   }
-  const until = new Date(now.getTime() + minutes * 60_000);
   const saved = await saveCouncilConfig({
     guildId: ctx.guildId,
     doublePointsUntil: until,

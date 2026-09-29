@@ -171,12 +171,12 @@ export const COUNCIL_COMMANDS = [
         options: [
           {
             name: "start",
-            description: "Turn on 2× shift points for a limited time",
+            description: "Turn on 2× shift points for as long as you choose",
             type: OptionType.SubCommand,
             options: [
               {
                 name: "duration",
-                description: "How long: 90, 2h, 1h30m or 1:30 (up to 48 hours)",
+                description: "How long: 90, 2h, 1h30m or 1:30 (no limit)",
                 type: OptionType.String,
                 required: true,
                 max_length: 20,

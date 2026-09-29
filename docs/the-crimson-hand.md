@@ -217,10 +217,10 @@ So 70 minutes is 5 points and 2 hours is 12.
 #### Double points
 
 A Scarlet Representative (or the Hands of the O5, or a server administrator) can
-run a limited-time double-points event:
+run a double-points event:
 
-- **`/shift double start duration:2h`** turns it on for up to 48 hours. Time can be
-  typed as `90`, `2h`, `1h30m` or `1:30`. The bot posts a notice in the channel
+- **`/shift double start duration:2h`** turns it on for as long as you set, with
+  no upper limit. Time can be typed as `90`, `2h`, `1h30m` or `1:30`. The bot posts a notice in the channel
   saying when it ends. Running it again while it is on replaces the end time.
 - **`/shift double end`** turns it off early.
 
