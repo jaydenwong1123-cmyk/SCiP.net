@@ -10,16 +10,16 @@ import type { CouncilShift } from "@prisma/client";
 import { mention, ordinal, points, roleMention } from "@/lib/engine/embeds";
 import { divisionLabel, type DivisionKey } from "./divisions";
 import type { CouncilRung } from "./ranks";
-import { formatDuration } from "./shift-points";
+import { DOUBLE_POINTS, formatDuration, shiftMultiplier } from "./shift-points";
 import type { ShiftTotals } from "./shifts";
 
-// Everything The Council renders. Same visual language as The Engine's panels
+// Everything The Crimson Hand renders. Same visual language as The Engine's panels
 // (lib/engine/embeds.ts) — large heading, small eyebrow — with the division
 // named wherever a rank is.
 
 export { mention, ordinal, points, roleMention };
 
-export const EYEBROW = "THE COUNCIL";
+export const EYEBROW = "THE CRIMSON HAND";
 
 export function panel(
   heading: string,
@@ -221,7 +221,7 @@ export function leaderboardEmbed(
   return embed;
 }
 
-export const POINTS_LOG_TITLE = "THE COUNCIL | POINTS SYSTEM";
+export const POINTS_LOG_TITLE = "THE CRIMSON HAND | POINTS SYSTEM";
 
 const pts = (n: number) => `\`${points(n)} point${n === 1 ? "" : "s"}\``;
 
@@ -258,6 +258,24 @@ export function pointsLogEmbed(input: {
 
 const unix = (date: Date) => Math.floor(date.getTime() / 1000);
 
+/** The banner the shift panels carry while double points are on, else null. */
+export function doublePointsLine(until: Date | null, now = new Date()): string | null {
+  if (!until || shiftMultiplier(until, now) === 1) return null;
+  return `**${DOUBLE_POINTS}× points** on every shift that ends before <t:${unix(until)}:t> (<t:${unix(until)}:R>).`;
+}
+
+/** Posted in the open by /shift double start. */
+export function doublePointsEmbed(until: Date, actorId: string, replaced: Date | null): Embed {
+  const was = replaced
+    ? `\n-# Replaces the window that was due to end <t:${unix(replaced)}:R>.`
+    : "";
+  return panel(
+    "Double Points",
+    `Every shift that **ends** before <t:${unix(until)}:f> (<t:${unix(until)}:R>) pays **${DOUBLE_POINTS}×** the usual points. End your shift before then to get them.${was}\n-# Started by ${mention(actorId)}`,
+    { color: COLOR.approved, timestamp: new Date().toISOString() }
+  );
+}
+
 export type ShiftPanelInput = {
   discordId: string;
   active: CouncilShift | null;
@@ -266,12 +284,17 @@ export type ShiftPanelInput = {
   totals: ShiftTotals;
   /** The member's division, for the shift type when they are off shift. */
   division: DivisionKey | null;
+  /** CouncilConfig.doublePointsUntil. */
+  doublePointsUntil: Date | null;
 };
 
 /** The /shift manage and /shift admin panel: the live shift, then the record. */
 export function shiftEmbed(input: ShiftPanelInput): Embed {
   const { active, totals } = input;
   const fields: NonNullable<Embed["fields"]> = [];
+
+  const double = doublePointsLine(input.doublePointsUntil);
+  if (double) fields.push({ name: "Double Points", value: double, inline: false });
 
   if (active) {
     const status = active.pausedAt
@@ -376,7 +399,7 @@ export type ActiveShiftRow = {
 /** Longest /shift active list; one embed holds about this many lines. */
 export const ACTIVE_SHIFTS_SHOWN = 40;
 
-export function activeShiftsEmbed(rows: ActiveShiftRow[]): Embed {
+export function activeShiftsEmbed(rows: ActiveShiftRow[], doublePointsUntil: Date | null): Embed {
   const lines = rows
     .slice(0, ACTIVE_SHIFTS_SHOWN)
     .map(
@@ -388,7 +411,8 @@ export function activeShiftsEmbed(rows: ActiveShiftRow[]): Embed {
   const body = lines.length
     ? `${header}\n${lines.join("\n")}${more > 0 ? `\n-# …and ${more} more.` : ""}`
     : "_Nobody is on shift._";
-  return panel("On Shift", body, {
+  const double = doublePointsLine(doublePointsUntil);
+  return panel("On Shift", double ? `${double}\n\n${body}` : body, {
     color: rows.length ? COLOR.approved : COLOR.neutral,
     footer: { text: `${rows.length} on shift` },
     timestamp: new Date().toISOString(),

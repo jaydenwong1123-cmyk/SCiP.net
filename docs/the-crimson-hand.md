@@ -1,8 +1,12 @@
-# The Council: setup walkthrough
+# The Crimson Hand: setup walkthrough
 
-The Council is the second bot. It works like The Engine (points, then a request, then an
-approval), with one difference: **each division has its own ladder, its own points
-and its own reviewers.**
+The Crimson Hand is the second bot. It used to be called The Council, and that is
+still its name inside the code: its environment variables start `COUNCIL_`, its
+database tables start `Council`, and it is registered with `npm run council:register`.
+
+It works like The Engine (points, then a request, then an approval), with one
+difference: **each division has its own ladder, its own points and its own
+reviewers.**
 
 ```
 Hands of the O5          ┐ handpicked, never on a ladder
@@ -24,7 +28,7 @@ you there and only lists what changes.
 
 Follow **Parts 1 and 2 of the-engine.md**, with two changes:
 
-- Name the application `The Council`.
+- Name the application `The Crimson Hand`.
 - Use the **Server ID of the new server**.
 
 It must be a new application. Reusing The Engine's would make one bot answer both
@@ -52,24 +56,28 @@ returns **401**. See Part 5 of the-engine.md for the exact command.
 ## Part 3: Invite it, register commands, connect it
 
 1. **Invite** the bot to the new server. Use the invite link from Part 6 of
-   the-engine.md, but with the Council's App ID.
+   the-engine.md, but with The Crimson Hand's App ID.
 2. **Register the commands:**
    ```
    npm run council:register
    ```
-   ✅ You should see `/points /leaderboard /promote /division /shift /announce /council` listed.
-3. **Connect it:** in the developer portal, open The Council → General Information →
+   ✅ You should see `/points /leaderboard /promote /division /shift /announce /crimson /security` listed.
+3. **Connect it:** in the developer portal, open The Crimson Hand → General Information →
    **Interactions Endpoint URL** →
    `https://YOURDOMAIN/api/discord/council/interactions` → Save.
-4. **Move The Council's role above every rank role and division role** in Server
+4. **Move The Crimson Hand's role above every rank role and division role** in Server
    Settings → Roles. If you skip this, approvals fail, but the bot tells you why.
+   Keep it **below every staff role**: anything beneath the bot is what a stolen
+   bot token could hand out. And never give it Administrator. It switches itself
+   off if its role has that or any other dangerous permission (see
+   [Security](#security-anti-nuke)).
 
 ---
 
 ## Part 4: Server-wide roles
 
 ```
-/council setup hands_role:@Hands of the O5 scarlet_role:@Scarlet Representative announce_channel:#promotions
+/crimson setup hands_role:@Hands of the O5 scarlet_role:@Scarlet Representative announce_channel:#promotions
 ```
 
 | Option | What it does |
@@ -79,8 +87,10 @@ returns **401**. See Part 5 of the-engine.md for the exact command.
 | `announce_channel` | Optional. Approved promotions are announced here |
 | `member_role` | Optional. Once set, only people with this role (or a division role the bot knows) can use the bot |
 | `points_webhook` | Optional. A public log of every point change, set up the same way as in The Engine |
+| `security_channel` | Where lockdowns and settings changes are reported. Make it admin-only |
 
 Server administrators always keep full access, so you can't lock yourself out.
+Only a server administrator can set `hands_role` or `security_channel`.
 
 ## Part 5: Set up each division
 
@@ -88,7 +98,7 @@ Run this once per division. Each option is optional, so you can come back and ch
 one at a time.
 
 ```
-/council division division:Clerical hr_role:@Clerical HR staff_role:@Clerical MR review_channel:#clerical-promotions division_role:@Clerical
+/crimson division division:Clerical hr_role:@Clerical HR staff_role:@Clerical MR review_channel:#clerical-promotions division_role:@Clerical
 ```
 
 | Option | What it does |
@@ -108,7 +118,7 @@ For the two Judicial subdivisions, `hr_role` and `review_channel` can be left em
 
 You will usually only set a `staff_role` and a `division_role` for them.
 
-Check everything with `/council settings`.
+Check everything with `/crimson settings`.
 
 ## Part 6: Build the ladders
 
@@ -116,24 +126,24 @@ Each rank belongs to exactly one division. Add them cheapest first. `band` is on
 label (LR/MR/HR) for display. The order comes from the points.
 
 ```
-/council rank add division:Clerical role:@Clerical Cadet points:0 band:LR
-/council rank add division:Clerical role:@Clerical Officer points:100 band:MR
-/council rank add division:Clerical role:@Clerical Director points:300 band:HR
+/crimson rank add division:Clerical role:@Clerical Cadet points:0 band:LR
+/crimson rank add division:Clerical role:@Clerical Officer points:100 band:MR
+/crimson rank add division:Clerical role:@Clerical Director points:300 band:HR
 
-/council rank add division:Judicial Enforcers role:@Enforcer points:0 band:LR
-/council rank add division:Judicial Enforcers role:@Senior Enforcer points:150 band:MR
+/crimson rank add division:Judicial Enforcers role:@Enforcer points:0 band:LR
+/crimson rank add division:Judicial Enforcers role:@Senior Enforcer points:150 band:MR
 
-/council rank add division:Judicial Legislators role:@Clerk of Law points:0 band:LR
-/council rank add division:Judicial Legislators role:@Legislator points:200 band:MR
+/crimson rank add division:Judicial Legislators role:@Clerk of Law points:0 band:LR
+/crimson rank add division:Judicial Legislators role:@Legislator points:200 band:MR
 
-/council rank add division:Judicial role:@Magistrate points:400 band:HR
-/council rank add division:Judicial role:@High Justice points:600 band:HR
+/crimson rank add division:Judicial role:@Magistrate points:400 band:HR
+/crimson rank add division:Judicial role:@High Justice points:600 band:HR
 ```
 
 Rank applications work as they do in The Engine: add `form:https://forms.gle/...`
 to a rank.
 
-Check the ladders with `/council rank list`. It shows every division, and notes that
+Check the ladders with `/crimson rank list`. It shows every division, and notes that
 the top Enforcer and Legislator ranks lead into Judicial.
 
 > **Do not add Hands of the O5 or Scarlet Representative as ranks.** They are
@@ -202,11 +212,53 @@ When a shift ends, its length is turned into points:
 | 55 – 60 minutes | 4 |
 | Past an hour | 4, plus 1 for every 10 more minutes (a block counts from its 8th minute), plus a bonus 2 once a second full hour is served |
 
-So 70 minutes is 5 points and 2 hours is 12. Shift payouts appear in `/points
+So 70 minutes is 5 points and 2 hours is 12.
+
+#### Double points
+
+A Scarlet Representative (or the Hands of the O5, or a server administrator) can
+run a limited-time double-points event:
+
+- **`/shift double start duration:2h`** turns it on for up to 48 hours. Time can be
+  typed as `90`, `2h`, `1h30m` or `1:30`. The bot posts a notice in the channel
+  saying when it ends. Running it again while it is on replaces the end time.
+- **`/shift double end`** turns it off early.
+
+While it is on, every shift that **ends** before the end time pays **2×** the
+table above, in every division. A shift that is still running when the window
+closes is paid normally, so members should end their shifts in time. The shift
+panels and `/shift active` show the end time while it is on. Doubled payouts are
+marked "(2× points)" in `/points history` and the public points log, and each
+start or early end is reported to the security channel. It does not double
+points added by hand with `/points add`, and it cannot be started during a
+lockdown. Shift payouts appear in `/points
 history` and the public points log like any other award.
 
 Because of the half point, points can be decimals. `/points add`, `remove` and
 `set` accept them too (for example `amount:0.5`).
+
+---
+
+## Security (anti-nuke)
+
+The Crimson Hand has the same protection as The Engine. Read
+[Security in the-engine.md](the-engine.md#security-anti-nuke) for the full
+picture, including the steps only you can take in Discord. In short:
+
+- It never hands out a rank role or **division role** that has Administrator, Ban,
+  Kick, Manage Channels or any other server-control permission, and it re-checks
+  every time it hands one out.
+- It stops working if its own role has more than Manage Roles from that list.
+- It only answers this server, and refuses requests older than five minutes.
+- **`/security lockdown`** freezes every role, point and settings change.
+  Scarlet Representatives, the Hands of the O5 and server administrators can use
+  it. **Only server administrators can `/security unlock`.**
+- It locks itself if one person, within 10 minutes, goes past **10 division moves**
+  (assign, transfer or remove), **15 point removals or resets** (including
+  deleting or re-timing a shift), or **5 announcements**. Server administrators
+  are not counted.
+- **`/security status`** checks your setup and turns green when nothing needs
+  fixing.
 
 ---
 
@@ -226,21 +278,26 @@ Because of the half point, points can be decimals. `/points add`, `remove` and
 | `/shift manage` | Anyone in a division |
 | `/shift active` | Anyone |
 | `/shift admin user` | Their division's HR, Scarlet, Hands |
+| `/shift double start duration`, `/shift double end` | Scarlet, Hands |
 | `/announce channel [colour]` | Scarlet, Hands |
-| `/council setup`, `/council division`, `/council rank …`, `/council settings` | Hands |
+| `/crimson setup`, `/crimson division`, `/crimson rank …`, `/crimson settings` | Hands (`hands_role` and `security_channel`: server administrators) |
+| `/security lockdown [reason]`, `/security status` | Scarlet, Hands |
+| `/security unlock` | Server administrators only |
 
 ## Troubleshooting
 
 Everything in The Engine's troubleshooting table applies, with `COUNCIL_*` in place
 of `DISCORD_*` and `npm run council:register` in place of `npm run bot:register`.
-Problems specific to The Council:
+Problems specific to The Crimson Hand:
 
 | What you see | Fix |
 |---|---|
-| "…has no review channel" | `/council division` for that division (or, for a subdivision, for Judicial) with `review_channel` |
+| "…has no review channel" | `/crimson division` for that division (or, for a subdivision, for Judicial) with `review_channel` |
 | "You have not been assigned to a division yet" | Their HR runs `/division assign` |
-| "…has no ranks yet" | `/council rank add` for that division |
+| "…has no ranks yet" | `/crimson rank add` for that division |
 | A rank moved to the wrong division | A role can only sit on one ladder. Run `rank add` again with the right division |
+| "…is in lockdown" | Check the security channel for why, then a server administrator runs `/security unlock` |
+| "The Crimson Hand only works in its own server" | `COUNCIL_GUILD_ID` on Vercel names a different server. Fix it and redeploy |
 
 ## Where the code lives
 
@@ -250,7 +307,7 @@ Problems specific to The Council:
 | [`src/lib/council/divisions.ts`](../src/lib/council/divisions.ts) | The five divisions and how they connect |
 | [`src/lib/council/permissions.ts`](../src/lib/council/permissions.ts) | Who can act in which division |
 | [`src/lib/council/ranks.ts`](../src/lib/council/ranks.ts) | The ladders and the Enforcers/Legislators → Judicial step |
-| [`src/lib/council/shift-points.ts`](../src/lib/council/shift-points.ts) | How shift time turns into points. Change the table here |
+| [`src/lib/council/shift-points.ts`](../src/lib/council/shift-points.ts) | How shift time turns into points, and the double-points multiplier. Change the table here |
 | [`src/lib/council/shifts.ts`](../src/lib/council/shifts.ts) | Starting, pausing, adjusting and ending shifts |
 | [`src/lib/council/command-defs.ts`](../src/lib/council/command-defs.ts) | The command list. Edit it, then run `npm run council:register` |
 

@@ -1,7 +1,8 @@
 import { OptionType } from "../discord/types";
+import { SECURITY_COMMAND, securityChannelOption } from "../discord/command-defs";
 import { BANDS, DIVISION_CHOICES } from "./divisions";
 
-// The Council's command set. Uploaded by
+// The Crimson Hand's command set. Uploaded by
 // `npm run council:register` (scripts/register-discord-commands.ts council) and
 // answered by lib/council/handlers.ts, which matches on the same names.
 //
@@ -163,11 +164,37 @@ export const COUNCIL_COMMANDS = [
         type: OptionType.SubCommand,
         options: [userOption],
       },
+      {
+        name: "double",
+        description: "Double points: shifts that end in the window pay 2× (Scarlet)",
+        type: OptionType.SubCommandGroup,
+        options: [
+          {
+            name: "start",
+            description: "Turn on 2× shift points for a limited time",
+            type: OptionType.SubCommand,
+            options: [
+              {
+                name: "duration",
+                description: "How long: 90, 2h, 1h30m or 1:30 (up to 48 hours)",
+                type: OptionType.String,
+                required: true,
+                max_length: 20,
+              },
+            ],
+          },
+          {
+            name: "end",
+            description: "Turn double points off early",
+            type: OptionType.SubCommand,
+          },
+        ],
+      },
     ],
   },
   {
     name: "announce",
-    description: "Post an embed to a channel as The Council",
+    description: "Post an embed to a channel as The Crimson Hand",
     options: [
       {
         name: "channel",
@@ -192,8 +219,8 @@ export const COUNCIL_COMMANDS = [
     ],
   },
   {
-    name: "council",
-    description: "Configure The Council",
+    name: "crimson",
+    description: "Configure The Crimson Hand",
     options: [
       {
         name: "setup",
@@ -232,6 +259,7 @@ export const COUNCIL_COMMANDS = [
             required: false,
             max_length: 200,
           },
+          securityChannelOption,
         ],
       },
       {
@@ -342,4 +370,5 @@ export const COUNCIL_COMMANDS = [
       },
     ],
   },
+  SECURITY_COMMAND,
 ];

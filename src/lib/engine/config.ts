@@ -16,6 +16,11 @@ export type EngineConfig = {
   reviewChannelId: string;
   announceChannelId: string;
   pointsWebhookUrl: string;
+  /** Anti-nuke: see lib/discord/guard.ts. */
+  securityChannelId: string;
+  lockedAt: Date | null;
+  lockedById: string;
+  lockReason: string;
 };
 
 export const EMPTY_CONFIG: EngineConfig = {
@@ -28,24 +33,33 @@ export const EMPTY_CONFIG: EngineConfig = {
   reviewChannelId: "",
   announceChannelId: "",
   pointsWebhookUrl: "",
+  securityChannelId: "",
+  lockedAt: null,
+  lockedById: "",
+  lockReason: "",
 };
+
+const pickConfig = (row: EngineConfig): EngineConfig => ({
+  guildId: row.guildId,
+  staffRoleId: row.staffRoleId,
+  highRankRoleId: row.highRankRoleId,
+  highCommandRoleId: row.highCommandRoleId,
+  ownerRoleId: row.ownerRoleId,
+  memberRoleId: row.memberRoleId,
+  reviewChannelId: row.reviewChannelId,
+  announceChannelId: row.announceChannelId,
+  pointsWebhookUrl: row.pointsWebhookUrl,
+  securityChannelId: row.securityChannelId,
+  lockedAt: row.lockedAt,
+  lockedById: row.lockedById,
+  lockReason: row.lockReason,
+});
 
 export async function getEngineConfig(): Promise<EngineConfig> {
   const row = await db.engineGuildConfig.findUnique({
     where: { id: SINGLETON },
   });
-  if (!row) return EMPTY_CONFIG;
-  return {
-    guildId: row.guildId,
-    staffRoleId: row.staffRoleId,
-    highRankRoleId: row.highRankRoleId,
-    highCommandRoleId: row.highCommandRoleId,
-    ownerRoleId: row.ownerRoleId,
-    memberRoleId: row.memberRoleId,
-    reviewChannelId: row.reviewChannelId,
-    announceChannelId: row.announceChannelId,
-    pointsWebhookUrl: row.pointsWebhookUrl,
-  };
+  return row ? pickConfig(row) : EMPTY_CONFIG;
 }
 
 /**
@@ -62,17 +76,7 @@ export async function saveEngineConfig(
     create: { id: SINGLETON, ...EMPTY_CONFIG, ...patch },
     update: patch,
   });
-  return {
-    guildId: row.guildId,
-    staffRoleId: row.staffRoleId,
-    highRankRoleId: row.highRankRoleId,
-    highCommandRoleId: row.highCommandRoleId,
-    ownerRoleId: row.ownerRoleId,
-    memberRoleId: row.memberRoleId,
-    reviewChannelId: row.reviewChannelId,
-    announceChannelId: row.announceChannelId,
-    pointsWebhookUrl: row.pointsWebhookUrl,
-  };
+  return pickConfig(row);
 }
 
 /**

@@ -55,7 +55,7 @@ export async function createRequest(
   if (ladders[division].length === 0) {
     return {
       ok: false,
-      message: `${divisionLabel(division)} has no ranks yet. Hands of the O5 add them with /council rank add.`,
+      message: `${divisionLabel(division)} has no ranks yet. Hands of the O5 add them with /crimson rank add.`,
     };
   }
 
@@ -89,7 +89,7 @@ export async function createRequest(
   if (!channelId) {
     return {
       ok: false,
-      message: `${divisionLabel(where.toDivision)} has no review channel, so a request would have nowhere to go. Hands of the O5 set one with /council division.`,
+      message: `${divisionLabel(where.toDivision)} has no review channel, so a request would have nowhere to go. Hands of the O5 set one with /crimson division.`,
     };
   }
 

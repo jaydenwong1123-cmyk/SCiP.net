@@ -1041,6 +1041,14 @@ model EngineGuildConfig {
   // at a different channel from inside Discord with /engine setup.
   pointsWebhookUrl String @default("")
 
+  // Anti-nuke (lib/discord/guard.ts). Where security alerts are posted, and
+  // the lockdown switch: while lockedAt is set, nothing that changes roles,
+  // points or settings works for anyone but a server administrator.
+  securityChannelId String    @default("")
+  lockedAt          DateTime?
+  lockedById        String    @default("") // Discord id, or "system" for the throttle
+  lockReason        String    @default("")
+
   updatedAt DateTime @default(now()) @updatedAt
 }
 
@@ -1164,7 +1172,8 @@ model EnginePromotionRequest {
 }
 
 // ============================================================================
-// THE COUNCIL — the second Discord bot, for the divisional server.
+// THE CRIMSON HAND — the second Discord bot, for the divisional server. Its
+// code name is still "council", which is why everything below is prefixed so.
 //
 // Same shape as The Engine's tables, but a member climbs one of several
 // ladders (a "division") rather than one. Divisions are fixed in code — see
@@ -1188,6 +1197,17 @@ model CouncilGuildConfig {
 
   announceChannelId String @default("")
   pointsWebhookUrl  String @default("")
+
+  // Anti-nuke, as on EngineGuildConfig.
+  securityChannelId String    @default("")
+  lockedAt          DateTime?
+  lockedById        String    @default("")
+  lockReason        String    @default("")
+
+  // Double shift points (/shift double): every shift that ends before this
+  // time pays twice the points. Null, or in the past, when it is off.
+  doublePointsUntil DateTime?
+  doublePointsById  String    @default("")
 
   updatedAt DateTime @default(now()) @updatedAt
 }
@@ -1358,4 +1378,21 @@ model CouncilShift {
 
   @@index([guildId, discordId, endedAt])
   @@index([guildId, endedAt])
+}
+
+// One row per destructive action a bot took for someone: a division move, a
+// point removal or reset, an announcement. Shared by both bots (`bot` says
+// which), and read back only to count how many one person took in the last
+// few minutes. Too many and the bot locks itself (lib/discord/guard.ts). Rows
+// older than a day are pruned as new ones arrive, so this never grows.
+model BotAction {
+  id        String   @id @default(cuid())
+  bot       String // "engine" | "council"
+  guildId   String
+  actorId   String
+  kind      String // a key of THROTTLES in lib/discord/security.ts
+  createdAt DateTime @default(now())
+
+  @@index([bot, guildId, actorId, kind, createdAt])
+  @@index([createdAt])
 }

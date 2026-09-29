@@ -214,6 +214,10 @@ something is wrong; see Troubleshooting.
    - ☑ **View Channels**
    - ☑ **Send Messages** — so it can post promotion requests
    - ☑ **Embed Links** — so those posts render properly
+
+   **Tick nothing else, and never Administrator.** The Engine switches itself
+   off if its role has Administrator, Ban, Kick, Manage Channels or any other
+   permission that could wreck the server. See [Security](#security-anti-nuke).
 5. At the very bottom, a **Generated URL** appears. Click **Copy**.
 6. Paste it into your browser's address bar and press Enter.
 7. Choose your server from the dropdown → **Continue** → **Authorize**.
@@ -249,13 +253,14 @@ npm run bot:register
 ✅ **You should see**:
 
 ```
-[engine] registering 5 top-level commands for guild 123456789...
+[engine] registering 6 top-level commands for guild 123456789...
 [engine]   /points
 [engine]   /leaderboard
 [engine]   /announce
 [engine]   /promote
 [engine]   /engine
-[engine] done. 5 commands are live in that server now.
+[engine]   /security
+[engine] done. 6 commands are live in that server now.
 ```
 
 > Run this again any time the command list changes. If it complains about a
@@ -306,6 +311,11 @@ in the role list. So The Engine's role must be **above every rank role**.
 rank. If you forget, the bot says so in plain language when an approval fails —
 it does not fail silently.
 
+**Keep it below every staff role, too.** Discord lets a bot hand out any role
+beneath its own, so if the bot's token were ever stolen, everything below The
+Engine is what the thief could give themselves. Put it as low as it can go
+while still sitting above the ranks. `/security status` checks this for you.
+
 ---
 
 ## Part 10 — Tell the bot your roles and channels
@@ -333,6 +343,9 @@ Set these:
 | `announce_channel` | e.g. `#announcements` | optional — where approvals are announced |
 | `member_role` | leave empty for now | optional — see below |
 | `points_webhook` | a webhook URL | optional — posts every point change publicly (see below) |
+| `security_channel` | e.g. `#bot-security`, visible to admins only | where lockdowns and settings changes are reported (see [Security](#security-anti-nuke)) |
+
+`owner_role` and `security_channel` can only be set by a server administrator.
 
 Press Enter.
 
@@ -496,6 +509,92 @@ approved promotion.
 
 ---
 
+## Security (anti-nuke)
+
+"Nuking" a server means deleting its channels and roles, banning everyone, or
+flooding it with pings, usually from an account or bot that was given too much
+power. The Engine is built so it can never be the tool that does it.
+
+### What it does on its own
+
+- **It never hands out a dangerous role.** Before giving anyone a role, the bot
+  reads that role from Discord and refuses if it has Administrator, Manage
+  Server, Manage Roles, Manage Channels, Manage Webhooks, Ban, Kick, Timeout,
+  Manage Messages, Manage Threads, Mention @everyone or Manage Expressions. This
+  is checked when a rank is added, and again every time the role is given out,
+  so editing a rank role later to add Administrator does not get past it. If one
+  of your ranks really needs one of those, give that rank out by hand.
+- **It won't run with too much power.** If The Engine's own role has any of
+  those permissions except Manage Roles, it stops answering and says what to
+  take away. A bot token is a password. If it leaks, the damage is limited to
+  what the bot's role can do.
+- **It answers only your server.** If it were invited anywhere else, it would
+  do nothing there.
+- **It rejects old requests.** A request from Discord older than five minutes is
+  refused, so a copied request can't be replayed.
+- **It locks itself if someone goes on a spree.** If one person takes more than
+  **15 point removals or resets**, or posts more than **5 announcements**, within
+  10 minutes, The Engine locks itself (see below) and refuses the next one. Server
+  administrators are not counted.
+
+### Lockdown
+
+If something looks wrong, such as a staff account behaving strangely, freeze the bot:
+
+```
+/security lockdown reason:Staff account compromised
+```
+
+While locked, nothing that changes roles, points or settings works. Look-ups
+(`/points check`, `/leaderboard`, `/engine settings`) still do. Server
+administrators are not frozen, so they can repair the bot's settings while it is
+locked.
+
+| | Who |
+|---|---|
+| `/security lockdown` | High Command, Owners, server administrators |
+| `/security unlock` | **Server administrators only**, so an account that has been taken over can't lift it |
+| `/security status` | High Command, Owners, server administrators |
+
+### The security channel
+
+Set one with `/engine setup security_channel:#bot-security` (server
+administrators only). Make it a channel only admins can see. The Engine posts
+there when:
+
+- anyone locks or unlocks it, or it locks itself,
+- someone changes its settings or the rank ladder,
+- someone tries to put a dangerous role on the ladder.
+
+### Check your setup
+
+Run `/security status`. It checks the lockdown, the security channel, the bot's
+own permissions, whether `@everyone` has anything dangerous, and whether any
+dangerous role sits below The Engine where a stolen token could reach it. The
+panel turns green when nothing needs fixing.
+
+### Things only you can do in Discord
+
+The bot can't protect you from a person who already has Administrator, because
+it only acts when someone runs one of its commands. It can't see channels being
+deleted by hand, and it can't undo that. These steps close that gap:
+
+1. **Give Administrator to as few people as possible.** Anyone with it can
+   delete the whole server.
+2. **Turn off "Public Bot".** In the Developer Portal → your app → **Bot**, switch
+   **Public Bot** off, so only you can invite it anywhere.
+3. **Require 2FA for moderators.** In Server Settings → **Safety Setup**, turn on
+   **Require 2FA for moderator actions**. A stolen password is then not enough to
+   ban or delete.
+4. **If the bot token ever leaks,** go to the Developer Portal → **Bot** → **Reset
+   Token** at once. The old token stops working immediately. Put the new one in
+   Vercel (Part 4) and redeploy.
+5. **For live protection against a rogue admin,** add a dedicated anti-nuke bot
+   that watches the audit log. The Engine can't do that. It doesn't keep a
+   permanent connection to Discord.
+
+---
+
 ## Command reference
 
 | Command | Who can use it |
@@ -511,7 +610,9 @@ approved promotion.
 | `/announce channel [colour]` — post an embed | High Command |
 | `/engine rank add role points [label] [form]` | Owner |
 | `/engine rank remove / list` | Owner |
-| `/engine setup`, `/engine settings` | Owner |
+| `/engine setup`, `/engine settings` | Owner (`owner_role` and `security_channel`: server administrators) |
+| `/security lockdown [reason]`, `/security status` | High Command |
+| `/security unlock` | server administrators only |
 
 Higher tiers can do everything the lower ones can — High Rank can award points
 without also holding the staff role. Refusals are always private to whoever tried.
@@ -532,6 +633,11 @@ without also holding the staff role. Refusals are always private to whoever trie
 | **A database error on every command** | The `Engine*` tables aren't in production | Check the build log for "migration(s) have been applied". If not, run `npm run db:deploy` against the production `DATABASE_URL`. |
 | **The bot shows as offline** | Nothing is wrong | This kind of bot is always greyed out. It still works. |
 | **"You do not have clearance…"** | Working as designed | Run `/engine settings` — you may not hold the role assigned to that tier. |
+| **"The Engine is switched off because its role has…"** | The bot's role has more power than it should | Server Settings → Roles → The Engine: untick what the message names. If they are already off, check the channel's own permission overrides. |
+| **"…is in lockdown"** | Someone ran `/security lockdown`, or the bot locked itself | Read the security channel to see why, then a server administrator runs `/security unlock`. |
+| **"…has Administrator. The bot never hands out a role with server-control permissions"** | That rank role is dangerous to hand out | Remove those permissions from the role, or give that rank out by hand. |
+| **"The Engine only works in its own server"** | `DISCORD_GUILD_ID` on Vercel names a different server | Fix the variable (Part 4) and redeploy. |
+| **`/security` doesn't appear** | The command list predates it | Run `npm run bot:register` again. |
 
 ---
 
@@ -542,6 +648,8 @@ without also holding the staff role. Refusals are always private to whoever trie
 | [`src/app/api/discord/interactions/route.ts`](../src/app/api/discord/interactions/route.ts) | The endpoint Discord talks to |
 | [`src/lib/discord/verify.ts`](../src/lib/discord/verify.ts) | Checks each request really came from Discord |
 | [`src/lib/discord/rest.ts`](../src/lib/discord/rest.ts) | Granting roles, posting messages |
+| [`src/lib/discord/security.ts`](../src/lib/discord/security.ts) | The anti-nuke rules: which permissions are dangerous, the throttle limits |
+| [`src/lib/discord/guard.ts`](../src/lib/discord/guard.ts) | Lockdown, the throttle, security alerts and `/security`, shared with The Crimson Hand |
 | [`src/lib/discord/command-defs.ts`](../src/lib/discord/command-defs.ts) | The command list — edit, then `npm run bot:register` |
 | [`src/lib/engine/`](../src/lib/engine/) | Points, ranks, promotions, permissions, embeds |
 

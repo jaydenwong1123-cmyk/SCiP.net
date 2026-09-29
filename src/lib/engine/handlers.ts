@@ -12,7 +12,16 @@ import {
   type MessageComponent,
   type MessagePayload,
 } from "@/lib/discord/types";
-import { createMessage, executeWebhook } from "@/lib/discord/rest";
+import { createMessage, engineRest, executeWebhook } from "@/lib/discord/rest";
+import {
+  handleSecurity,
+  securityAlert,
+  securityGate,
+  throttle,
+  type Access,
+  type SecurityProfile,
+} from "@/lib/discord/guard";
+import { listOf, roleGrantProblem } from "@/lib/discord/security";
 import { db } from "@/lib/db";
 import {
   getEngineConfig,
@@ -36,6 +45,7 @@ import {
 import {
   Tier,
   hasTier,
+  isGuildAdmin,
   refusalFor,
   tierOf,
   type TierValue,
@@ -67,6 +77,19 @@ import {
 // a serverless invocation cannot promise to finish.
 
 export type InteractionResponse = { type: number; data?: unknown };
+
+/** The Engine as the anti-nuke gate sees it (lib/discord/guard.ts). */
+const SECURITY: SecurityProfile = {
+  bot: "engine",
+  name: "The Engine",
+  guildEnv: "DISCORD_GUILD_ID",
+  setupCommand: "/engine setup",
+  engageLabel: "High Command, Owners and server administrators",
+  throttles: ["points", "announce"],
+  rest: engineRest,
+  panel,
+  saveLock: saveEngineConfig,
+};
 
 function reply(
   payload: MessagePayload,
@@ -228,6 +251,13 @@ async function handlePoints(
         }),
       ],
     });
+  }
+
+  // Taking points away is how a leaderboard gets wiped, so it is counted.
+  // Awarding is not: inflated points still need High Rank to act on them.
+  if (path === "set" || path === "remove") {
+    const slowed = await throttle(SECURITY, interaction, config, "points");
+    if (slowed) return text(slowed);
   }
 
   const common = {
@@ -504,10 +534,24 @@ async function handleEngine(
   opts: Opts
 ): Promise<InteractionResponse> {
   if (!hasTier(interaction.member, config, Tier.Owner)) return refuse(Tier.Owner);
+  const actor = actorOf(interaction);
 
   if (path === "setup") {
+    // Who holds top control of the bot, and where its alarms go, are for
+    // server administrators alone. An Owner who could change either could hand
+    // the bot to someone else or quietly silence its security alerts.
+    if (
+      (id(opts, "owner_role") || id(opts, "security_channel")) &&
+      !isGuildAdmin(interaction.member)
+    ) {
+      return text(
+        "Only server administrators can change the Owner role or the security channel. Nothing was saved."
+      );
+    }
+
     const patch: Partial<EngineConfig> = { guildId };
-    const map: [string, keyof EngineConfig][] = [
+    // Every setting ending in "Id" holds a role or channel id (a string).
+    const map: [string, keyof EngineConfig & `${string}Id`][] = [
       ["staff_role", "staffRoleId"],
       ["high_rank_role", "highRankRoleId"],
       ["high_command_role", "highCommandRoleId"],
@@ -515,13 +559,14 @@ async function handleEngine(
       ["member_role", "memberRoleId"],
       ["review_channel", "reviewChannelId"],
       ["announce_channel", "announceChannelId"],
+      ["security_channel", "securityChannelId"],
     ];
-    let changed = 0;
+    const changed: string[] = [];
     for (const [option, field] of map) {
       const value = id(opts, option);
       if (value) {
         patch[field] = value;
-        changed += 1;
+        changed.push(`\`${option}\``);
       }
     }
     // The webhook is a pasted URL, not a picked role, so it is validated here;
@@ -537,14 +582,21 @@ async function handleEngine(
           "That is not a Discord webhook URL. In the channel's settings go to **Integrations → Webhooks → New Webhook → Copy Webhook URL**, and paste that. Nothing was saved."
         );
       }
-      changed += 1;
+      changed.push("`points_webhook`");
     }
-    if (changed === 0) {
+    if (changed.length === 0) {
       return text(
         "Nothing to change — pass at least one role or channel. Run `/engine settings` to see what is set."
       );
     }
     const saved = await saveEngineConfig(patch);
+    await securityAlert(
+      SECURITY,
+      saved,
+      "Settings Changed",
+      `${mention(actor.id)} changed ${listOf(changed)} with \`/engine setup\`.`,
+      COLOR.info
+    );
     return reply({ embeds: [settingsEmbed(saved)] });
   }
 
@@ -577,6 +629,19 @@ async function handleEngine(
 
   if (path === "rank add") {
     const roleId = id(opts, "role");
+    // Refused here for a clear answer up front. The same check runs again on
+    // every grant (lib/discord/rest.ts), since the role can be edited later.
+    const role = interaction.data?.resolved?.roles?.[roleId];
+    const unsafe = role ? roleGrantProblem(role, guildId) : null;
+    if (unsafe) {
+      await securityAlert(
+        SECURITY,
+        config,
+        "Unsafe Rank Refused",
+        `${mention(actor.id)} tried to put ${roleMention(roleId)} on the ladder. ${unsafe}`
+      );
+      return text(`${unsafe} Nothing was saved.`);
+    }
     const points = int(opts, "points");
     const label =
       str(opts, "label") ||
@@ -597,6 +662,13 @@ async function handleEngine(
       applicationUrl = form;
     }
     const saved = await upsertRung(guildId, roleId, label, points, applicationUrl);
+    await securityAlert(
+      SECURITY,
+      config,
+      "Ladder Changed",
+      `${mention(actor.id)} put ${roleMention(roleId)} on the ladder at **${saved.points}** points.`,
+      COLOR.info
+    );
 
     const gate = saved.requiresApplication
       ? ` Members also need to fill in the [application form](${saved.applicationUrl}) before their request reaches High Rank.`
@@ -609,6 +681,15 @@ async function handleEngine(
   if (path === "rank remove") {
     const roleId = id(opts, "role");
     const removed = await removeRung(guildId, roleId);
+    if (removed) {
+      await securityAlert(
+        SECURITY,
+        config,
+        "Ladder Changed",
+        `${mention(actor.id)} took ${roleMention(roleId)} off the ladder.`,
+        COLOR.info
+      );
+    }
     return text(
       removed
         ? `Removed **${removed.label}** from the ladder. Nobody's roles were changed.`
@@ -669,6 +750,13 @@ function settingsEmbed(config: EngineConfig): Embed {
         value: config.memberRoleId
           ? `${roleMention(config.memberRoleId)}\n_required for everyday commands_`
           : "_not set — everyone may check points_",
+        inline: true,
+      },
+      {
+        name: "Security alerts",
+        value: config.securityChannelId
+          ? `${show(config.securityChannelId, "channel")}\n_lockdowns and settings changes_`
+          : "_not set — see `/security status`_",
         inline: true,
       },
     ],
@@ -783,6 +871,8 @@ async function handleModal(
 
   // engine:say:<colour>:<channelId> — the announcement composer.
   if (parsed.area === "say") {
+    const slowed = await throttle(SECURITY, interaction, config, "announce");
+    if (slowed) return text(slowed);
     return postAnnouncement(parsed.id, parsed.verb, field);
   }
 
@@ -855,6 +945,32 @@ async function refreshedEmbed(
 
 // --- entry point ------------------------------------------------------------
 
+/**
+ * The commands that only look things up, and so keep working in a lockdown.
+ * Anything not listed counts as a change, so a command added later is frozen
+ * by a lockdown until someone decides otherwise. /security is listed because
+ * it has to work during one; it checks its own permissions.
+ */
+const READ_ONLY = new Set([
+  "points check",
+  "points history",
+  "leaderboard",
+  "promote list",
+  "announce", // only opens the compose box; posting it is the modal
+  "engine settings",
+  "engine rank list",
+  "security lockdown",
+  "security unlock",
+  "security status",
+]);
+
+function accessOf(interaction: Interaction): Access {
+  if (interaction.type !== InteractionType.ApplicationCommand) return "write";
+  const name = interaction.data?.name ?? "";
+  const { path } = route(interaction.data?.options);
+  return READ_ONLY.has(path ? `${name} ${path}` : name) ? "read" : "write";
+}
+
 export async function handleInteraction(
   interaction: Interaction
 ): Promise<InteractionResponse> {
@@ -868,6 +984,11 @@ export async function handleInteraction(
   }
 
   const config = await getEngineConfig();
+
+  // The anti-nuke gate (lib/discord/guard.ts): this server only, never while
+  // the bot holds dangerous permissions, and no changes during a lockdown.
+  const blocked = securityGate(SECURITY, interaction, config, accessOf(interaction));
+  if (blocked) return text(blocked);
 
   // The base gate. Everything the bot does, including pressing a button, is
   // behind at least this — which is what makes the optional member role a real
@@ -900,6 +1021,13 @@ export async function handleInteraction(
       return handlePromote(interaction, guildId, config, path);
     case "engine":
       return handleEngine(interaction, guildId, config, path, opts);
+    case "security":
+      return reply(
+        await handleSecurity(SECURITY, interaction, config, path, {
+          canEngage: hasTier(interaction.member, config, Tier.HighCommand),
+          reason: str(opts, "reason"),
+        })
+      );
     default:
       return text("Unknown command.");
   }

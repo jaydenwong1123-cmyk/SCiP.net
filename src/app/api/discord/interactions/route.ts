@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyDiscordRequest } from "@/lib/discord/verify";
+import { isFreshTimestamp } from "@/lib/discord/security";
 import type { Interaction } from "@/lib/discord/types";
 import { handleInteraction } from "@/lib/engine/handlers";
 
@@ -24,12 +25,17 @@ export async function POST(request: Request) {
   // not verify, even when it is semantically identical.
   const rawBody = await request.text();
 
-  const valid = verifyDiscordRequest(
-    rawBody,
-    request.headers.get("x-signature-ed25519"),
-    request.headers.get("x-signature-timestamp"),
-    process.env.DISCORD_PUBLIC_KEY
-  );
+  const timestamp = request.headers.get("x-signature-timestamp");
+  const valid =
+    verifyDiscordRequest(
+      rawBody,
+      request.headers.get("x-signature-ed25519"),
+      timestamp,
+      process.env.DISCORD_PUBLIC_KEY
+    ) &&
+    // A genuine request replayed later still verifies, so its signed
+    // timestamp must also be recent.
+    isFreshTimestamp(timestamp, Date.now());
 
   // 401 is not merely convention here: Discord tests this endpoint with
   // deliberately bad signatures when the URL is saved, and refuses the URL

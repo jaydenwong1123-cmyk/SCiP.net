@@ -2,12 +2,12 @@ import { db } from "@/lib/db";
 import { discordRest } from "@/lib/discord/rest";
 import { DIVISION_KEYS, DIVISIONS, type DivisionKey } from "./divisions";
 
-// The Council's settings: one server-wide row, plus one row per division.
+// The Crimson Hand's settings: one server-wide row, plus one row per division.
 // Both are read through helpers that invent the defaults when nothing has been
 // saved yet, so no caller ever has to handle a missing config.
 
-/** Every REST call The Council makes goes out under its own token. */
-export const rest = discordRest("COUNCIL_BOT_TOKEN", "The Council");
+/** Every REST call The Crimson Hand makes goes out under its own token. */
+export const rest = discordRest("COUNCIL_BOT_TOKEN", "The Crimson Hand");
 
 const SINGLETON = "singleton";
 
@@ -18,6 +18,14 @@ export type CouncilConfig = {
   memberRoleId: string;
   announceChannelId: string;
   pointsWebhookUrl: string;
+  /** Anti-nuke: see lib/discord/guard.ts. */
+  securityChannelId: string;
+  lockedAt: Date | null;
+  lockedById: string;
+  lockReason: string;
+  /** Double shift points run until this time (see ./shift-points.ts). */
+  doublePointsUntil: Date | null;
+  doublePointsById: string;
 };
 
 export const EMPTY_CONFIG: CouncilConfig = {
@@ -27,6 +35,12 @@ export const EMPTY_CONFIG: CouncilConfig = {
   memberRoleId: "",
   announceChannelId: "",
   pointsWebhookUrl: "",
+  securityChannelId: "",
+  lockedAt: null,
+  lockedById: "",
+  lockReason: "",
+  doublePointsUntil: null,
+  doublePointsById: "",
 };
 
 export type DivisionConfig = {
@@ -58,6 +72,12 @@ const pickConfig = (row: CouncilConfig): CouncilConfig => ({
   memberRoleId: row.memberRoleId,
   announceChannelId: row.announceChannelId,
   pointsWebhookUrl: row.pointsWebhookUrl,
+  securityChannelId: row.securityChannelId,
+  lockedAt: row.lockedAt,
+  lockedById: row.lockedById,
+  lockReason: row.lockReason,
+  doublePointsUntil: row.doublePointsUntil,
+  doublePointsById: row.doublePointsById,
 });
 
 const pickDivision = (row: DivisionConfig): DivisionConfig => ({

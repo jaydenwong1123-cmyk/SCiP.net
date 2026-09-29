@@ -13,8 +13,18 @@ import {
   type MessagePayload,
 } from "@/lib/discord/types";
 import { executeWebhook } from "@/lib/discord/rest";
+import {
+  handleSecurity,
+  securityAlert,
+  securityGate,
+  throttle,
+  type Access,
+  type SecurityProfile,
+} from "@/lib/discord/guard";
+import { listOf, roleGrantProblem } from "@/lib/discord/security";
 import { isWebhookUrl } from "@/lib/engine/config";
 import { isFormUrl } from "@/lib/engine/applications";
+import { isGuildAdmin } from "@/lib/engine/permissions";
 import {
   getCouncilConfig,
   getDivisionConfigs,
@@ -36,6 +46,7 @@ import {
 import {
   activeShiftsEmbed,
   applicationPrompt,
+  doublePointsEmbed,
   leaderboardEmbed,
   mention,
   ordinal,
@@ -78,7 +89,12 @@ import {
   refreshRequestMessage,
   renderRequest,
 } from "./promotions";
-import { formatDuration, parseMinutes } from "./shift-points";
+import {
+  MAX_DOUBLE_MINUTES,
+  formatDuration,
+  parseMinutes,
+  shiftMultiplier,
+} from "./shift-points";
 import {
   activeShifts,
   addShiftTime,
@@ -93,7 +109,7 @@ import {
   type EndedShift,
 } from "./shifts";
 
-// THE COUNCIL'S DISPATCHER.
+// THE CRIMSON HAND'S DISPATCHER.
 //
 // Same contract as lib/engine/handlers.ts: one signed interaction in, one JSON
 // response out, inside Discord's three seconds. What differs is the question
@@ -101,6 +117,19 @@ import {
 // IN THIS DIVISION?" — see ./permissions.ts.
 
 export type InteractionResponse = { type: number; data?: unknown };
+
+/** The Crimson Hand as the anti-nuke gate sees it (lib/discord/guard.ts). */
+const SECURITY: SecurityProfile = {
+  bot: "council",
+  name: "The Crimson Hand",
+  guildEnv: "COUNCIL_GUILD_ID",
+  setupCommand: "/crimson setup",
+  engageLabel: "Scarlet Representatives, the Hands of the O5 and server administrators",
+  throttles: ["roles", "points", "announce"],
+  rest,
+  panel,
+  saveLock: saveCouncilConfig,
+};
 
 type Ctx = {
   interaction: Interaction;
@@ -297,6 +326,12 @@ async function handlePoints(
     });
   }
 
+  // Taking points away is how a leaderboard gets wiped, so it is counted.
+  if (path === "set" || path === "remove") {
+    const slowed = await throttle(SECURITY, interaction, ctx.config, "points");
+    if (slowed) return text(slowed);
+  }
+
   const reason = str(opts, "reason");
   const amount = num(opts, "amount");
   const common = {
@@ -352,7 +387,7 @@ async function logPoints(
   });
   return posted.ok
     ? ""
-    : `\n-# The public points log could not be posted: ${posted.error} Re-run \`/council setup points_webhook\` with a fresh webhook URL.`;
+    : `\n-# The public points log could not be posted: ${posted.error} Re-run \`/crimson setup points_webhook\` with a fresh webhook URL.`;
 }
 
 // --- /leaderboard -----------------------------------------------------------
@@ -473,6 +508,8 @@ async function handleDivision(
     if (!canReview(ctx.member, ctx.config, ctx.divisions, previous)) {
       return refuse(`remove members from ${divisionLabel(previous)}`, hrOf(previous));
     }
+    const slowed = await throttle(SECURITY, interaction, ctx.config, "roles");
+    if (slowed) return text(slowed);
     const out = await removeFromDivision(ctx.divisions, guildId, target);
     return text(out.message);
   }
@@ -491,6 +528,9 @@ async function handleDivision(
       hrOf(previous)
     );
   }
+  // Counted because a transfer strips the old division's roles.
+  const slowed = await throttle(SECURITY, interaction, ctx.config, "roles");
+  if (slowed) return text(slowed);
   const out = await assignDivision(
     ctx.divisions,
     guildId,
@@ -525,7 +565,14 @@ async function handleShift(
       seconds: shiftSeconds(shift, now),
       paused: !!shift.pausedAt,
     }));
-    return reply({ embeds: [activeShiftsEmbed(rows)] }, { ephemeral: false });
+    return reply(
+      { embeds: [activeShiftsEmbed(rows, ctx.config.doublePointsUntil)] },
+      { ephemeral: false }
+    );
+  }
+
+  if (path === "double start" || path === "double end") {
+    return handleDoublePoints(ctx, path, opts);
   }
 
   // path === "admin"
@@ -557,6 +604,7 @@ async function shiftPanel(
         seconds: active ? shiftSeconds(active) : 0,
         totals,
         division,
+        doublePointsUntil: ctx.config.doublePointsUntil,
       }),
     ],
     components: admin
@@ -565,6 +613,78 @@ async function shiftPanel(
     // Public now: "Started a shift for @someone" should not ping them.
     allowed_mentions: { parse: [] },
   };
+}
+
+/**
+ * /shift double start | end. Scarlet and Hands only: it changes what every
+ * shift in every division pays. Announced where it was run, since members need
+ * to know to end their shifts inside the window, and reported to the security
+ * channel like any other settings change.
+ */
+async function handleDoublePoints(
+  ctx: Ctx,
+  path: string,
+  opts: Opts
+): Promise<InteractionResponse> {
+  if (!isScarlet(ctx.member, ctx.config)) {
+    return refuse(
+      "turn double points on or off",
+      "Scarlet Representatives and the Hands of the O5"
+    );
+  }
+  const actor = actorOf(ctx.interaction);
+  const now = new Date();
+  const running = shiftMultiplier(ctx.config.doublePointsUntil, now) > 1;
+
+  if (path === "double end") {
+    if (!running) return text("Double points are not on.");
+    await saveCouncilConfig({ doublePointsUntil: null, doublePointsById: actor.id });
+    await securityAlert(
+      SECURITY,
+      ctx.config,
+      "Double Points Ended",
+      `${mention(actor.id)} ended double shift points early with \`/shift double end\`.`,
+      COLOR.info
+    );
+    return reply(
+      {
+        embeds: [
+          panel(
+            "Double Points Ended",
+            `Shifts pay the usual points again. Shifts that ended during the window keep their double points.\n-# Ended by ${mention(actor.id)}`,
+            { color: COLOR.neutral, timestamp: now.toISOString() }
+          ),
+        ],
+      },
+      { ephemeral: false }
+    );
+  }
+
+  const typed = str(opts, "duration");
+  const minutes = parseMinutes(typed);
+  if (minutes === null || minutes < 1 || minutes > MAX_DOUBLE_MINUTES) {
+    return text(
+      `"${typed.trim().slice(0, 20)}" is not a length between 1 minute and ${MAX_DOUBLE_MINUTES / 60} hours. Use minutes (\`90\`), \`2h\`, \`1h30m\` or \`1:30\`. Nothing was changed.`
+    );
+  }
+  const until = new Date(now.getTime() + minutes * 60_000);
+  const saved = await saveCouncilConfig({
+    guildId: ctx.guildId,
+    doublePointsUntil: until,
+    doublePointsById: actor.id,
+  });
+  const replaced = running ? ctx.config.doublePointsUntil : null;
+  await securityAlert(
+    SECURITY,
+    saved,
+    "Double Points Started",
+    `${mention(actor.id)} turned on double shift points for ${formatDuration(minutes * 60)} with \`/shift double start\`, until <t:${Math.floor(until.getTime() / 1000)}:f>.`,
+    COLOR.info
+  );
+  return reply(
+    { embeds: [doublePointsEmbed(until, actor.id, replaced)] },
+    { ephemeral: false }
+  );
 }
 
 /**
@@ -621,7 +741,8 @@ async function endedLine(ctx: Ctx, whose: string, ended: EndedShift): Promise<st
     reason: ended.reason,
   });
   const n = ended.paid.delta;
-  return `${whose} shift ended after ${length}: **${fmtPoints(n)}** point${n === 1 ? "" : "s"} paid into ${divisionLabel(ended.division)}. New total: **${fmtPoints(ended.paid.after)}**.${logged}`;
+  const doubled = ended.multiplier > 1 ? ` (${ended.multiplier}× double points)` : "";
+  return `${whose} shift ended after ${length}: **${fmtPoints(n)}** point${n === 1 ? "" : "s"}${doubled} paid into ${divisionLabel(ended.division)}. New total: **${fmtPoints(ended.paid.after)}**.${logged}`;
 }
 
 /** Start / Pause / End on a member's own panel. */
@@ -651,7 +772,12 @@ async function handleShiftButton(
     );
   }
   if (verb === "end") {
-    const ended = await endShift(ctx.guildId, actor.id, actor.id);
+    const ended = await endShift(
+      ctx.guildId,
+      actor.id,
+      actor.id,
+      ctx.config.doublePointsUntil
+    );
     return panelWith(ended.ok ? await endedLine(ctx, "Your", ended.shift) : ended.message);
   }
   return text("Unknown control.");
@@ -704,7 +830,12 @@ async function handleShiftAdminButton(
       return panelWith(started.ok ? `Started a shift for ${who}.` : started.message);
     }
     case "end": {
-      const ended = await endShift(ctx.guildId, target, actorOf(ctx.interaction).id);
+      const ended = await endShift(
+        ctx.guildId,
+        target,
+        actorOf(ctx.interaction).id,
+        ctx.config.doublePointsUntil
+      );
       return panelWith(ended.ok ? await endedLine(ctx, `${who}'s`, ended.shift) : ended.message);
     }
     case "add":
@@ -721,6 +852,8 @@ async function handleShiftAdminButton(
       });
     }
     case "deleteyes": {
+      const slowed = await throttle(SECURITY, ctx.interaction, ctx.config, "points");
+      if (slowed) return text(slowed);
       const deleted = await deleteShift(ctx.guildId, target);
       return panelWith(
         deleted.ok
@@ -758,6 +891,9 @@ async function handleShiftTimeModal(
     return panelWith(added.ok ? `Added ${shown} to ${mention(target)}'s shift.` : added.message);
   }
   if (verb !== "settime") return text("Unknown form.");
+  // Setting can take time away, which is a point removal by another route.
+  const slowed = await throttle(SECURITY, ctx.interaction, ctx.config, "points");
+  if (slowed) return text(slowed);
   const set = await setShiftTime(ctx.guildId, target, minutes);
   return panelWith(
     set.ok
@@ -804,7 +940,7 @@ function handleAnnounce(ctx: Ctx, opts: Opts): InteractionResponse {
       custom_id: `council:say:${colour}:${channelId}`,
       title: "New announcement",
       components: [
-        input("title", "Title", 1, true, 256, "COUNCIL NOTICE"),
+        input("title", "Title", 1, true, 256, "CRIMSON HAND NOTICE"),
         input("body", "Message", 2, true, 4000, "Markdown works here. **Bold**, *italics*, lists."),
         input("footer", "Footer (optional)", 1, false, 2048, "— Hands of the O5"),
       ],
@@ -834,38 +970,70 @@ async function postAnnouncement(
     const hint =
       posted.status === 0
         ? " This is a deployment problem, not a channel one: check COUNCIL_BOT_TOKEN in the hosting environment and redeploy."
-        : " Check The Council can view that channel and send messages with embeds in it.";
+        : " Check The Crimson Hand can view that channel and send messages with embeds in it.";
     return text(`That could not be posted to <#${channelId}>: ${posted.error}${hint}`);
   }
   return text(`Posted to <#${channelId}>.`);
 }
 
-// --- /council ---------------------------------------------------------------
+// --- /crimson ---------------------------------------------------------------
 
-async function handleCouncil(
+async function handleCrimson(
   ctx: Ctx,
   path: string,
   opts: Opts
 ): Promise<InteractionResponse> {
   const { interaction, guildId } = ctx;
   if (!isHands(ctx.member, ctx.config)) {
-    return refuse("change The Council's configuration", "the Hands of the O5");
+    return refuse("change The Crimson Hand's configuration", "the Hands of the O5");
   }
+  const actor = actorOf(interaction);
+
+  /** Why the bot must not hand this role out, reported to the security
+   *  channel; null when it may. Checked here for a clear answer up front, and
+   *  again on every grant (lib/discord/rest.ts), since roles can be edited. */
+  const unsafeRole = async (roleId: string, attempt: string) => {
+    const role = interaction.data?.resolved?.roles?.[roleId];
+    const problem = role ? roleGrantProblem(role, guildId) : null;
+    if (problem) {
+      await securityAlert(
+        SECURITY,
+        ctx.config,
+        "Unsafe Role Refused",
+        `${mention(actor.id)} tried to ${attempt}. ${problem}`
+      );
+    }
+    return problem;
+  };
 
   if (path === "setup") {
+    // Who holds full control of the bot, and where its alarms go, are for
+    // server administrators alone. Hands who could change either could give
+    // the bot away or quietly silence its security alerts.
+    if (
+      (id(opts, "hands_role") || id(opts, "security_channel")) &&
+      !isGuildAdmin(ctx.member)
+    ) {
+      return text(
+        "Only server administrators can change the Hands of the O5 role or the security channel. Nothing was saved."
+      );
+    }
+
     const patch: Partial<CouncilConfig> = { guildId };
-    const map: [string, keyof CouncilConfig][] = [
+    // Every setting ending in "Id" holds a role or channel id (a string).
+    const map: [string, keyof CouncilConfig & `${string}Id`][] = [
       ["hands_role", "handsRoleId"],
       ["scarlet_role", "scarletRoleId"],
       ["member_role", "memberRoleId"],
       ["announce_channel", "announceChannelId"],
+      ["security_channel", "securityChannelId"],
     ];
-    let changed = 0;
+    const changed: string[] = [];
     for (const [option, field] of map) {
       const value = id(opts, option);
       if (value) {
         patch[field] = value;
-        changed += 1;
+        changed.push(`\`${option}\``);
       }
     }
     const webhook = str(opts, "points_webhook").trim();
@@ -877,12 +1045,19 @@ async function handleCouncil(
           "That is not a Discord webhook URL. In the channel's settings go to **Integrations → Webhooks → New Webhook → Copy Webhook URL**, and paste that. Nothing was saved."
         );
       }
-      changed += 1;
+      changed.push("`points_webhook`");
     }
-    if (changed === 0) {
-      return text("Nothing to change. Pass at least one role or channel, or run `/council settings` to see what is set.");
+    if (changed.length === 0) {
+      return text("Nothing to change. Pass at least one role or channel, or run `/crimson settings` to see what is set.");
     }
     const saved = await saveCouncilConfig(patch);
+    await securityAlert(
+      SECURITY,
+      saved,
+      "Settings Changed",
+      `${mention(actor.id)} changed ${listOf(changed)} with \`/crimson setup\`.`,
+      COLOR.info
+    );
     return reply({ embeds: [settingsEmbed(saved, ctx.divisions)] });
   }
 
@@ -896,16 +1071,36 @@ async function handleCouncil(
       ["review_channel", "reviewChannelId"],
       ["division_role", "divisionRoleId"],
     ];
+    const changed: string[] = [];
     for (const [option, field] of map) {
       const value = id(opts, option);
-      if (value) patch[field] = value;
+      if (value) {
+        patch[field] = value;
+        changed.push(`\`${option}\``);
+      }
     }
-    if (Object.keys(patch).length === 0) {
+    if (changed.length === 0) {
       return text("Nothing to change. Pass at least one role or channel.");
+    }
+    // The division role is handed to everyone assigned, so it is checked like
+    // a rank. The HR and staff roles are never handed out by the bot.
+    if (patch.divisionRoleId) {
+      const unsafe = await unsafeRole(
+        patch.divisionRoleId,
+        `make ${roleMention(patch.divisionRoleId)} the ${divisionLabel(division)} division role`
+      );
+      if (unsafe) return text(`${unsafe} Nothing was saved.`);
     }
     // Remember the server id too: the first config command run may be this one.
     if (!ctx.config.guildId) await saveCouncilConfig({ guildId });
     const saved = await saveDivisionConfig(guildId, division, patch);
+    await securityAlert(
+      SECURITY,
+      ctx.config,
+      "Settings Changed",
+      `${mention(actor.id)} changed ${listOf(changed)} for ${divisionLabel(division)} with \`/crimson division\`.`,
+      COLOR.info
+    );
     return reply({
       embeds: [
         settingsEmbed(ctx.config, { ...ctx.divisions, [division]: saved }),
@@ -953,6 +1148,11 @@ async function handleCouncil(
     if (roleId === ctx.config.handsRoleId || roleId === ctx.config.scarletRoleId) {
       return text("Hands of the O5 and Scarlet Representative are handpicked and cannot be put on a ladder.");
     }
+    const unsafe = await unsafeRole(
+      roleId,
+      `put ${roleMention(roleId)} on the ${divisionLabel(division)} ladder`
+    );
+    if (unsafe) return text(`${unsafe} Nothing was saved.`);
     const points = num(opts, "points");
     const label =
       str(opts, "label") ||
@@ -981,6 +1181,13 @@ async function handleCouncil(
       band,
       applicationUrl,
     });
+    await securityAlert(
+      SECURITY,
+      ctx.config,
+      "Ladder Changed",
+      `${mention(actor.id)} put ${roleMention(roleId)} on the ${divisionLabel(division)} ladder at **${rung.points}** points.`,
+      COLOR.info
+    );
     const moved = movedFrom
       ? ` It was moved here from **${divisionLabel(movedFrom)}**, since a role can only sit on one ladder.`
       : "";
@@ -988,12 +1195,21 @@ async function handleCouncil(
       ? ` Members also need to fill in the [application form](${rung.applicationUrl}).`
       : "";
     return text(
-      `**${label}** (${roleMention(roleId)}) now sits in **${divisionLabel(division)}** at **${points}** points.${moved}${gate} Check the order with \`/council rank list\`.`
+      `**${label}** (${roleMention(roleId)}) now sits in **${divisionLabel(division)}** at **${points}** points.${moved}${gate} Check the order with \`/crimson rank list\`.`
     );
   }
 
   if (path === "rank remove") {
     const removed = await removeRung(guildId, id(opts, "role"));
+    if (removed) {
+      await securityAlert(
+        SECURITY,
+        ctx.config,
+        "Ladder Changed",
+        `${mention(actor.id)} took ${roleMention(removed.roleId)} off the ${divisionLabel(removed.division)} ladder.`,
+        COLOR.info
+      );
+    }
     return text(
       removed
         ? `Removed **${removed.label}** from ${divisionLabel(removed.division)}. Nobody's roles were changed.`
@@ -1024,7 +1240,13 @@ function settingsEmbed(config: CouncilConfig, divisions: DivisionConfigs): Embed
       value: config.pointsWebhookUrl ? "Webhook set" : "_not set_",
       inline: true,
     },
-    { name: "​", value: "​", inline: true },
+    {
+      name: "Security alerts",
+      value: config.securityChannelId
+        ? channel(config.securityChannelId)
+        : "_not set: see `/security status`_",
+      inline: true,
+    },
   ];
 
   for (const key of DIVISION_KEYS) {
@@ -1143,6 +1365,8 @@ async function handleModal(ctx: Ctx): Promise<InteractionResponse> {
     if (!isScarlet(ctx.member, ctx.config)) {
       return refuse("post announcements", "Scarlet Representatives and the Hands of the O5");
     }
+    const slowed = await throttle(SECURITY, ctx.interaction, ctx.config, "announce");
+    if (slowed) return text(slowed);
     return postAnnouncement(parsed.id, parsed.verb, field);
   }
 
@@ -1185,6 +1409,57 @@ async function refreshedEmbed(requestId: string): Promise<InteractionResponse | 
 
 // --- entry point ------------------------------------------------------------
 
+/**
+ * Commands too slow to answer inside Discord's three seconds.
+ *
+ * /division assign and remove chain several database reads with one or more
+ * role calls before they can say anything, and on a cold start that overruns
+ * the window ("The application did not respond"). These are acknowledged
+ * straight away as a private "thinking…" and the result is edited in after.
+ * Every reply they give is private, so deferring them privately loses nothing.
+ */
+export function shouldDefer(interaction: Interaction): boolean {
+  if (interaction.type !== InteractionType.ApplicationCommand) return false;
+  if (interaction.data?.name !== "division") return false;
+  const { path } = route(interaction.data?.options);
+  return path === "assign" || path === "remove";
+}
+
+/**
+ * The commands and controls that only look things up, and so keep working in
+ * a lockdown. Anything not listed counts as a change, so a command added later
+ * is frozen by a lockdown until someone decides otherwise. /security is listed
+ * because it has to work during one; it checks its own permissions.
+ */
+const READ_ONLY = new Set([
+  "points check",
+  "points history",
+  "leaderboard",
+  "promote list",
+  "division info",
+  "shift manage", // posts the panel; its buttons are the changes
+  "shift active",
+  "shift admin",
+  "announce", // only opens the compose box; posting it is the modal
+  "crimson settings",
+  "crimson rank list",
+  "security lockdown",
+  "security unlock",
+  "security status",
+]);
+
+function accessOf(interaction: Interaction): Access {
+  if (interaction.type === InteractionType.MessageComponent) {
+    // Redrawing a shift panel (and "Cancel" on a delete) changes nothing.
+    const parsed = parseCustomId(interaction.data?.custom_id ?? "");
+    return parsed?.area === "shiftadm" && parsed.verb === "panel" ? "read" : "write";
+  }
+  if (interaction.type !== InteractionType.ApplicationCommand) return "write";
+  const name = interaction.data?.name ?? "";
+  const { path } = route(interaction.data?.options);
+  return READ_ONLY.has(path ? `${name} ${path}` : name) ? "read" : "write";
+}
+
 export async function handleInteraction(
   interaction: Interaction
 ): Promise<InteractionResponse> {
@@ -1193,7 +1468,7 @@ export async function handleInteraction(
   }
 
   const guildId = interaction.guild_id;
-  if (!guildId) return text("The Council only works inside the server, not in DMs.");
+  if (!guildId) return text("The Crimson Hand only works inside the server, not in DMs.");
 
   const [config, divisions] = await Promise.all([
     getCouncilConfig(),
@@ -1201,8 +1476,13 @@ export async function handleInteraction(
   ]);
   const ctx: Ctx = { interaction, member: interaction.member, guildId, config, divisions };
 
+  // The anti-nuke gate (lib/discord/guard.ts): this server only, never while
+  // the bot holds dangerous permissions, and no changes during a lockdown.
+  const blocked = securityGate(SECURITY, interaction, config, accessOf(interaction));
+  if (blocked) return text(blocked);
+
   if (!isMember(ctx.member, config, divisions)) {
-    return text("You do not have clearance to use The Council.");
+    return text("You do not have clearance to use The Crimson Hand.");
   }
 
   if (interaction.type === InteractionType.MessageComponent) return handleComponent(ctx);
@@ -1225,8 +1505,15 @@ export async function handleInteraction(
       return handleShift(ctx, path, opts);
     case "announce":
       return handleAnnounce(ctx, opts);
-    case "council":
-      return handleCouncil(ctx, path, opts);
+    case "crimson":
+      return handleCrimson(ctx, path, opts);
+    case "security":
+      return reply(
+        await handleSecurity(SECURITY, interaction, config, path, {
+          canEngage: isScarlet(ctx.member, config),
+          reason: str(opts, "reason"),
+        })
+      );
     default:
       return text("Unknown command.");
   }

@@ -34,6 +34,51 @@ const reasonOption = {
   max_length: 200,
 };
 
+/**
+ * /security: the anti-nuke controls, the same on both bots and answered by
+ * lib/discord/guard.ts. Unlike the rest, these descriptions do say who may use
+ * them, because nobody should have to find out mid-incident.
+ */
+export const SECURITY_COMMAND = {
+  name: "security",
+  description: "Anti-nuke controls: lock the bot down, lift a lockdown, check the setup",
+  options: [
+    {
+      name: "lockdown",
+      description: "Freeze every role, point and settings change until an admin lifts it",
+      type: OptionType.SubCommand,
+      options: [
+        {
+          name: "reason",
+          description: "Why (posted to the security channel)",
+          type: OptionType.String,
+          required: false,
+          max_length: 300,
+        },
+      ],
+    },
+    {
+      name: "unlock",
+      description: "Lift a lockdown (server administrators only)",
+      type: OptionType.SubCommand,
+    },
+    {
+      name: "status",
+      description: "Lockdown state, plus a check of the bot's permissions and role position",
+      type: OptionType.SubCommand,
+    },
+  ],
+} as const;
+
+/** The setup option for where security alerts go. Admin-only, enforced at runtime. */
+export const securityChannelOption = {
+  name: "security_channel",
+  description: "Where security alerts are posted (server administrators only)",
+  type: OptionType.Channel,
+  channel_types: [0, 5],
+  required: false,
+} as const;
+
 export const COMMANDS = [
   {
     name: "points",
@@ -194,6 +239,7 @@ export const COMMANDS = [
             required: false,
             max_length: 200,
           },
+          securityChannelOption,
         ],
       },
       {
@@ -263,4 +309,5 @@ export const COMMANDS = [
       },
     ],
   },
+  SECURITY_COMMAND,
 ] as const;

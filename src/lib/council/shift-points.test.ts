@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { formatDuration, parseMinutes, shiftPoints } from "./shift-points";
+import {
+  DOUBLE_POINTS,
+  formatDuration,
+  parseMinutes,
+  shiftMultiplier,
+  shiftPoints,
+} from "./shift-points";
 
 // The conversion table from shift-points.ts, pinned at every boundary.
 
@@ -73,5 +79,19 @@ describe("parseMinutes", () => {
 
   it.each(["", "abc", "1.5", "-10", "1:75", "h", "99999"])("rejects %j", (input) => {
     expect(parseMinutes(input)).toBeNull();
+  });
+});
+
+describe("shiftMultiplier", () => {
+  const at = new Date("2026-09-28T12:00:00Z");
+
+  it("doubles a shift that ends inside the window", () => {
+    expect(shiftMultiplier(new Date("2026-09-28T12:00:01Z"), at)).toBe(DOUBLE_POINTS);
+  });
+
+  it("pays normally once the window has closed, or when there is none", () => {
+    expect(shiftMultiplier(new Date("2026-09-28T12:00:00Z"), at)).toBe(1);
+    expect(shiftMultiplier(new Date("2026-09-28T11:00:00Z"), at)).toBe(1);
+    expect(shiftMultiplier(null, at)).toBe(1);
   });
 });

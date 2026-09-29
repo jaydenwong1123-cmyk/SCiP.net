@@ -16,7 +16,7 @@ dotenv.config();
 // Upload a bot's command set to Discord.
 //
 //   npm run bot:register       The Engine   (DISCORD_* variables)
-//   npm run council:register   The Council  (COUNCIL_* variables)
+//   npm run council:register   The Crimson Hand  (COUNCIL_* variables)
 //
 // WHY THIS IS A SCRIPT AND NOT PART OF THE APP. Discord stores the command list
 // itself — the names, the options, the pickers members see — separately from

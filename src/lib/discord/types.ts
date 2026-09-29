@@ -17,6 +17,8 @@ export const InteractionType = {
 export const InteractionResponseType = {
   Pong: 1,
   ChannelMessageWithSource: 4,
+  /** "Thinking…" now; the real reply is edited in within 15 minutes. */
+  DeferredChannelMessageWithSource: 5,
   /** Edits the message the pressed component lives on. */
   UpdateMessage: 7,
   Modal: 9,
@@ -84,10 +86,24 @@ export type InteractionMember = {
   permissions?: string;
 };
 
+/** A server role, as GET /guilds/{id}/roles and a role option's resolved data
+ *  both describe it. */
+export type GuildRole = {
+  id: string;
+  name: string;
+  /** Bitfield as a decimal string. */
+  permissions?: string;
+  position?: number;
+  /** Owned by a bot or integration (a bot's own role, the booster role). */
+  managed?: boolean;
+  /** `bot_id` is set on the role Discord creates for a bot when it joins. */
+  tags?: { bot_id?: string };
+};
+
 export type ResolvedData = {
   users?: Record<string, InteractionUser>;
   members?: Record<string, Omit<InteractionMember, "user">>;
-  roles?: Record<string, { id: string; name: string }>;
+  roles?: Record<string, GuildRole>;
   channels?: Record<string, { id: string; name: string; type: number }>;
 };
 
@@ -100,6 +116,9 @@ export type Interaction = {
   channel_id?: string;
   member?: InteractionMember;
   user?: InteractionUser;
+  /** What the bot itself may do in the channel this came from, as a decimal
+   *  bitfield. Includes everything its roles grant it server-wide. */
+  app_permissions?: string;
   data?: {
     id?: string;
     name?: string;

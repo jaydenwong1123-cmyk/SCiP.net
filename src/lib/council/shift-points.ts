@@ -51,6 +51,26 @@ export function shiftPoints(minutes: number): number {
   return 0;
 }
 
+// DOUBLE POINTS.
+//
+// A Scarlet Representative can open a window (/shift double start) in which
+// every shift pays twice the table above. What counts is when the shift ENDS:
+// a shift ended inside the window is doubled in full, one ended after it is
+// not, however much of it fell inside. That keeps the rule easy to state on
+// the panels — "end before <time> for 2×" — and needs nothing stored per shift.
+
+export const DOUBLE_POINTS = 2;
+
+/** Longest window one /shift double start may open: 48 hours. */
+export const MAX_DOUBLE_MINUTES = 48 * 60;
+
+/** What a shift ending at `at` is multiplied by. */
+export function shiftMultiplier(doublePointsUntil: Date | null, at: Date): number {
+  return doublePointsUntil && doublePointsUntil.getTime() > at.getTime()
+    ? DOUBLE_POINTS
+    : 1;
+}
+
 /** "8 hours, 7 minutes, 2 seconds" — zero parts left out. */
 export function formatDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));

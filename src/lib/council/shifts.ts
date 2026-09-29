@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import type { AdjustResult } from "@/lib/engine/points";
 import { isDivision, type DivisionKey } from "./divisions";
 import { adjustPoints } from "./points";
-import { formatDuration, shiftPoints } from "./shift-points";
+import { formatDuration, shiftMultiplier, shiftPoints } from "./shift-points";
 
 // THE SHIFT TIMER.
 //
@@ -15,7 +15,8 @@ import { formatDuration, shiftPoints } from "./shift-points";
 //                + whatever HR has added or taken away
 //
 // Ending a shift freezes that number, converts it to points
-// (./shift-points.ts), and pays them into the division the shift was worked in.
+// (./shift-points.ts), doubles them if double points are on, and pays them into
+// the division the shift was worked in.
 
 const activeKey = (guildId: string, discordId: string) => `${guildId}:${discordId}`;
 
@@ -168,6 +169,8 @@ export type EndedShift = {
   seconds: number;
   points: number;
   division: DivisionKey | null;
+  /** 2 when double points were on as the shift ended, otherwise 1. */
+  multiplier: number;
   /** The balance change, when any points were paid. */
   paid: AdjustResult | null;
   reason: string;
@@ -176,14 +179,17 @@ export type EndedShift = {
 export async function endShift(
   guildId: string,
   discordId: string,
-  actorId: string
+  actorId: string,
+  /** The server's double-points window (CouncilConfig.doublePointsUntil). */
+  doublePointsUntil: Date | null
 ): Promise<ShiftOutcome<EndedShift>> {
   const shift = await getActiveShift(guildId, discordId);
   if (!shift) return { ok: false, message: "Not on shift." };
 
   const now = new Date();
   const seconds = shiftSeconds(shift, now);
-  const points = shiftPoints(seconds / 60);
+  const multiplier = shiftMultiplier(doublePointsUntil, now);
+  const points = shiftPoints(seconds / 60) * multiplier;
 
   // Claim the shift before paying for it: clearing activeKey only succeeds
   // once, so a double-pressed End cannot pay out twice.
@@ -204,7 +210,7 @@ export async function endShift(
   if (claimed.count === 0) return { ok: false, message: "That shift has already ended." };
 
   const division = isDivision(shift.division) ? shift.division : null;
-  const reason = `Shift: ${formatDuration(seconds)}`;
+  const reason = `Shift: ${formatDuration(seconds)}${multiplier > 1 ? ` (${multiplier}× points)` : ""}`;
   const paid =
     points > 0 && division
       ? await adjustPoints({
@@ -225,6 +231,7 @@ export async function endShift(
       seconds,
       points,
       division,
+      multiplier,
       paid,
       reason,
     },
