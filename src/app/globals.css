@@ -70,11 +70,12 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: var(--term-bg);
+}
+
 html,
 body {
-  background-color: var(--term-bg);
-  background-image: var(--term-bg-image);
-  background-attachment: fixed;
   color: var(--term-fg);
   font-family: var(--term-font);
   font-size: var(--term-size);
@@ -85,6 +86,21 @@ body {
 body {
   position: relative;
   overflow-x: hidden;
+}
+
+/* The custom gradient, pinned to the viewport as its own layer. Not
+   background-attachment: fixed — that repaints on every scroll (flickering
+   under the scanline blend) and is ignored outright by iOS Safari, which
+   stretches the gradient down the whole document instead. A fixed box is
+   composited once and never moves. It sits at z -1: above the html
+   background colour, below everything else, so body must stay transparent. */
+html::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image: var(--term-bg-image);
 }
 
 /* ---------------------------------------------------------------------------

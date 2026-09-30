@@ -25,7 +25,7 @@ export type QuartermasterGradient = { from: string; to: string } | null;
 
 // The stops the preview falls back to while a stop is blank or half-typed, so
 // the swatch never collapses to nothing mid-edit.
-const PREVIEW_FALLBACK = { from: "#1e8f3d", to: "#050705" };
+const PREVIEW_FALLBACK = { from: "#8b0000", to: "#000000" };
 
 /**
  * Issue intrusion tooling to a member, and set your own background while
@@ -227,7 +227,7 @@ function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
               value={from}
               onChange={(e) => setFrom(e.target.value)}
               maxLength={7}
-              placeholder="#33FF66"
+              placeholder="#8B0000"
               spellCheck={false}
               autoComplete="off"
               aria-invalid={from.trim() !== "" && !fromOk}
@@ -242,7 +242,7 @@ function GradientEditor({ gradient }: { gradient: QuartermasterGradient }) {
               value={to}
               onChange={(e) => setTo(e.target.value)}
               maxLength={7}
-              placeholder="#050705"
+              placeholder="#000000"
               spellCheck={false}
               autoComplete="off"
               aria-invalid={to.trim() !== "" && !toOk}
