@@ -1,5 +1,6 @@
 import { enforceMaintenance, enforceShutdown } from "@/lib/site-config";
 import { enforceSentinel } from "@/lib/session";
+import { LegalLinks } from "@/components/legal-links";
 
 // The maintenance gate must run on every request, so this segment (login /
 // register / set-name) can't be statically prerendered.
@@ -39,8 +40,10 @@ export default async function AuthLayout({
           {children}
         </div>
       </div>
-      <div className="hud-banner hud-banner--ts">
+      <div className="hud-banner hud-banner--ts flex-wrap">
         <span>ALL ACCESS ATTEMPTS ARE LOGGED AND TRACED</span>
+        <span aria-hidden>{"//"}</span>
+        <LegalLinks />
       </div>
     </div>
   );

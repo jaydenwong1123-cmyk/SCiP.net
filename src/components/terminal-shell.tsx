@@ -7,6 +7,7 @@ import { CommandRail } from "@/components/command-rail";
 import { UtcClock } from "@/components/utc-clock";
 import { NotificationBell, type NotificationRow } from "@/components/notification-bell";
 import { StationBreadcrumb } from "@/components/station-breadcrumb";
+import { LegalLinks } from "@/components/legal-links";
 import type { BadgeCounts, Section } from "@/lib/sections";
 
 export function TerminalShell({
@@ -104,8 +105,10 @@ export function TerminalShell({
           </main>
         </div>
 
-        <footer className="hud-banner hud-banner--ts">
+        <footer className="hud-banner hud-banner--ts flex-wrap">
           <span>UNAUTHORIZED DISCLOSURE PUNISHABLE UNDER SITE DIRECTIVE 1-C</span>
+          <span aria-hidden>{"//"}</span>
+          <LegalLinks />
         </footer>
       </div>
     </div>

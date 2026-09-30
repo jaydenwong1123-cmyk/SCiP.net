@@ -19,8 +19,16 @@ const { auth } = NextAuth(authConfig);
 // `/terminated` is public because a full site shutdown darkens the login screen
 // too — there would otherwise be nowhere for a signed-out visitor to land.
 // `/sentinel` is deliberately NOT public: it is only ever reached by an
-// already-authenticated owner.
-const PUBLIC_PATHS = ["/login", "/register", "/maintenance", "/terminated"];
+// already-authenticated owner. `/privacy` and `/terms` are public so a visitor
+// can read them before registering.
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/maintenance",
+  "/terminated",
+  "/privacy",
+  "/terms",
+];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
