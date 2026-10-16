@@ -1,8 +1,13 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
-import { canPostBroadcast, authoringClearance } from "@/lib/clearance";
-import { canEditBroadcast } from "@/lib/doc-permissions";
+import {
+  canPostBroadcast,
+  authoringClearance,
+  clearanceLabel,
+} from "@/lib/clearance";
+import { canEditBroadcast, canReadBroadcast } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
 import {
   liveBroadcastWhere,
@@ -31,8 +36,24 @@ export default async function BroadcastsPage() {
   // its scheduled and expired ones, so a pending notice isn't invisible to
   // the person who scheduled it.
   const canSeeAllSchedules = hasAdminPowers(user) || canPostBroadcast(authoringClearance(user));
+  // A directive is also aimed at a minimum clearance. The query narrows to what
+  // this viewer may read (their own and, for admins, everything); the filter
+  // below re-checks each row with the same rule so the two cannot drift apart.
+  const audienceWhere: Prisma.BroadcastWhereInput = canManage
+    ? {}
+    : {
+        OR: [
+          { clearanceRequired: { lte: user.clearance } },
+          { authorId: user.id },
+        ],
+      };
   const broadcasts = await db.broadcast.findMany({
-    where: canSeeAllSchedules ? undefined : liveBroadcastWhere(now),
+    where: {
+      AND: [
+        audienceWhere,
+        canSeeAllSchedules ? {} : liveBroadcastWhere(now),
+      ],
+    },
     orderBy: { createdAt: "desc" },
     include: { author: { select: { displayName: true } } },
   });
@@ -40,6 +61,7 @@ export default async function BroadcastsPage() {
   // For privileged viewers, a directive they can't edit should still only show
   // if it's live — being able to post doesn't mean seeing someone else's draft.
   const visible = broadcasts.filter((b) => {
+    if (!canReadBroadcast(user, b)) return false;
     if (scheduleState(b, now) === "live") return true;
     return canEditBroadcast(user, b);
   });
@@ -72,7 +94,7 @@ export default async function BroadcastsPage() {
 
       {canPostBroadcast(authoringClearance(user)) && (
         <HudPanel code="01" title="ISSUE DIRECTIVE" status="SITE-WIDE">
-          <BroadcastForm />
+          <BroadcastForm maxClearance={authoringClearance(user)} />
         </HudPanel>
       )}
 
@@ -116,7 +138,12 @@ export default async function BroadcastsPage() {
               </span>
             </div>
             <div className="flex flex-wrap justify-between gap-x-3 text-xs">
-              <span className="hud-recid">{b.author.displayName}</span>
+              <span className="hud-recid">
+                {b.author.displayName} —{" "}
+                {b.clearanceRequired <= 1
+                  ? "ALL PERSONNEL"
+                  : `${clearanceLabel(b.clearanceRequired)}+ ONLY`}
+              </span>
               <span className="hud-recid">
                 {b.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                 {b.updatedAt && ` — AMENDED (REV ${b.revisionCount})`}

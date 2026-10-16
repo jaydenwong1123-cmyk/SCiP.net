@@ -70,9 +70,13 @@ export function Tutorial() {
                   redaction box.
                 </li>
                 <li>
-                  <code className="text-[var(--term-fg)]">[*secret*][O5]</code> or{" "}
-                  <code className="text-[var(--term-fg)]">[OMNI]</code> — restrict
-                  to L-O5 / L-OMNI.
+                  <code className="text-[var(--term-fg)]">[*secret*][TOP SECRET]</code>,{" "}
+                  <code className="text-[var(--term-fg)]">[*secret*][OMNI]</code>{" "}
+                  or{" "}
+                  <code className="text-[var(--term-fg)]">[*secret*][NULL]</code> —
+                  the level can be a number (1-7) or its name: DECLASSIFIED,
+                  RESTRICTED, CONFIDENTIAL, TOP SECRET, COSMIC TOP SECRET, OMNI
+                  or NULL.
                 </li>
               </ul>
             </section>

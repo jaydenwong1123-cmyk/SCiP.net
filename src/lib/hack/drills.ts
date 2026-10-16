@@ -1,4 +1,4 @@
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceCode } from "@/lib/clearance";
 import { eligibleGames } from "@/lib/hack/games";
 
 // The training range — client-safe half.
@@ -22,8 +22,9 @@ import { eligibleGames } from "@/lib/hack/games";
 
 // The difficulty axis. This is `band` — the number a game's minBand/maxBand
 // window is checked against — NOT the `tier` a ladder stage banks. The two are
-// distinct and only incidentally overlap. Labelled with clearanceLabel() so
-// L-1..L-5 read the same here as everywhere else in the app.
+// distinct and only incidentally overlap. Labelled with clearanceCode() so
+// L-1..L-5 read as the same compact codes the clearance ladder uses, without
+// the classification words that would overflow the band buttons.
 export const DRILL_BANDS = [1, 2, 3, 4, 5] as const;
 
 export type DrillBand = (typeof DRILL_BANDS)[number];
@@ -33,7 +34,7 @@ export function isDrillBand(value: number): value is DrillBand {
 }
 
 export function drillBandLabel(band: number): string {
-  return clearanceLabel(band);
+  return clearanceCode(band);
 }
 
 /** The roster the console renders, as plain data. */

@@ -36,7 +36,7 @@ export function canAnnotateMembers(user: {
 }
 
 // Holders of the per-member personnel-file grant, RAISA recordkeepers (the
-// L-R5 designation), and staff/admin/owner. RAISA are the custodians of
+// R5 designation), and staff/admin/owner. RAISA are the custodians of
 // personnel records, so they may rewrite any member's personal file, not only
 // their own; the explicit grant lets the same duty be handed to anyone else.
 // Mirrors the RAISA definition used for the message logs — clearance rank alone
@@ -82,7 +82,7 @@ export const getCurrentUser = cache(async () => {
     return {
       ...user,
       clearance: viewAs,
-      // An alternate designation (E5 / R5) is an identity at rank 6; carrying
+      // The RAISA recordkeeper designation (R5) is an identity at rank 6; carrying
       // it into a rank-2 persona would be nonsense.
       designation: null,
       isOwner: false,
@@ -94,7 +94,7 @@ export const getCurrentUser = cache(async () => {
       viewAsClearance: viewAs,
       // A simulation suppresses an intrusion grant outright. "View as" exists
       // to see LESS, so a banner reading "SIMULATING L-1 (ACTUAL L-1, ILLICIT
-      // L-O5)" would be incoherent — and canViewAs already requires a real
+      // L-6)" would be incoherent — and canViewAs already requires a real
       // rank of 5, which no grant-boosted member has.
       hackClearance: null,
       hackGrantExpiresAt: null,
@@ -175,10 +175,10 @@ export async function requireUser() {
 //                          MAX_CO_OWNERS members at a time (see roles.ts).
 //                          Cannot be demoted/suspended/deleted by anyone but
 //                          the owner, and cannot appoint a fellow Co-Owner.
-//   Admin    (isAdmin)   — owner-level powers: delete accounts, grant L-OMNI,
+//   Admin    (isAdmin)   — owner-level powers: delete accounts, grant L-7 (NULL),
 //                          grant/revoke Staff, plus everything Staff can do.
 //   Staff    (isStaff)   — elevated panel access: rename, set clearance (below
-//                          L-OMNI), toggle SCP-post, delete SCP files, invite
+//                          L-7), toggle SCP-post, delete SCP files, invite
 //                          codes, review clearance requests.
 //   Helper   (isHelper)  — sits directly below Staff and carries no power over
 //                          another member. It works the General Assistance

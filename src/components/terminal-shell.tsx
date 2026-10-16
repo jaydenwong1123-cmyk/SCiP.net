@@ -39,7 +39,7 @@ export function TerminalShell({
   /** Full-bleed session-state strips (view-as simulation, illicit grant). */
   banners?: React.ReactNode;
 }) {
-  const accent = clearanceAccent(user.clearance, user.designation);
+  const accent = clearanceAccent(user.clearance);
   const rank = clearanceDisplay(user.clearance, user.designation);
 
   return (
@@ -55,7 +55,7 @@ export function TerminalShell({
         <div className="hud-banner hud-banner--ts">
           <span>TOP SECRET</span>
           <span aria-hidden>{"//"}</span>
-          <span>SCiP-147</span>
+          <span>SCiP-NULL</span>
           <span aria-hidden>{"//"}</span>
           <span>NOFORN</span>
         </div>
@@ -65,7 +65,7 @@ export function TerminalShell({
           <span className="hud-statusbar__sep" aria-hidden>
             │
           </span>
-          <span className="text-[var(--term-amber)]">FACILITY-147</span>
+          <span className="text-[var(--term-amber)]">FACILITY-NULL</span>
           <StationBreadcrumb />
 
           <div className="hud-statusbar__right">

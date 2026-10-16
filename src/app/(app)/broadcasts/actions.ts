@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, requireAdminPowers } from "@/lib/session";
-import { canPostBroadcast, authoringClearance } from "@/lib/clearance";
+import {
+  canPostBroadcast,
+  authoringClearance,
+  MIN_CLEARANCE,
+  MAX_CLEARANCE,
+} from "@/lib/clearance";
 import { canEditBroadcast } from "@/lib/doc-permissions";
 import {
   REVISION_ENTITIES,
@@ -25,6 +30,30 @@ import {
   CONTENT_SCOPES,
 } from "@/lib/rate-limit";
 
+// The audience a directive is aimed at: the minimum clearance needed to read
+// it. A directive may be aimed no higher than the issuer's own authoring
+// clearance — an intrusion grant or a "view as" simulation changes what you can
+// read, never what you can broadcast — except that an unchanged value is always
+// accepted, so an admin can amend the text of a directive aimed above their own
+// rank without being forced to retarget it.
+function parseAudience(
+  raw: FormDataEntryValue | null,
+  authorRank: number,
+  unchangedFrom?: number
+): { ok: true; rank: number } | { ok: false; error: string } {
+  const rank = Number(raw);
+  if (!Number.isInteger(rank) || rank < MIN_CLEARANCE || rank > MAX_CLEARANCE) {
+    return { ok: false, error: "INVALID CLEARANCE LEVEL." };
+  }
+  if (rank > authorRank && rank !== unchangedFrom) {
+    return {
+      ok: false,
+      error: "YOU CANNOT AIM A BROADCAST ABOVE YOUR OWN CLEARANCE LEVEL.",
+    };
+  }
+  return { ok: true, rank };
+}
+
 export async function createBroadcastAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
@@ -42,6 +71,12 @@ export async function createBroadcastAction(
   if (!title || !body) {
     return { ok: false, error: "TITLE AND BODY ARE REQUIRED." };
   }
+  const audience = parseAudience(
+    formData.get("clearanceRequired"),
+    authoringClearance(user)
+  );
+  if (!audience.ok) return { ok: false, error: audience.error };
+
   const redactCheck = checkRedactionAuthorization(`${title}\n${body}`, user);
   if (!redactCheck.ok) {
     return {
@@ -78,6 +113,7 @@ export async function createBroadcastAction(
     data: {
       title: title.slice(0, 200),
       body: body.slice(0, 10000),
+      clearanceRequired: audience.rank,
       authorId: user.id,
       publishAt,
       expiresAt,
@@ -138,6 +174,13 @@ export async function updateBroadcastAction(
     return { ok: false, error: "TITLE AND BODY ARE REQUIRED." };
   }
 
+  const audience = parseAudience(
+    formData.get("clearanceRequired"),
+    authoringClearance(user),
+    existing.clearanceRequired
+  );
+  if (!audience.ok) return { ok: false, error: audience.error };
+
   const redactCheck = checkRedactionAuthorization(`${title}\n${body}`, user);
   if (!redactCheck.ok) {
     return {
@@ -151,7 +194,11 @@ export async function updateBroadcastAction(
 
   const nextTitle = title.slice(0, 200);
   const nextBody = body.slice(0, 10000);
-  if (nextTitle === existing.title && nextBody === existing.body) {
+  if (
+    nextTitle === existing.title &&
+    nextBody === existing.body &&
+    audience.rank === existing.clearanceRequired
+  ) {
     redirect("/broadcasts");
   }
 
@@ -169,7 +216,7 @@ export async function updateBroadcastAction(
     entityId: id,
     title: existing.title,
     body: existing.body,
-    meta: {},
+    meta: { clearanceRequired: existing.clearanceRequired },
     reason,
     editor: user,
   });
@@ -179,6 +226,7 @@ export async function updateBroadcastAction(
     data: {
       title: nextTitle,
       body: nextBody,
+      clearanceRequired: audience.rank,
       updatedAt: new Date(),
       revisionCount: { increment: 1 },
     },

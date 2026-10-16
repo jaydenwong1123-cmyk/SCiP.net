@@ -3,11 +3,14 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { updateBroadcastAction } from "../../actions";
+import { AudienceField } from "../../audience-field";
 
 export function EditBroadcastForm({
   broadcast,
+  maxClearance,
 }: {
-  broadcast: { id: string; title: string; body: string };
+  broadcast: { id: string; title: string; body: string; clearanceRequired: number };
+  maxClearance: number;
 }) {
   const [state, formAction, pending] = useActionState(updateBroadcastAction, null);
 
@@ -39,6 +42,10 @@ export function EditBroadcastForm({
           className="term-input resize-y"
         />
       </div>
+      <AudienceField
+        maxClearance={maxClearance}
+        current={broadcast.clearanceRequired}
+      />
       <div>
         <label className="block text-sm mb-1" htmlFor="reason">
           REVISION NOTE <span className="text-[var(--term-fg-dim)]">(OPTIONAL)</span>

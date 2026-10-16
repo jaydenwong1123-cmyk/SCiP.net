@@ -5,7 +5,6 @@ import {
   CLEARANCE_LEVELS,
   MAX_CLEARANCE,
   clearanceDisplay,
-  E5_DESIGNATION,
   R5_DESIGNATION,
 } from "@/lib/clearance";
 import { renderRedactedName, redactNameToText } from "@/lib/redact";
@@ -18,12 +17,10 @@ import {
   pickQuery,
 } from "@/lib/filters";
 
-// Within a single clearance rank, plain designations sort ahead of the
-// alternate ones so rank 6 reads L-O5, L-E5, L-R5.
+// Within a single clearance rank, plain members sort ahead of RAISA
+// recordkeepers.
 function designationWeight(designation?: string | null): number {
-  if (designation === E5_DESIGNATION) return 1;
-  if (designation === R5_DESIGNATION) return 2;
-  return 0;
+  return designation === R5_DESIGNATION ? 1 : 0;
 }
 
 export default async function PersonnelPage({
@@ -36,7 +33,7 @@ export default async function PersonnelPage({
 
   // Unlike the document registries, the level facet here is NOT capped at the
   // viewer's own rank: the roster already shows every member's clearance to
-  // everyone, so filtering by L-O5 discloses nothing the page did not.
+  // everyone, so filtering by L-6 discloses nothing the page did not.
   const activeLevel = pickRank(levelParam, 1, MAX_CLEARANCE);
   const query = pickQuery(qParam);
 
@@ -111,7 +108,7 @@ export default async function PersonnelPage({
   const filtered = hasActiveFilters(current);
 
   // The DB sort already orders by clearance (desc) then name; refine so that
-  // within a rank the alternate designations fall into L-O5, L-E5, L-R5 order.
+  // within a rank the RAISA recordkeepers fall in after everyone else.
   personnel.sort((a, b) => {
     if (a.clearance !== b.clearance) return b.clearance - a.clearance;
     const dw = designationWeight(a.designation) - designationWeight(b.designation);

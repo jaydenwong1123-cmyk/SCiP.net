@@ -100,7 +100,7 @@ function TraceLadder({ level, max }: { level: number; max: number }) {
   );
 }
 
-// L-R5 only — see canDeleteCounterIntelLog(). Checkbox selection plus a
+// RAISA recordkeeper only — see canDeleteCounterIntelLog(). Checkbox selection plus a
 // WIPE ALL escape hatch, both gated behind the same designation as the
 // per-case DeleteForm on the detail view.
 export function CaseList({

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { authoringClearance } from "@/lib/clearance";
 import { db } from "@/lib/db";
 import { canEditBroadcast } from "@/lib/doc-permissions";
 import { EditBroadcastForm } from "./edit-broadcast-form";
@@ -34,7 +35,9 @@ export default async function EditBroadcastPage({
             id: broadcast.id,
             title: broadcast.title,
             body: broadcast.body,
+            clearanceRequired: broadcast.clearanceRequired,
           }}
+          maxClearance={authoringClearance(user)}
         />
       </HudPanel>
     </>

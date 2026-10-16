@@ -123,7 +123,7 @@ export async function setClearanceAction(formData: FormData) {
   if (!userId || !parsed) return;
   const { clearance, designation } = parsed;
 
-  // Only owner/co-owner/admin may grant the top clearance (L-OMNI). Staff cap
+  // Only owner/co-owner/admin may grant the top clearance (L-7 NULL). Staff cap
   // below it.
   const canGrantTop = hasOwnerPowers(actor) || actor.isAdmin;
   if (clearance >= OWNER_CLEARANCE && !canGrantTop) return;
@@ -605,10 +605,10 @@ export async function bulkMemberAction(
     const parsed = parseClearanceAssignment(String(formData.get("clearance") ?? ""));
     if (!parsed) return { ok: false, error: "INVALID CLEARANCE LEVEL." };
     ({ clearance, designation } = parsed);
-    // Same caps as setClearanceAction: only admin+ may grant L-OMNI, and plain
+    // Same caps as setClearanceAction: only admin+ may grant L-7, and plain
     // Staff top out at L-3.
     if (clearance >= OWNER_CLEARANCE && !adminPowers) {
-      return { ok: false, error: "ONLY ADMIN AND ABOVE MAY GRANT L-OMNI." };
+      return { ok: false, error: "ONLY ADMIN AND ABOVE MAY GRANT L-7 (NULL)." };
     }
     if (!adminPowers && clearance > 3) {
       return { ok: false, error: "STAFF MAY ONLY ASSIGN UP TO L-3." };

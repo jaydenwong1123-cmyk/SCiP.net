@@ -2,8 +2,9 @@
 
 import { useActionState } from "react";
 import { createBroadcastAction } from "./actions";
+import { AudienceField } from "./audience-field";
 
-export function BroadcastForm() {
+export function BroadcastForm({ maxClearance }: { maxClearance: number }) {
   const [state, formAction, pending] = useActionState(createBroadcastAction, null);
 
   return (
@@ -20,6 +21,7 @@ export function BroadcastForm() {
         </label>
         <textarea id="body" name="body" required rows={6} className="term-input resize-y" />
       </div>
+      <AudienceField maxClearance={maxClearance} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm mb-1" htmlFor="publishAt">

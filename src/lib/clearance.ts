@@ -1,11 +1,24 @@
+// The clearance ladder. Seven levels, stored on every member as the integer
+// `rank` below:
+//
+//   L-1  Level-1 Security Clearance (DECLASSIFIED)
+//   L-2  Level-2 Security Clearance (RESTRICTED)
+//   L-3  Level-3 Security Clearance (CONFIDENTIAL)
+//   L-4  Level-4 Security Clearance (TOP SECRET)
+//   L-5  Level-5 Security Clearance (COSMIC TOP SECRET)
+//   L-6  Level-6 Security Clearance (OMNI)
+//   L-7  Level-7 Security Clearance (NULL)
+//
+// `label` is the compact code, `name` the classification word, `title` the
+// formal designation. Gates compare ranks, never strings.
 export const CLEARANCE_LEVELS = [
-  { rank: 1, label: "L-1" },
-  { rank: 2, label: "L-2" },
-  { rank: 3, label: "L-3" },
-  { rank: 4, label: "L-4" },
-  { rank: 5, label: "L-5" },
-  { rank: 6, label: "L-O5" },
-  { rank: 7, label: "L-OMNI" },
+  { rank: 1, label: "L-1", name: "DECLASSIFIED", title: "Level-1 Security Clearance" },
+  { rank: 2, label: "L-2", name: "RESTRICTED", title: "Level-2 Security Clearance" },
+  { rank: 3, label: "L-3", name: "CONFIDENTIAL", title: "Level-3 Security Clearance" },
+  { rank: 4, label: "L-4", name: "TOP SECRET", title: "Level-4 Security Clearance" },
+  { rank: 5, label: "L-5", name: "COSMIC TOP SECRET", title: "Level-5 Security Clearance" },
+  { rank: 6, label: "L-6", name: "OMNI", title: "Level-6 Security Clearance" },
+  { rank: 7, label: "L-7", name: "NULL", title: "Level-7 Security Clearance" },
 ] as const;
 
 export const MIN_CLEARANCE = 1;
@@ -53,31 +66,46 @@ export function authoringClearance(user: {
   return Math.min(user.clearance, user.realClearance);
 }
 
-export function clearanceLabel(rank: number): string {
-  return CLEARANCE_LEVELS.find((l) => l.rank === rank)?.label ?? `L-${rank}`;
+// The bare code, "L-4", for tight spots like button groups and ranges where the
+// classification word would wrap.
+export function clearanceCode(rank: number): string {
+  return `L-${rank}`;
 }
 
-// E5 is a distinct designation that carries the same access as L-O5 (rank 6).
-export const E5_DESIGNATION = "E5";
-export const E5_RANK = 6;
+// Compact designation with its classification word: "L-4 (TOP SECRET)". Falls
+// back to the bare code for a rank outside the ladder so a corrupt row cannot
+// take a page down.
+export function clearanceLabel(rank: number): string {
+  const level = CLEARANCE_LEVELS.find((l) => l.rank === rank);
+  return level ? `${level.label} (${level.name})` : `L-${rank}`;
+}
 
-// R5 is a distinct designation that carries the same access as L-O5 / L-E5
-// (rank 6).
+// The formal designation: "Level-4 Security Clearance (TOP SECRET)".
+export function clearanceTitle(rank: number): string {
+  const level = CLEARANCE_LEVELS.find((l) => l.rank === rank);
+  return level ? `${level.title} (${level.name})` : `Level-${rank} Security Clearance`;
+}
+
+// R5 is not a clearance level. It is the RAISA recordkeeper designation: a
+// role carried by a rank-6 member that confers recordkeeping duties (approving
+// redactions, reading the message logs, rewriting personnel files, closing
+// counter-intrusion cases). Their clearance is plain L-6.
 export const R5_DESIGNATION = "R5";
 export const R5_RANK = 6;
+export const R5_ROLE_LABEL = "RAISA RECORDKEEPER";
 
-// Display label for a member, honoring an alternate designation like E5 / R5.
+// Display label for a member: their clearance, plus the recordkeeper role if
+// they hold it.
 export function clearanceDisplay(
   clearance: number,
   designation?: string | null
 ): string {
-  if (designation === E5_DESIGNATION) return "L-E5";
-  if (designation === R5_DESIGNATION) return "L-R5";
-  return clearanceLabel(clearance);
+  const label = clearanceLabel(clearance);
+  return designation === R5_DESIGNATION ? `${label} · ${R5_ROLE_LABEL}` : label;
 }
 
 // Rank accent colors used to tint the terminal chrome, so an L-1 session is
-// visually distinguishable from an L-OMNI one at a glance.
+// visually distinguishable from an L-7 one at a glance.
 //
 // Ranks 1-3 track the active theme (they read as "ordinary personnel" in
 // whatever palette the member chose). Ranks 4+ are deliberately fixed colors:
@@ -93,37 +121,31 @@ const CLEARANCE_ACCENTS: Record<number, string> = {
   7: "#ffffff",
 };
 
-export function clearanceAccent(
-  clearance: number,
-  designation?: string | null
-): string {
-  // E5 / R5 sit at rank 6 but get their own distinct accents.
-  if (designation === E5_DESIGNATION) return "#1a6b1a";
-  if (designation === R5_DESIGNATION) return "#00e5ff";
+export function clearanceAccent(clearance: number): string {
   return CLEARANCE_ACCENTS[clearance] ?? "var(--term-fg-dim)";
 }
 
-// Selectable clearance options for admin assignment. E5 is a value distinct
-// from O5 even though both resolve to rank 6.
+// Selectable clearance options for admin assignment. The recordkeeper role is
+// a distinct value from a plain rank 6 even though both resolve to rank 6.
 export const CLEARANCE_ASSIGN_OPTIONS = [
-  { value: "1", label: "L-1", rank: 1 },
-  { value: "2", label: "L-2", rank: 2 },
-  { value: "3", label: "L-3", rank: 3 },
-  { value: "4", label: "L-4", rank: 4 },
-  { value: "5", label: "L-5", rank: 5 },
-  { value: "6", label: "L-O5", rank: 6 },
-  { value: E5_DESIGNATION, label: "L-E5", rank: E5_RANK },
-  { value: R5_DESIGNATION, label: "L-R5", rank: R5_RANK },
-  { value: "7", label: "L-OMNI", rank: 7 },
-] as const;
+  ...CLEARANCE_LEVELS.map((l) => ({
+    value: String(l.rank),
+    label: clearanceTitle(l.rank),
+    rank: l.rank as number,
+  })),
+  {
+    value: R5_DESIGNATION,
+    label: `${clearanceTitle(R5_RANK)} + ${R5_ROLE_LABEL}`,
+    rank: R5_RANK,
+  },
+];
 
-// The stored form value for a member's current clearance (E5 / R5 designation
-// wins).
+// The stored form value for a member's current clearance (the recordkeeper
+// designation wins).
 export function clearanceAssignValue(
   clearance: number,
   designation?: string | null
 ): string {
-  if (designation === E5_DESIGNATION) return E5_DESIGNATION;
   if (designation === R5_DESIGNATION) return R5_DESIGNATION;
   return String(clearance);
 }
@@ -132,9 +154,6 @@ export function clearanceAssignValue(
 export function parseClearanceAssignment(
   value: string
 ): { clearance: number; designation: string | null } | null {
-  if (value === E5_DESIGNATION) {
-    return { clearance: E5_RANK, designation: E5_DESIGNATION };
-  }
   if (value === R5_DESIGNATION) {
     return { clearance: R5_RANK, designation: R5_DESIGNATION };
   }
@@ -151,10 +170,20 @@ export function canPostBroadcast(rank: number): boolean {
   return rank >= BROADCAST_POST_CLEARANCE;
 }
 
-// Resolve a redaction level token to a clearance rank. Accepts either a plain
-// rank number ("6") or a clearance label in any common form:
-//   "6", "L-O5", "LO5", "O5", "L-OMNI", "OMNI", "L5", "5"
-// Returns null if the token doesn't map to a known level.
+// Collapse a classification word to its comparable form: uppercase, with
+// whitespace, dashes, underscores and parentheses removed ("Top Secret" ->
+// "TOPSECRET"). Dots are deliberately kept so "0.1" can never squash to "01".
+function squash(s: string): string {
+  return s.toUpperCase().replace(/[\s_()-]/g, "");
+}
+
+// Resolve a redaction level token to a clearance rank. Accepts a plain rank
+// number or a level in any common form:
+//   "4", "L4", "L-4", "LEVEL-4", "Level 4"
+//   "TOP SECRET", "COSMIC TOP SECRET", "OMNI", "NULL"
+//   "L-4 (TOP SECRET)", "Level-4 Security Clearance (TOP SECRET)"
+// A number followed by a classification word must agree ("L-4 RESTRICTED" is
+// rejected). Returns null if the token doesn't map to a known level.
 export function parseClearanceToken(token: string): number | null {
   const raw = token.trim();
   if (raw === "") return null;
@@ -173,13 +202,24 @@ export function parseClearanceToken(token: string): number | null {
     return n >= MIN_CLEARANCE && n <= MAX_CLEARANCE ? n : null;
   }
 
-  // Normalize label: uppercase, strip spaces / dashes / leading "L".
-  const norm = raw.toUpperCase().replace(/[\s-]/g, "").replace(/^L/, "");
-  // E5 / R5 share O5's rank-6 access.
-  if (norm === E5_DESIGNATION) return E5_RANK;
-  if (norm === R5_DESIGNATION) return R5_RANK;
-  const match = CLEARANCE_LEVELS.find(
-    (l) => l.label.toUpperCase().replace(/[\s-]/g, "").replace(/^L/, "") === norm
-  );
-  return match ? match.rank : null;
+  const norm = squash(raw);
+
+  // "L4", "LEVEL4", optionally followed by the classification word.
+  const numbered = norm.match(/^(?:LEVEL|L)(\d+)(.*)$/);
+  if (numbered) {
+    const n = parseInt(numbered[1], 10);
+    if (n < MIN_CLEARANCE || n > MAX_CLEARANCE) return null;
+    const rest = numbered[2].replace(/^SECURITYCLEARANCE/, "");
+    const level = CLEARANCE_LEVELS[n - 1];
+    return rest === "" || rest === squash(level.name) ? n : null;
+  }
+
+  // The classification word on its own, with or without a leading "L" / "LEVEL"
+  // ("TOP SECRET", "L-OMNI"). Anything else — including the retired O5 / E5 /
+  // R5 names — falls through to null and so fails closed to a full redaction.
+  for (const c of [norm, norm.replace(/^LEVEL/, ""), norm.replace(/^L/, "")]) {
+    const match = CLEARANCE_LEVELS.find((l) => squash(l.name) === c);
+    if (match) return match.rank;
+  }
+  return null;
 }

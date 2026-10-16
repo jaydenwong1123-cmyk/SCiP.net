@@ -6,8 +6,8 @@ import { db } from "@/lib/db";
 import {
   CLEARANCE_LEVELS,
   CLEARANCE_ASSIGN_OPTIONS,
-  E5_DESIGNATION,
   R5_DESIGNATION,
+  R5_ROLE_LABEL,
   clearanceLabel,
   clearanceDisplay,
   clearanceAssignValue,
@@ -54,7 +54,6 @@ export default async function AdminPage() {
     incidentCount,
     messageCount,
     activeInviteCount,
-    e5Count,
     r5Count,
   ] = await Promise.all([
     db.user.findMany({
@@ -93,7 +92,6 @@ export default async function AdminPage() {
         useCount: { lt: db.inviteCode.fields.maxUses },
       },
     }),
-    db.user.count({ where: { designation: E5_DESIGNATION } }),
     db.user.count({ where: { designation: R5_DESIGNATION } }),
   ]);
 
@@ -172,15 +170,11 @@ export default async function AdminPage() {
                   {tierMap.get(l.rank) ?? 0}
                 </span>
               </span>
-              {l.rank === 5 && (
-                <>
-                  <span>
-                    L-E5=<span className="text-[var(--term-fg)]">{e5Count}</span>
-                  </span>
-                  <span>
-                    L-R5=<span className="text-[var(--term-fg)]">{r5Count}</span>
-                  </span>
-                </>
+              {l.rank === 6 && (
+                <span>
+                  {R5_ROLE_LABEL}=
+                  <span className="text-[var(--term-fg)]">{r5Count}</span>
+                </span>
               )}
             </Fragment>
           ))}

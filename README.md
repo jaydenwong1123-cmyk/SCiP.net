@@ -118,7 +118,21 @@ Setup, commands and the permission tiers are in **[docs/the-engine.md](docs/the-
 
 ## How clearance works
 
-Ranks run 1–7, labeled L-1 through L-5, then L-O5, then L-OMNI (rank 7 — reserved
-for the single owner account). The owner adjusts anyone's clearance from `/admin`,
+Ranks run 1–7:
+
+| Rank | Designation |
+| --- | --- |
+| L-1 | Level-1 Security Clearance (DECLASSIFIED) |
+| L-2 | Level-2 Security Clearance (RESTRICTED) |
+| L-3 | Level-3 Security Clearance (CONFIDENTIAL) |
+| L-4 | Level-4 Security Clearance (TOP SECRET) |
+| L-5 | Level-5 Security Clearance (COSMIC TOP SECRET) |
+| L-6 | Level-6 Security Clearance (OMNI) |
+| L-7 | Level-7 Security Clearance (NULL) |
+
+L-7 (NULL) can be granted only by admin and above and reads every redaction.
+RAISA recordkeeper is a role carried by an L-6 member, not a clearance level of its
+own. Redaction tags take a rank or a level name: `[*text*][4]`, `[*text*][TOP SECRET]`,
+`[*text*][NULL]`. Broadcasts carry a minimum clearance too, chosen when issued. The owner adjusts anyone's clearance from `/admin`,
 which also handles inviting new members, granting/revoking SCP-file posting rights,
 and approving/denying clearance-change requests submitted via `/clearance-request`.

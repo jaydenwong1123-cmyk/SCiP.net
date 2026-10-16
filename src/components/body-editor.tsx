@@ -7,7 +7,7 @@ import { renderRedacted } from "@/lib/redact";
 import { formatNodes } from "@/lib/format";
 
 // The SCP body field plus a redaction preview. A writer marks text up for a
-// clearance they may not be able to un-see (staff and L-OMNI bypass redaction
+// clearance they may not be able to un-see (admins and L-7 bypass redaction
 // entirely), so the only way to check the markup actually hides what it should
 // is to render it at an arbitrary rank. Safe to do client-side: the author is
 // holding the full source text in the textarea either way.
@@ -40,7 +40,8 @@ export function BodyEditor({
       />
       <p className="text-xs text-[var(--term-fg-dim)] mt-1">
         REDACTION: <code>[*text*]</code> hides text from everyone. <code>[*text*][4]</code>{" "}
-        reveals it only to L-4 clearance or higher; lower levels see a redacted box.
+        (or <code>[*text*][TOP SECRET]</code>) reveals it only to L-4 clearance or
+        higher; lower levels see a redacted box.
         You may redact up to one level above your own clearance; two or more
         levels higher (or a full <code>[*text*]</code> redaction) must be applied
         by a RAISA recordkeeper.

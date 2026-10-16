@@ -74,7 +74,7 @@ export function MemberRow({
   // A co-owner is owner-equivalent: only the seeded owner may touch them, and
   // then only to revoke the role.
   const locked = member.isCoOwner && !canManageCoOwner;
-  // L-OMNI (value "7") may only be granted by owner/admin. Plain Staff (no
+  // L-7 NULL (value "7") may only be granted by owner/admin. Plain Staff (no
   // admin/owner powers) are capped at L-3.
   const selectableOptions = CLEARANCE_ASSIGN_OPTIONS.filter((o) =>
     canGrantTopClearance ? true : o.rank <= 3

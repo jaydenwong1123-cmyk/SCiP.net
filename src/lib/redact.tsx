@@ -9,7 +9,7 @@ import {
 } from "@/lib/clearance";
 
 // Viewers who may read every redaction, including full (level-less) ones:
-// L-OMNI clearance, admins, the owner and the co-owner.
+// L-7 (NULL) clearance, admins, the owner and the co-owner.
 //
 // Staff are deliberately NOT on this list. A full redaction is meant to wall
 // content off from everyone outside the top of the chain of command, and Staff
@@ -30,12 +30,16 @@ export function canBypassRedaction(user: {
 }
 
 // Redaction markup:
-//   [*SECRET*]         -> always redacted (white box), nobody can read it
-//   [*SECRET*][3]      -> only viewers with clearance >= L-3 see "SECRET"
-//   [*SECRET*][L-O5]   -> only L-O5 (rank 6) and above; others see a box
-//   [*SECRET*][OMNI]   -> only L-OMNI (rank 7); others see a box
+//   [*SECRET*]               -> always redacted (white box), only bypass roles read it
+//   [*SECRET*][3]            -> only viewers with clearance >= L-3 see "SECRET"
+//   [*SECRET*][TOP SECRET]   -> only L-4 (TOP SECRET) and above; others see a box
+//   [*SECRET*][OMNI]         -> only L-6 (OMNI) and above; others see a box
+//   [*SECRET*][NULL]         -> only L-7 (NULL); others see a box
 //
-// The level tag accepts a rank number or a clearance label (L-O5, O5, OMNI…).
+// The level tag accepts a rank number or a level name (3, L-3, CONFIDENTIAL,
+// TOP SECRET, COSMIC TOP SECRET, OMNI, NULL…); see parseClearanceToken. A tag
+// that names no known level — including the retired O5 / E5 / R5 names —
+// redacts fully rather than guessing.
 // Redaction is resolved on the server so hidden text is never sent to a
 // browser that isn't cleared to read it.
 const REDACT_RE = /\[\*([\s\S]+?)\*\](?:\[([^\]]+)\])?/g;
@@ -58,7 +62,7 @@ export function renderRedacted(
 
     const content = match[1];
     const level = match[2] ? parseClearanceToken(match[2]) : null;
-    // Cleared viewers (L-OMNI / staff / admin / owner) see everything, including
+    // Cleared viewers (L-7 NULL / admin / owner) see everything, including
     // full redactions with no level tag.
     const canSee = canSeeAll || (level !== null && viewerClearance >= level);
 
@@ -148,7 +152,7 @@ export const SELF_REDACT_OFFSET = 1;
 // the same way — fail closed rather than wave it through.
 const FULL_REDACTION_RANK = MAX_CLEARANCE + 1;
 
-// RAISA recordkeepers (the L-R5 designation) and admin/owner may approve — and
+// RAISA recordkeepers (the R5 designation) and admin/owner may approve — and
 // so may themselves apply — a redaction at any level. Staff are not included:
 // they hold no more redaction authority than their clearance gives them, and
 // must go through RAISA like anyone else. Role booleans are checked inline

@@ -33,7 +33,7 @@ model User {
   // contained anomaly are different jobs, held by different personnel.
   canLogTest       Boolean  @default(false)
   // Rewriting another member's personnel file. Previously implied by the RAISA
-  // (L-R5) designation alone; now a grant in its own right, so recordkeeping
+  // (R5) designation alone; now a grant in its own right, so recordkeeping
   // duty can be handed out without also handing out a clearance designation.
   canEditPersonnel Boolean  @default(false)
   isOwner          Boolean  @default(false)
@@ -47,8 +47,9 @@ model User {
   // ticket queue and nothing else. Only an Admin (or above) may grant it.
   isHelper         Boolean  @default(false)
   department       String?
-  // Optional alternate clearance designation shown instead of the numeric label
-  // (e.g. "E5", which carries the same rank-6 / L-O5 access). Null = normal.
+  // Optional role designation carried on top of the clearance rank. The only
+  // live value is "R5", the RAISA recordkeeper role (rank 6 / L-6 OMNI). The
+  // retired "E5" value may linger on old rows and is ignored. Null = normal.
   designation      String?
   personalFile     String   @default("")
   suspended        Boolean  @default(false)
@@ -438,7 +439,7 @@ model HackRun {
   // what the desk has DONE about a case, not what the intrusion itself did.
   // Every new case starts at NEEDS_ACTION — RAISA has not looked at it yet.
   // Any RAISA member may move it, except into RESOLVED — see
-  // canResolveCounterIntelCase() for why that step is L-R5 only.
+  // canResolveCounterIntelCase() for why that step is RAISA recordkeeper only.
   // Accumulated conduct suspicion across this run's intrusion rounds. Crossing
   // SUSPICION_FLAG_SCORE sets `flagged` below. Never fails a run on its own —
   // see lib/hack/suspicion.ts for why the evidence is advisory, not a verdict.
@@ -627,7 +628,7 @@ model HackChallenge {
 // ANONYMITY: this row is keyed by userId, which is exactly the identity the
 // counter-intel reveal ladder exists to protect. It is therefore readable ONLY
 // by hasAdminPowers() — the tier that already deletes accounts and grants
-// L-OMNI, and so learns nothing here it could not already learn. A RAISA
+// L-7, and so learns nothing here it could not already learn. A RAISA
 // officer never sees this table; what they see is HackRun.flagged, which
 // carries a marker and no identity.
 model ConductRecord {
@@ -782,6 +783,11 @@ model Broadcast {
   // and disappears on its own without anything needing to run.
   publishAt     DateTime?
   expiresAt     DateTime?
+  // Minimum clearance rank (1-7, see CLEARANCE_LEVELS in lib/clearance.ts)
+  // needed to read the directive. 1 = every member. The author and anyone with
+  // admin powers can always read their own / any directive; see
+  // canReadBroadcast() in lib/doc-permissions.ts.
+  clearanceRequired Int @default(1)
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id])

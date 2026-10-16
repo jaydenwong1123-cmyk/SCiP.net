@@ -78,17 +78,39 @@ describe("redactToText", () => {
     expect(redactToText("[*VANCE*][7]", 1, true)).toBe("VANCE");
   });
 
-  it("accepts label tags, not just numbers", () => {
-    expect(redactToText("[*X*][L-O5]", 6, false)).toBe("X");
-    expect(redactToText("[*X*][L-O5]", 5, false)).not.toContain("X");
-    expect(redactToText("[*X*][OMNI]", 7, false)).toBe("X");
-    expect(redactToText("[*X*][OMNI]", 6, false)).not.toContain("X");
+  it("accepts level-name tags, not just numbers", () => {
+    expect(redactToText("[*X*][TOP SECRET]", 4, false)).toBe("X");
+    expect(redactToText("[*X*][TOP SECRET]", 3, false)).not.toContain("X");
+    expect(redactToText("[*X*][COSMIC TOP SECRET]", 5, false)).toBe("X");
+    expect(redactToText("[*X*][COSMIC TOP SECRET]", 4, false)).not.toContain("X");
+    expect(redactToText("[*X*][OMNI]", 6, false)).toBe("X");
+    expect(redactToText("[*X*][OMNI]", 5, false)).not.toContain("X");
+    expect(redactToText("[*X*][NULL]", 7, false)).toBe("X");
+    expect(redactToText("[*X*][NULL]", 6, false)).not.toContain("X");
+    expect(redactToText("[*X*][L-3 (CONFIDENTIAL)]", 3, false)).toBe("X");
+    expect(redactToText("[*X*][L-3 (CONFIDENTIAL)]", 2, false)).not.toContain("X");
   });
 
   it("treats an unparseable tag as a full redaction", () => {
     // Failing closed matters more here than being forgiving: a typo'd tag must
-    // hide the text, never expose it.
-    for (const tag of ["NONSENSE", "", "0", "8", "-1", "+3", "L-", "3.5"]) {
+    // hide the text, never expose it. The retired O5 / E5 / R5 names and a
+    // number contradicting its own classification word are in this set too.
+    for (const tag of [
+      "NONSENSE",
+      "",
+      "0",
+      "8",
+      "-1",
+      "+3",
+      "L-",
+      "3.5",
+      "0.1",
+      "O5",
+      "L-O5",
+      "E5",
+      "R5",
+      "L-4 RESTRICTED",
+    ]) {
       const out = redactToText(`[*X*][${tag}]`, 7, false);
       expect(out, `tag "${tag}" failed open`).not.toContain("X");
     }
@@ -106,7 +128,7 @@ describe("redactToText", () => {
   });
 
   it("handles several redactions in one body independently", () => {
-    const out = redactToText("[*A*][2] AND [*B*][6] AND [*C*]", 2, false);
+    const out = redactToText("[*A*][2] AND [*B*][OMNI] AND [*C*]", 2, false);
     expect(out).toContain("A");
     expect(out).not.toContain("B");
     expect(out).not.toContain("C");

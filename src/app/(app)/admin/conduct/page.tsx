@@ -26,7 +26,7 @@ import { IssueSanctionForm, LiftSanctionForm } from "./sanction-console";
 // Rows here are keyed to a named member — including intruders whose identity
 // the counter-intel reveal ladder is specifically designed to keep from RAISA
 // until they have traced it. hasAdminPowers() is the tier that already deletes
-// accounts and grants L-OMNI, so it learns nothing here it could not already
+// accounts and grants L-7, so it learns nothing here it could not already
 // learn; an ordinary RAISA officer cannot reach this page, and what they see
 // instead is HackRun.flagged, which carries a marker and no name.
 //

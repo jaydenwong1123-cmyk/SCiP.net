@@ -64,3 +64,18 @@ export function canEditBroadcast(
 ): boolean {
   return broadcast.authorId === actor.id || hasAdminPowers(actor);
 }
+
+// A directive is aimed at everyone holding `clearanceRequired` or above. Anyone
+// who could edit it can also read it: an author keeps sight of what they
+// issued even after a demotion, and admins oversee every directive. `clearance`
+// is the effective read rank, so "view as" and intrusion grants apply as they
+// do everywhere else.
+export function canReadBroadcast(
+  actor: Actor & { clearance: number },
+  broadcast: { authorId: string; clearanceRequired: number }
+): boolean {
+  return (
+    broadcast.clearanceRequired <= actor.clearance ||
+    canEditBroadcast(actor, broadcast)
+  );
+}
