@@ -140,7 +140,7 @@ export function redactNameToText(name: string, viewer: Viewer): string {
 // own authority — an L-3 can hide something behind an L-4 requirement, keeping
 // it from their own peers. Anything two or more levels higher (or a level-less
 // full redaction, which hides the text from everyone) has to be signed off by
-// a RAISA recordkeeper, since it walls the content off from the author's own
+// a RAISA administrator, since it walls the content off from the author's own
 // chain of command.
 
 // The highest offset above a member's clearance they may redact unaided.
@@ -152,7 +152,7 @@ export const SELF_REDACT_OFFSET = 1;
 // the same way — fail closed rather than wave it through.
 const FULL_REDACTION_RANK = MAX_CLEARANCE + 1;
 
-// RAISA recordkeepers (the R5 designation) and admin/owner may approve — and
+// RAISA administrators (the R5 designation) and admin/owner may approve — and
 // so may themselves apply — a redaction at any level. Staff are not included:
 // they hold no more redaction authority than their clearance gives them, and
 // must go through RAISA like anyone else. Role booleans are checked inline

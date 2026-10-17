@@ -48,7 +48,7 @@ model User {
   isHelper         Boolean  @default(false)
   department       String?
   // Optional role designation carried on top of the clearance rank. The only
-  // live value is "R5", the RAISA recordkeeper role (rank 6 / L-6 OMNI). The
+  // live value is "R5", the RAISA administrator role (rank 6 / L-6 OMNI). The
   // retired "E5" value may linger on old rows and is ignored. Null = normal.
   designation      String?
   personalFile     String   @default("")
@@ -439,7 +439,7 @@ model HackRun {
   // what the desk has DONE about a case, not what the intrusion itself did.
   // Every new case starts at NEEDS_ACTION — RAISA has not looked at it yet.
   // Any RAISA member may move it, except into RESOLVED — see
-  // canResolveCounterIntelCase() for why that step is RAISA recordkeeper only.
+  // canResolveCounterIntelCase() for why that step is RAISA administrator only.
   // Accumulated conduct suspicion across this run's intrusion rounds. Crossing
   // SUSPICION_FLAG_SCORE sets `flagged` below. Never fails a run on its own —
   // see lib/hack/suspicion.ts for why the evidence is advisory, not a verdict.

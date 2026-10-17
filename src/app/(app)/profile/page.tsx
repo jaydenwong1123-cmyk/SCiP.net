@@ -1,5 +1,5 @@
 import { requireUser, hasOwnerPowers } from "@/lib/session";
-import { clearanceDisplay } from "@/lib/clearance";
+import { clearanceDisplay, clearanceChipStyle } from "@/lib/clearance";
 import {
   OPEN_DEPARTMENTS,
   ALL_DEPARTMENTS,
@@ -45,7 +45,7 @@ export default async function ProfilePage() {
         </div>
         <div>
           <div className="hud-readout__label">Clearance</div>
-          <div className="clearance-chip inline-block mt-1 text-xs">
+          <div className="clearance-chip inline-block mt-1 text-xs" style={clearanceChipStyle(user.clearance)}>
             {clearanceDisplay(user.clearance, user.designation)}
           </div>
         </div>

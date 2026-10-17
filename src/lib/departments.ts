@@ -3,7 +3,7 @@ export const OPEN_DEPARTMENTS = [
   "Facility Enforcement",
   "Medical Department",
   "Scientific Department",
-  "Site Administration",
+  "Facility Management",
 ] as const;
 
 // Restricted departments only staff (owner/admin/staff) may assign to a member.

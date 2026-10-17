@@ -42,6 +42,9 @@ export type HackGame = {
   minHumanMs: number;
   generate(band: number, rng: Rng): GameGeneration;
   grade(solution: unknown, answer: string): GradeResult;
+  // The solution as a player would type it, for the training range's answer
+  // key. Optional: a game without one falls back to the raw solution JSON.
+  answerKey?(solution: unknown): string;
 };
 
 export type GameGeneration = {

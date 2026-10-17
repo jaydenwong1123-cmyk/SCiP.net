@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { deleteHackRunAction } from "../actions";
 
-// RAISA recordkeeper only — see canDeleteCounterIntelLog(). A confirm step guards against
+// RAISA administrator only — see canDeleteCounterIntelLog(). A confirm step guards against
 // a stray click purging a case file early; the 30-day retention sweep is the
 // safe default, this is the manual override.
 export function DeleteForm({ runId }: { runId: string }) {

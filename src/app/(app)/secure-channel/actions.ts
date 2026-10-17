@@ -20,6 +20,10 @@ import {
   ATTACHMENT_RULE,
   CONTENT_SCOPES,
 } from "@/lib/rate-limit";
+import {
+  checkRedactionAuthorization,
+  redactionAuthorizationError,
+} from "@/lib/redact";
 
 export async function postSecureMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -42,6 +46,21 @@ export async function postSecureMessageAction(
   // A transmission needs to carry something — text, an image, or both.
   if (!body && !hasUpload) {
     return { ok: false, error: "TRANSMISSION BODY OR ATTACHMENT REQUIRED." };
+  }
+
+  // Checked against the stored slice, not the raw body: a redaction opened
+  // before the 10000-character cut would otherwise be authorized as written
+  // and then persist truncated.
+  const stored = body.slice(0, 10000);
+  const redactCheck = checkRedactionAuthorization(stored, user);
+  if (!redactCheck.ok) {
+    return {
+      ok: false,
+      error: redactionAuthorizationError(
+        redactCheck.requiredRank,
+        authoringClearance(user)
+      ),
+    };
   }
 
   if (countUploads(formData) > MAX_ATTACHMENTS_PER_MESSAGE) {
@@ -81,7 +100,7 @@ export async function postSecureMessageAction(
   }
 
   const message = await db.secureMessage.create({
-    data: { authorId: user.id, body: body.slice(0, 10000) },
+    data: { authorId: user.id, body: stored },
   });
 
   if (file) {

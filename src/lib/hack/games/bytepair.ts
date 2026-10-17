@@ -110,4 +110,10 @@ export const bytepairGame: HackGame = {
         given.every((byte, i) => byte === expected[i]),
     };
   },
+
+  answerKey(solution) {
+    const { orphans, ordered } = solution as BytepairSolution;
+    // Order only matters when the game asks for it, and then it is ascending.
+    return (ordered ? [...orphans].sort() : orphans).join(" ");
+  },
 };

@@ -5,7 +5,7 @@ import { setCaseStatusAction, toggleCaseFlagAction } from "../actions";
 import { CASE_STATUSES, CASE_STATUS_LABELS, type CaseStatus } from "@/lib/counter-intel";
 
 // RAISA's manual workflow control. Any desk member gets IN PROGRESS/NEEDS
-// ACTION; RESOLVED only renders for RAISA recordkeepers — the action itself enforces the
+// ACTION; RESOLVED only renders for RAISA administrators — the action itself enforces the
 // same gate, this just avoids offering a button that would 403. The flag
 // toggle is a second, independent form: flagging carries no closing
 // authority, so it stays open to every desk member regardless of caseStatus.

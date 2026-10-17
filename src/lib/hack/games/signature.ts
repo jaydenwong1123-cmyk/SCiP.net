@@ -94,4 +94,8 @@ export const signatureGame: HackGame = {
     const { token } = solution as SignatureSolution;
     return { correct: normalizeToken(answer) === token };
   },
+
+  answerKey(solution) {
+    return (solution as SignatureSolution).token;
+  },
 };

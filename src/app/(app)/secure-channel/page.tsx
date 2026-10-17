@@ -3,8 +3,12 @@ import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import {
   clearanceDisplay,
-  canAccessSecureChannel,
-} from "@/lib/clearance";
+  canAccessSecureChannel, clearanceChipStyle } from "@/lib/clearance";
+import {
+  renderRedacted,
+  renderRedactedName,
+  canBypassRedaction,
+} from "@/lib/redact";
 import { SecureForm } from "./secure-form";
 import { AttachmentList } from "@/components/attachment-list";
 import {
@@ -89,11 +93,11 @@ export default async function SecureChannelPage() {
               }}
             >
               <p className="text-xs flex flex-wrap items-center gap-2">
-                <span className="clearance-chip text-[10px]">
+                <span className="clearance-chip text-[10px]" style={clearanceChipStyle(m.author.clearance)}>
                   {clearanceDisplay(m.author.clearance, m.author.designation)}
                 </span>
                 <span className="text-[var(--term-amber)]">
-                  {m.author.displayName}
+                  {renderRedactedName(m.author.displayName ?? "", user)}
                 </span>
                 <span className="hud-recid">
                   {m.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
@@ -101,7 +105,7 @@ export default async function SecureChannelPage() {
               </p>
               {m.body && (
                 <pre className="whitespace-pre-wrap break-words font-mono text-sm">
-                  {m.body}
+                  {renderRedacted(m.body, user.clearance, canBypassRedaction(user))}
                 </pre>
               )}
               <AttachmentList attachments={attachments.get(m.id) ?? []} />

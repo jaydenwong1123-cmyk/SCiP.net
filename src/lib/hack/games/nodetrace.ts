@@ -119,4 +119,8 @@ export const nodetraceGame: HackGame = {
         given.every((node, i) => node === path[i]),
     };
   },
+
+  answerKey(solution) {
+    return (solution as NodetraceSolution).path.join(" ");
+  },
 };

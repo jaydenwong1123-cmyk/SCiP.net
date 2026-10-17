@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
+import { clearanceDisplay, clearanceLabel, clearanceChipStyle } from "@/lib/clearance";
 import { canAccessForum, canDeleteForum, canDeleteForumPost } from "@/lib/forums";
 import {
   renderRedacted,
@@ -103,7 +103,7 @@ export default async function ForumPage({
             >
               <p className="text-xs flex flex-wrap items-center gap-2">
                 {p.author && (
-                  <span className="clearance-chip text-[10px]">
+                  <span className="clearance-chip text-[10px]" style={clearanceChipStyle(p.author.clearance)}>
                     {clearanceDisplay(p.author.clearance, p.author.designation)}
                   </span>
                 )}

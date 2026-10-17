@@ -80,4 +80,8 @@ export const icebreakerGame: HackGame = {
       feedback: `ACCESS DENIED — LIKENESS ${likeness}/${password.length}`,
     };
   },
+
+  answerKey(solution) {
+    return (solution as IcebreakerSolution).password;
+  },
 };

@@ -43,7 +43,7 @@ describe("desk access", () => {
     expect(canAccessCounterIntel({ department: null })).toBe(false);
   });
 
-  it("gates deleting and resolving behind the R5 recordkeeper designation on top of desk membership", () => {
+  it("gates deleting and resolving behind the R5 administrator designation on top of desk membership", () => {
     const officer = { department: RAISA_DEPARTMENT, designation: null };
     const r5 = { department: RAISA_DEPARTMENT, designation: R5_DESIGNATION };
     const outsiderR5 = { department: "O5 Command", designation: R5_DESIGNATION };

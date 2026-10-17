@@ -26,7 +26,7 @@ import {
 //
 // This module decides what every gate in the application sees, so its edge
 // cases are the ones most worth pinning down: the two-axis read/write split,
-// the L-1..L-7 ladder and its names, the RAISA recordkeeper role, and the
+// the L-1..L-7 ladder and its names, the RAISA administrator role, and the
 // token parser that redaction tags are fed through.
 
 describe("authoringClearance", () => {
@@ -140,6 +140,11 @@ describe("the L-1 .. L-7 ladder", () => {
       expect(clearanceAccent(l.rank)).toBeTruthy();
     }
   });
+
+  it("gives every rank a unique accent", () => {
+    const accents = CLEARANCE_LEVELS.map((l) => clearanceAccent(l.rank));
+    expect(new Set(accents).size).toBe(CLEARANCE_LEVELS.length);
+  });
 });
 
 describe("clearance assignment round-trip", () => {
@@ -160,7 +165,7 @@ describe("clearance assignment round-trip", () => {
     }
   });
 
-  it("offers exactly the seven levels plus the recordkeeper role", () => {
+  it("offers exactly the seven levels plus the administrator role", () => {
     expect(CLEARANCE_ASSIGN_OPTIONS.map((o) => o.value)).toEqual([
       "1",
       "2",
@@ -177,14 +182,14 @@ describe("clearance assignment round-trip", () => {
     expect(parseClearanceAssignment("E5")).toBeNull();
   });
 
-  it("keeps the RAISA recordkeeper at rank 6 without changing the clearance", () => {
+  it("keeps the RAISA administrator at rank 6 without changing the clearance", () => {
     const r5 = parseClearanceAssignment(R5_DESIGNATION)!;
     expect(r5.clearance).toBe(R5_RANK);
     expect(R5_RANK).toBe(6);
     expect(r5.designation).toBe(R5_DESIGNATION);
     // The role rides on top of L-6; it is not a clearance level of its own.
     expect(clearanceDisplay(r5.clearance, r5.designation)).toBe(
-      "L-6 (OMNI) · RAISA RECORDKEEPER"
+      "L-6 (OMNI) · RAISA ADMINISTRATOR"
     );
     expect(clearanceDisplay(6, null)).toBe("L-6 (OMNI)");
     // A stale designation left over from the retired system shows nothing extra.

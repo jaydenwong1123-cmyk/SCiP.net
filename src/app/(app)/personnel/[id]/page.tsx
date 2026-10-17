@@ -7,7 +7,7 @@ import {
   hasStaffPowers,
   canEditAnyPersonalFile,
 } from "@/lib/session";
-import { clearanceDisplay } from "@/lib/clearance";
+import { clearanceDisplay, clearanceChipStyle } from "@/lib/clearance";
 import { renderBody } from "@/lib/render-body";
 import {
   addMemberNoteAction,
@@ -49,7 +49,6 @@ export default async function PersonnelFilePage({
       displayName: true,
       clearance: true,
       designation: true,
-      department: true,
       personalFile: true,
       isOwner: true,
       isAdmin: true,
@@ -107,13 +106,9 @@ export default async function PersonnelFilePage({
       <div className="hud-fields">
         <div>
           <div className="hud-readout__label">Clearance</div>
-          <div className="clearance-chip inline-block mt-1 text-xs">
+          <div className="clearance-chip inline-block mt-1 text-xs" style={clearanceChipStyle(person.clearance)}>
             {clearanceDisplay(person.clearance, person.designation)}
           </div>
-        </div>
-        <div>
-          <div className="hud-readout__label">Department</div>
-          <div className="text-sm mt-1">{person.department || "UNASSIGNED"}</div>
         </div>
         <div>
           <div className="hud-readout__label">Record ID</div>

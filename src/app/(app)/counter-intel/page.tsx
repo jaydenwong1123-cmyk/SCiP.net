@@ -371,7 +371,7 @@ export default async function CounterIntelPage({
           <TickRule className="my-2" />
           <p className="text-[10px] text-[var(--term-fg-dim)] leading-snug">
             CASE FILES PURGE AUTOMATICALLY AFTER{" "}
-            {COUNTER_INTEL_RETENTION_DAYS}D. A RAISA RECORDKEEPER MAY DELETE CASES EARLY,
+            {COUNTER_INTEL_RETENTION_DAYS}D. A RAISA ADMINISTRATOR MAY DELETE CASES EARLY,
             INDIVIDUALLY OR IN BULK, OR WIPE THE ENTIRE DESK.
           </p>
         </HudPanel>

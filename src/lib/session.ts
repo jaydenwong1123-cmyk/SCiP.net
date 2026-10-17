@@ -35,7 +35,7 @@ export function canAnnotateMembers(user: {
   );
 }
 
-// Holders of the per-member personnel-file grant, RAISA recordkeepers (the
+// Holders of the per-member personnel-file grant, RAISA administrators (the
 // R5 designation), and staff/admin/owner. RAISA are the custodians of
 // personnel records, so they may rewrite any member's personal file, not only
 // their own; the explicit grant lets the same duty be handed to anyone else.
@@ -82,7 +82,7 @@ export const getCurrentUser = cache(async () => {
     return {
       ...user,
       clearance: viewAs,
-      // The RAISA recordkeeper designation (R5) is an identity at rank 6; carrying
+      // The RAISA administrator designation (R5) is an identity at rank 6; carrying
       // it into a rank-2 persona would be nonsense.
       designation: null,
       isOwner: false,

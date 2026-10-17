@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser, hasStaffPowers, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceLabel, clearanceChipStyle } from "@/lib/clearance";
 import { canEditIncident } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
 import { SeverityBadge } from "@/components/signal-badge";
@@ -85,7 +85,7 @@ export default async function IncidentDetailPage({
         </div>
         <div>
           <div className="hud-readout__label">Clearance</div>
-          <div className="clearance-chip inline-block mt-1 text-xs">
+          <div className="clearance-chip inline-block mt-1 text-xs" style={clearanceChipStyle(report.clearanceRequired)}>
             {clearanceLabel(report.clearanceRequired)}
           </div>
         </div>

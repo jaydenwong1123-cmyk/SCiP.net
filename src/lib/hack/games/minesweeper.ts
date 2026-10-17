@@ -185,4 +185,8 @@ export const minesweeperGame: HackGame = {
     const { mines } = solution as MinesweeperSolution;
     return { correct: sameSet(normalizeList(answer), mines) };
   },
+
+  answerKey(solution) {
+    return (solution as MinesweeperSolution).mines.join(" ");
+  },
 };

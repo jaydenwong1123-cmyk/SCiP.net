@@ -5,8 +5,7 @@ import {
   CLEARANCE_LEVELS,
   MAX_CLEARANCE,
   clearanceDisplay,
-  R5_DESIGNATION,
-} from "@/lib/clearance";
+  R5_DESIGNATION, clearanceChipStyle } from "@/lib/clearance";
 import { renderRedactedName, redactNameToText } from "@/lib/redact";
 import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 import { FilterRow, FilterSearch } from "@/components/filter-bar";
@@ -18,7 +17,7 @@ import {
 } from "@/lib/filters";
 
 // Within a single clearance rank, plain members sort ahead of RAISA
-// recordkeepers.
+// administrators.
 function designationWeight(designation?: string | null): number {
   return designation === R5_DESIGNATION ? 1 : 0;
 }
@@ -108,7 +107,7 @@ export default async function PersonnelPage({
   const filtered = hasActiveFilters(current);
 
   // The DB sort already orders by clearance (desc) then name; refine so that
-  // within a rank the RAISA recordkeepers fall in after everyone else.
+  // within a rank the RAISA administrators fall in after everyone else.
   personnel.sort((a, b) => {
     if (a.clearance !== b.clearance) return b.clearance - a.clearance;
     const dw = designationWeight(a.designation) - designationWeight(b.designation);
@@ -131,20 +130,6 @@ export default async function PersonnelPage({
 
       <HudPanel code="01" title="QUERY" status="ROSTER FILTER">
         <div className="space-y-2">
-          {departments.length > 0 && (
-            <FilterRow
-              label="DEPT"
-              active={activeDept}
-              options={departments.map((d) => ({
-                value: d,
-                // Departments have long formal names ("Recordkeeping &
-                // Information Security Administration"); the segmented control
-                // needs something that fits on one line.
-                label: d.toUpperCase().slice(0, 22),
-              }))}
-              hrefFor={(value) => qs({ dept: value })}
-            />
-          )}
           <FilterRow
             label="LEVEL"
             active={activeLevel?.toString() ?? null}
@@ -212,7 +197,7 @@ export default async function PersonnelPage({
                   </span>
                 )}
               </span>
-              <span className="clearance-chip text-[10px] shrink-0">
+              <span className="clearance-chip text-[10px] shrink-0" style={clearanceChipStyle(p.clearance)}>
                 {clearanceDisplay(p.clearance, p.designation)}
               </span>
             </Link>

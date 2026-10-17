@@ -123,17 +123,16 @@ export async function gradeDrill(
       correct: graded.correct,
       feedback: graded.feedback,
       attemptsLeft,
-      answerKey: settled ? formatAnswerKey(solution) : null,
+      answerKey: settled ? formatAnswerKey(drill.game, solution) : null,
     },
   };
 }
 
-// Solutions are per-game shapes — { password }, a coordinate list, a set of
-// ids — with no common interface, so the key is rendered as its raw JSON rather
-// than as prose. On a range that is the honest thing to show: it is exactly
-// what the grader compared against.
-function formatAnswerKey(solution: unknown): string {
-  return JSON.stringify(solution, null, 2);
+// Solutions are per-game shapes — { password }, a board plus a target, a set of
+// ids — so each game renders its own key as the answer a player would type. A
+// game without a formatter falls back to the raw solution JSON.
+function formatAnswerKey(gameId: string, solution: unknown): string {
+  return gameFor(gameId)?.answerKey?.(solution) ?? JSON.stringify(solution, null, 2);
 }
 
 // Drills accumulate one row per puzzle and are worthless the moment they are

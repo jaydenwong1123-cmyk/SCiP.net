@@ -131,4 +131,36 @@ export const daemonGame: HackGame = {
 
     return { correct: true };
   },
+
+  answerKey(solution) {
+    const { matrix, target } = solution as DaemonSolution;
+    const path = findPickPath(matrix, target);
+    return path ? path.join(" ") : target.join(" ");
+  },
 };
+
+// Depth-first search for one legal pick sequence spelling `target`, mirroring
+// the move rules grade() enforces: pick 1 is in row 1, then picks alternate
+// between holding the column and holding the row. Returns RnCn labels, or null
+// if no path exists (which a generated board never produces).
+function findPickPath(matrix: string[][], target: string[]): string[] | null {
+  const size = matrix.length;
+  const picks: string[] = [];
+
+  const walk = (i: number, row: number, col: number): boolean => {
+    if (i === target.length) return true;
+    // Odd picks hold the column and roam the rows; even picks hold the row.
+    const holdColumn = i % 2 === 1;
+    for (let n = 0; n < size; n++) {
+      const r = i === 0 ? 0 : holdColumn ? n : row;
+      const c = i === 0 ? n : holdColumn ? col : n;
+      if (matrix[r][c] !== target[i]) continue;
+      picks.push(`R${r + 1}C${c + 1}`);
+      if (walk(i + 1, r, c)) return true;
+      picks.pop();
+    }
+    return false;
+  };
+
+  return walk(0, 0, 0) ? picks : null;
+}

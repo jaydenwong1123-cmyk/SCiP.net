@@ -366,7 +366,7 @@ export async function revokeHackGrantAction(
 
 // Move a case through RAISA's manual investigative workflow. Any desk member
 // may pick a case up (IN_PROGRESS) or send it back to the queue (NEEDS_ACTION);
-// closing it (RESOLVED) is RAISA recordkeeper only — see canResolveCounterIntelCase() for why.
+// closing it (RESOLVED) is RAISA administrator only — see canResolveCounterIntelCase() for why.
 export async function setCaseStatusAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
@@ -379,7 +379,7 @@ export async function setCaseStatusAction(
   if (!runId) return { ok: false, error: "MISSING CASE ID." };
   if (!isCaseStatus(status)) return { ok: false, error: "INVALID STATUS." };
   if (status === CASE_STATUSES.resolved && !canResolveCounterIntelCase(user)) {
-    return { ok: false, error: "ONLY A RAISA RECORDKEEPER MAY MARK A CASE RESOLVED." };
+    return { ok: false, error: "ONLY A RAISA ADMINISTRATOR MAY MARK A CASE RESOLVED." };
   }
 
   const run = await db.hackRun.findUnique({
@@ -408,7 +408,7 @@ export async function setCaseStatusAction(
 // Pick a case up, so the rest of the desk can see it is being worked.
 //
 // ANY desk member may claim — a claim is investigative work, not a
-// recordkeeping decision, so it carries none of the recordkeeper gates that RESOLVED
+// recordkeeping decision, so it carries none of the administrator gates that RESOLVED
 // and delete do. It is also not a lock: nothing here prevents another officer
 // tracing a claimed case. It is a coordination signal, and treating it as
 // enforcement would mean a lapsed claim could strand a case nobody could touch.
@@ -529,7 +529,7 @@ export async function releaseCaseAction(
 }
 
 // Flag a case for attention. Any desk member may toggle this — unlike
-// caseStatus it carries no closing authority, so it needs no recordkeeper gate.
+// caseStatus it carries no closing authority, so it needs no administrator gate.
 // Independent of caseStatus: a case can be IN_PROGRESS and flagged at once.
 export async function toggleCaseFlagAction(
   _prevState: { ok: boolean; error?: string } | null,
@@ -564,7 +564,7 @@ export async function toggleCaseFlagAction(
   return { ok: true };
 }
 
-// Early, manual purge of a single case file — the R5 recordkeeper
+// Early, manual purge of a single case file — the R5 administrator
 // designation only. Desk membership (the department gate every other action
 // here uses) is not enough on its own; see canDeleteCounterIntelLog().
 export async function deleteHackRunAction(
@@ -586,7 +586,7 @@ export async function deleteHackRunAction(
     targetType: "hack_run",
     targetId: run.id,
     targetName: caseCode(run.id),
-    summary: "Case file deleted by a RAISA recordkeeper",
+    summary: "Case file deleted by a RAISA administrator",
   });
 
   await db.$transaction([
@@ -601,7 +601,7 @@ export async function deleteHackRunAction(
 }
 
 // Multi-select purge of several case files at once, from the desk's list
-// view. Same recordkeeper gate as deleteHackRunAction; a bad or already-gone id in
+// view. Same administrator gate as deleteHackRunAction; a bad or already-gone id in
 // the batch is simply excluded rather than failing the whole submission —
 // same shape as bulkMemberAction in admin/actions.ts.
 export async function deleteHackRunsAction(
@@ -636,7 +636,7 @@ export async function deleteHackRunsAction(
       targetType: "hack_run",
       targetId: run.id,
       targetName: caseCode(run.id),
-      summary: "Case file deleted by a RAISA recordkeeper (bulk)",
+      summary: "Case file deleted by a RAISA administrator (bulk)",
     });
   }
 
@@ -652,7 +652,7 @@ export async function deleteHackRunsAction(
   return { ok: true, message: `${ids.length} CASE FILE(S) DELETED.` };
 }
 
-// Nuke every case file on the desk, regardless of trace state. Same recordkeeper
+// Nuke every case file on the desk, regardless of trace state. Same administrator
 // gate as the other two delete verbs. Logged as a single summary entry
 // rather than one per row — a wipe is one deliberate act, not N of them,
 // and by the time it runs the individual case codes are gone anyway.
@@ -681,7 +681,7 @@ export async function wipeAllHackRunsAction(
     action: AUDIT_ACTIONS.hackRunDeleted,
     actor: user,
     targetType: "hack_run",
-    summary: `ALL case files wiped by a RAISA recordkeeper (${count} deleted)`,
+    summary: `ALL case files wiped by a RAISA administrator (${count} deleted)`,
   });
 
   revalidatePath("/counter-intel");

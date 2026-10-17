@@ -16,7 +16,7 @@ export function logRetentionCutoff(now = new Date()): Date {
   );
 }
 
-// RAISA (the R5 recordkeeper designation) and Staff and above. Note this
+// RAISA (the R5 administrator designation) and Staff and above. Note this
 // deliberately does not consult clearance rank on its own: an L-6 who is
 // neither RAISA nor staff has no business reading other members' mail.
 export function canAccessMessageLogs(user: {

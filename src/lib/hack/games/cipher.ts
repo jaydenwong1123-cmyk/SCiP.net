@@ -95,4 +95,8 @@ export const cipherGame: HackGame = {
     const { plaintext } = solution as CipherSolution;
     return { correct: normalizeToken(answer) === plaintext };
   },
+
+  answerKey(solution) {
+    return (solution as CipherSolution).plaintext;
+  },
 };

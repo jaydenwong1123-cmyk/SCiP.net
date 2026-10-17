@@ -74,6 +74,11 @@ function makeStopwatchGame(opts: {
       if (Math.abs(diff) <= toleranceMs) return { correct: true };
       return { correct: false, feedback: diff > 0 ? "TOO LATE." : "TOO EARLY." };
     },
+
+    answerKey(solution) {
+      const { targetMs, toleranceMs } = solution as StopwatchSolution;
+      return `${targetMs} MS (ANY STOP WITHIN ±${toleranceMs} MS)`;
+    },
   };
 }
 

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser, hasStaffPowers, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
-import { clearanceLabel } from "@/lib/clearance";
+import { clearanceLabel, clearanceChipStyle } from "@/lib/clearance";
 import {
   canEditScpFile,
   canLogScpTest,
@@ -138,7 +138,7 @@ export default async function ScpDetailPage({
         </div>
         <div>
           <div className="hud-readout__label">Clearance Required</div>
-          <div className="clearance-chip inline-block mt-1 text-xs">
+          <div className="clearance-chip inline-block mt-1 text-xs" style={clearanceChipStyle(file.clearanceRequired)}>
             {clearanceLabel(file.clearanceRequired)}
           </div>
         </div>

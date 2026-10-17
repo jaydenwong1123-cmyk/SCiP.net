@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 // The clearance ladder. Seven levels, stored on every member as the integer
 // `rank` below:
 //
@@ -86,15 +88,15 @@ export function clearanceTitle(rank: number): string {
   return level ? `${level.title} (${level.name})` : `Level-${rank} Security Clearance`;
 }
 
-// R5 is not a clearance level. It is the RAISA recordkeeper designation: a
+// R5 is not a clearance level. It is the RAISA administrator designation: a
 // role carried by a rank-6 member that confers recordkeeping duties (approving
 // redactions, reading the message logs, rewriting personnel files, closing
 // counter-intrusion cases). Their clearance is plain L-6.
 export const R5_DESIGNATION = "R5";
 export const R5_RANK = 6;
-export const R5_ROLE_LABEL = "RAISA RECORDKEEPER";
+export const R5_ROLE_LABEL = "RAISA ADMINISTRATOR";
 
-// Display label for a member: their clearance, plus the recordkeeper role if
+// Display label for a member: their clearance, plus the administrator role if
 // they hold it.
 export function clearanceDisplay(
   clearance: number,
@@ -107,13 +109,12 @@ export function clearanceDisplay(
 // Rank accent colors used to tint the terminal chrome, so an L-1 session is
 // visually distinguishable from an L-7 one at a glance.
 //
-// Ranks 1-3 track the active theme (they read as "ordinary personnel" in
-// whatever palette the member chose). Ranks 4+ are deliberately fixed colors:
-// a privileged session should look the same to everyone regardless of theme,
-// which is the point of the signal.
+// Every level has its own fixed color, so a rank is identifiable by color alone
+// and never collides with another rank or with a theme's own palette. Keep them
+// unique (clearance.test.ts enforces it).
 const CLEARANCE_ACCENTS: Record<number, string> = {
-  1: "var(--term-fg-dim)",
-  2: "var(--term-fg-dim)",
+  1: "#9aa0a6",
+  2: "#ffcc55",
   3: "#99e6ff",
   4: "#33cc33",
   5: "#8b2fc9",
@@ -125,7 +126,16 @@ export function clearanceAccent(clearance: number): string {
   return CLEARANCE_ACCENTS[clearance] ?? "var(--term-fg-dim)";
 }
 
-// Selectable clearance options for admin assignment. The recordkeeper role is
+// Inline style that tints a `.clearance-chip` with the color of the level it
+// displays. The chip reads --term-clearance, which the app shell sets to the
+// VIEWER's accent; without this override every chip on a page (a member's rank
+// in the personnel list, a file's required level) would show the viewer's color
+// instead of its own.
+export function clearanceChipStyle(rank: number): CSSProperties {
+  return { ["--term-clearance" as string]: clearanceAccent(rank) };
+}
+
+// Selectable clearance options for admin assignment. The administrator role is
 // a distinct value from a plain rank 6 even though both resolve to rank 6.
 export const CLEARANCE_ASSIGN_OPTIONS = [
   ...CLEARANCE_LEVELS.map((l) => ({
@@ -140,7 +150,7 @@ export const CLEARANCE_ASSIGN_OPTIONS = [
   },
 ];
 
-// The stored form value for a member's current clearance (the recordkeeper
+// The stored form value for a member's current clearance (the administrator
 // designation wins).
 export function clearanceAssignValue(
   clearance: number,

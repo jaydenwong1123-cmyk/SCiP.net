@@ -25,7 +25,7 @@ export function canAccessCounterIntel(user: {
 }
 
 // Deleting a case file is a step further than reading one: it also requires
-// the R5 recordkeeper designation specifically, not just desk membership.
+// the R5 administrator designation specifically, not just desk membership.
 // Staff powers do not substitute here, same as everywhere else in this file.
 export function canDeleteCounterIntelLog(user: {
   department?: string | null;
@@ -36,7 +36,7 @@ export function canDeleteCounterIntelLog(user: {
 
 // Closing a case is a step further than working it: any desk member may pick
 // a case up (IN_PROGRESS) or flag it (NEEDS_ACTION), but only the R5
-// recordkeeper designation may mark it RESOLVED — same gate as deleting a
+// administrator designation may mark it RESOLVED — same gate as deleting a
 // case file, for the same reason: closing the book on a case is a
 // recordkeeping decision, not an investigative one.
 export function canResolveCounterIntelCase(user: {

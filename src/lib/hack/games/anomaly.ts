@@ -110,4 +110,9 @@ export const anomalyGame: HackGame = {
     }
     return { correct: sameSet(given, expected) };
   },
+
+  answerKey(solution) {
+    const { violators } = solution as AnomalySolution;
+    return violators.length === 0 ? "NONE" : violators.join(" ");
+  },
 };

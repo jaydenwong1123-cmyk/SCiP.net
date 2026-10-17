@@ -10,8 +10,7 @@ import {
   R5_ROLE_LABEL,
   clearanceLabel,
   clearanceDisplay,
-  clearanceAssignValue,
-} from "@/lib/clearance";
+  clearanceAssignValue, clearanceChipStyle } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
 import { MemberList } from "./member-list";
 import { Quartermaster } from "./quartermaster";
@@ -340,11 +339,11 @@ export default async function AdminPage() {
               <span className="text-[var(--term-fg-bright)]">
                 {r.user.displayName}
               </span>
-              <span className="clearance-chip text-[10px]">
+              <span className="clearance-chip text-[10px]" style={clearanceChipStyle(r.user.clearance)}>
                 {clearanceDisplay(r.user.clearance, r.user.designation)}
               </span>
               <span className="hud-recid">REQUESTS</span>
-              <span className="clearance-chip text-[10px]">
+              <span className="clearance-chip text-[10px]" style={clearanceChipStyle(r.requestedLevel)}>
                 {clearanceLabel(r.requestedLevel)}
               </span>
             </p>

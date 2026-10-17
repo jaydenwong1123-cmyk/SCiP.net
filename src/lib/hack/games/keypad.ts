@@ -67,4 +67,8 @@ export const keypadGame: HackGame = {
     const { code } = solution as KeypadSolution;
     return { correct: normalizeToken(answer) === code };
   },
+
+  answerKey(solution) {
+    return (solution as KeypadSolution).code;
+  },
 };

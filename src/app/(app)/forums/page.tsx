@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
-import { canCreateForum, authoringClearance, clearanceLabel } from "@/lib/clearance";
+import { canCreateForum, authoringClearance, clearanceLabel, clearanceChipStyle } from "@/lib/clearance";
 import {
   renderRedacted,
   renderRedactedName,
@@ -66,7 +66,7 @@ export default async function ForumsPage() {
               }}
             >
               <p className="text-xs flex flex-wrap items-center gap-2">
-                <span className="clearance-chip text-[10px]">
+                <span className="clearance-chip text-[10px]" style={clearanceChipStyle(f.minClearance)}>
                   {clearanceLabel(f.minClearance)}+
                 </span>
                 <span className="text-[var(--term-amber)]">

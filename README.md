@@ -131,7 +131,7 @@ Ranks run 1–7:
 | L-7 | Level-7 Security Clearance (NULL) |
 
 L-7 (NULL) can be granted only by admin and above and reads every redaction.
-RAISA recordkeeper is a role carried by an L-6 member, not a clearance level of its
+RAISA administrator is a role carried by an L-6 member, not a clearance level of its
 own. Redaction tags take a rank or a level name: `[*text*][4]`, `[*text*][TOP SECRET]`,
 `[*text*][NULL]`. Broadcasts carry a minimum clearance too, chosen when issued. The owner adjusts anyone's clearance from `/admin`,
 which also handles inviting new members, granting/revoking SCP-file posting rights,

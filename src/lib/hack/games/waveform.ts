@@ -72,4 +72,8 @@ export const waveformGame: HackGame = {
     const { id } = solution as WaveformSolution;
     return { correct: normalizeToken(answer) === id };
   },
+
+  answerKey(solution) {
+    return (solution as WaveformSolution).id;
+  },
 };

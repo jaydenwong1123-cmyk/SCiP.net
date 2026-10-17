@@ -44,7 +44,7 @@ export function BodyEditor({
         higher; lower levels see a redacted box.
         You may redact up to one level above your own clearance; two or more
         levels higher (or a full <code>[*text*]</code> redaction) must be applied
-        by a RAISA recordkeeper.
+        by a RAISA administrator.
       </p>
 
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

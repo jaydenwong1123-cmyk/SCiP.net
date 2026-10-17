@@ -38,7 +38,7 @@ function runCommand(raw: string): {
       return {
         out: [
           "OPERATIVE: [REDACTED]",
-          "CLEARANCE: L-6 (OMNI) · RAISA RECORDKEEPER",
+          "CLEARANCE: L-6 (OMNI) · RAISA ADMINISTRATOR",
           "STATION: Facility-Null, Sub-level 4",
         ],
       };
