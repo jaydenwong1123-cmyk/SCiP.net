@@ -160,6 +160,27 @@ export async function createRequest(
 
 export type DecisionOutcome = { ok: boolean; message: string };
 
+// Move a request off "pending" only if it is still there. True when THIS call
+// made the decision.
+async function claimDecision(
+  requestId: string,
+  data: { status: "approved" | "denied"; reviewerId: string; reason?: string }
+): Promise<boolean> {
+  const { count } = await db.enginePromotionRequest.updateMany({
+    where: { id: requestId, status: "pending" },
+    data: { ...data, decidedAt: new Date() },
+  });
+  return count === 1;
+}
+
+async function alreadyDecided(requestId: string): Promise<DecisionOutcome> {
+  const now = await db.enginePromotionRequest.findUnique({
+    where: { id: requestId },
+    select: { status: true },
+  });
+  return { ok: false, message: `That request was already ${now?.status ?? "decided"}.` };
+}
+
 /**
  * Approve a request: grant the new role, strip the old one, record the rank.
  *
@@ -182,23 +203,30 @@ export async function approveRequest(
     return { ok: false, message: `That request was already ${request.status}.` };
   }
 
+  // Claim the decision before acting on it. Two reviewers pressing Approve and
+  // Deny at the same moment both pass the check above; only one of them can
+  // move the row off "pending", and the other is told it was already decided.
+  if (!(await claimDecision(requestId, { status: "approved", reviewerId }))) {
+    return alreadyDecided(requestId);
+  }
+
   const granted = await addRole(
     request.guildId,
     request.discordId,
     request.toRoleId
   );
   if (!granted.ok) {
+    // Nothing changed on Discord, so the request goes back to the queue.
+    await db.enginePromotionRequest.updateMany({
+      where: { id: requestId, status: "approved" },
+      data: { status: "pending", reviewerId: null, decidedAt: null },
+    });
     return { ok: false, message: granted.error ?? "The role change failed." };
   }
 
   if (request.fromRoleId) {
     await removeRole(request.guildId, request.discordId, request.fromRoleId);
   }
-
-  await db.enginePromotionRequest.update({
-    where: { id: requestId },
-    data: { status: "approved", reviewerId, decidedAt: new Date() },
-  });
 
   await db.engineMember.upsert({
     where: {
@@ -253,15 +281,15 @@ export async function denyRequest(
     return { ok: false, message: `That request was already ${request.status}.` };
   }
 
-  await db.enginePromotionRequest.update({
-    where: { id: requestId },
-    data: {
+  if (
+    !(await claimDecision(requestId, {
       status: "denied",
       reviewerId,
       reason: reason.slice(0, 500),
-      decidedAt: new Date(),
-    },
-  });
+    }))
+  ) {
+    return alreadyDecided(requestId);
+  }
 
   return { ok: true, message: `Denied the request from ${request.username}.` };
 }

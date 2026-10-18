@@ -4,8 +4,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { generateCodeword } from "@/lib/codeword";
 import {
-  checkRateLimit,
-  recordAttempt,
+  spendAttempt,
   clearAttempts,
   pruneAttempts,
   formatRetryAfter,
@@ -46,7 +45,9 @@ export async function enlistAction(
   const ip = await clientIp();
   const bucket = ip || "unknown";
   await pruneAttempts();
-  const limit = await checkRateLimit("ci-enlist", bucket, CI_ENLIST_RULE);
+  // Spent before the code is checked, so simultaneous guesses cannot all slip
+  // under the limit (see spendAttempt). A live code clears the bucket below.
+  const limit = await spendAttempt("ci-enlist", bucket, CI_ENLIST_RULE, ip);
   if (limit.blocked) {
     return {
       ok: false,
@@ -56,7 +57,6 @@ export async function enlistAction(
   // The code is checked before the username so a bad name cannot be used to
   // probe the code without spending an attempt.
   if (!(await isLiveCiCode("signup", code))) {
-    await recordAttempt("ci-enlist", bucket, ip);
     return { ok: false, error: REJECTED };
   }
   await clearAttempts("ci-enlist", bucket);

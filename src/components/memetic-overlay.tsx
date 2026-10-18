@@ -15,11 +15,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 //   2. IT NEVER RENDERS BLANK. The plate is preloaded before the overlay is
 //      allowed to mount, so the first flash is the image and not a black sheet
 //      of unexplained nothing.
-//   3. IT IS NOT DRIVEN BY CSS ANIMATION. globals.css flattens every animation
-//      under prefers-reduced-motion, which would silently freeze the flash on
-//      exactly the machines most likely to have that set. The cadence is a
-//      JS interval instead, so what the console says will happen is what
-//      happens.
+//   3. IT DOES NOT FLASH FOR A VIEWER WHO ASKED FOR REDUCED MOTION. That
+//      setting is what a light-sensitive person turns on, and a full-screen
+//      strobe they cannot dismiss is the one thing here that could hurt them.
+//      They get the plate held steady for the same duration instead. The
+//      cadence is a JS interval rather than a CSS animation so that this is a
+//      deliberate check, not a side effect of globals.css freezing animations
+//      on a lit frame.
 
 export type MemeticExposure = {
   agent: string;
@@ -161,6 +163,8 @@ export function MemeticOverlay({
   // that way, so this only has to keep the beat.
   useEffect(() => {
     if (!exposure) return;
+    // Rule 3: held steady, never strobed, under reduced motion.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = setInterval(() => setLit((on) => !on), exposure.periodMs);
     return () => clearInterval(id);
   }, [exposure]);

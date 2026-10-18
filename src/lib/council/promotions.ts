@@ -167,6 +167,29 @@ export async function getRequest(requestId: string) {
   return db.councilPromotionRequest.findUnique({ where: { id: requestId } });
 }
 
+// Move a request off "pending" only if it is still there. True when THIS call
+// made the decision.
+async function claimDecision(
+  requestId: string,
+  data: {
+    status: "approved" | "denied" | "cancelled";
+    reviewerId?: string;
+    reason?: string;
+    decidedAt: Date;
+  }
+): Promise<boolean> {
+  const { count } = await db.councilPromotionRequest.updateMany({
+    where: { id: requestId, status: "pending" },
+    data,
+  });
+  return count === 1;
+}
+
+async function alreadyDecided(requestId: string): Promise<DecisionOutcome> {
+  const now = await getRequest(requestId);
+  return { ok: false, message: `That request was already ${now?.status ?? "decided"}.` };
+}
+
 /**
  * Approve: grant the new rank, strip the old one, record it.
  *
@@ -192,8 +215,21 @@ export async function approveRequest(
   const to = request.toDivision;
   const { guildId, discordId } = request;
 
+  // Claim the decision before acting on it. Two reviewers pressing Approve and
+  // Deny at the same moment both pass the status check above; only one of
+  // them can move the row off "pending".
+  const now = new Date();
+  if (!(await claimDecision(requestId, { status: "approved", reviewerId, decidedAt: now }))) {
+    return alreadyDecided(requestId);
+  }
+
   const granted = await rest.addRole(guildId, discordId, request.toRoleId);
   if (!granted.ok) {
+    // Nothing changed on Discord, so the request goes back to the queue.
+    await db.councilPromotionRequest.updateMany({
+      where: { id: requestId, status: "approved" },
+      data: { status: "pending", reviewerId: null, decidedAt: null },
+    });
     return { ok: false, message: granted.error ?? "The role change failed." };
   }
   if (request.fromRoleId) {
@@ -211,7 +247,6 @@ export async function approveRequest(
     if (newRole) await rest.addRole(guildId, discordId, newRole);
   }
 
-  const now = new Date();
   const target = await ensureStanding(guildId, discordId, to, request.username);
 
   if (feedIn) {
@@ -220,10 +255,6 @@ export async function approveRequest(
     const source = await ensureStanding(guildId, discordId, from);
     const carried = Math.max(target.points, source.points);
     await db.$transaction([
-      db.councilPromotionRequest.update({
-        where: { id: requestId },
-        data: { status: "approved", reviewerId, decidedAt: now },
-      }),
       db.councilStanding.update({
         where: { id: target.id },
         data: { rankRoleId: request.toRoleId, points: carried },
@@ -245,16 +276,10 @@ export async function approveRequest(
       }),
     ]);
   } else {
-    await db.$transaction([
-      db.councilPromotionRequest.update({
-        where: { id: requestId },
-        data: { status: "approved", reviewerId, decidedAt: now },
-      }),
-      db.councilStanding.update({
-        where: { id: target.id },
-        data: { rankRoleId: request.toRoleId },
-      }),
-    ]);
+    await db.councilStanding.update({
+      where: { id: target.id },
+      data: { rankRoleId: request.toRoleId },
+    });
   }
 
   if (config.announceChannelId) {
@@ -291,15 +316,13 @@ export async function denyRequest(
   if (request.status !== "pending") {
     return { ok: false, message: `That request was already ${request.status}.` };
   }
-  await db.councilPromotionRequest.update({
-    where: { id: requestId },
-    data: {
-      status: "denied",
-      reviewerId,
-      reason: reason.slice(0, 500),
-      decidedAt: new Date(),
-    },
+  const claimed = await claimDecision(requestId, {
+    status: "denied",
+    reviewerId,
+    reason: reason.slice(0, 500),
+    decidedAt: new Date(),
   });
+  if (!claimed) return alreadyDecided(requestId);
   return { ok: true, message: `Denied the request from ${request.username}.` };
 }
 
@@ -316,11 +339,13 @@ export async function cancelPending(
     where: { guildId, discordId, status: "pending" },
   });
   for (const request of open) {
-    await db.councilPromotionRequest.update({
-      where: { id: request.id },
-      data: { status: "cancelled", reason: why, decidedAt: new Date() },
+    // Only if no reviewer decided it in the meantime.
+    const claimed = await claimDecision(request.id, {
+      status: "cancelled",
+      reason: why,
+      decidedAt: new Date(),
     });
-    await refreshRequestMessage(request.id);
+    if (claimed) await refreshRequestMessage(request.id);
   }
 }
 

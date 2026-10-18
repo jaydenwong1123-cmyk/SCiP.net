@@ -21,8 +21,11 @@ function randomDigits(length: number): string {
   return out;
 }
 
+// Four words and four digits: 32^4 * 10^4, about 10 billion codewords. The
+// old two-words-three-digits form was only ~1 million, small enough that the
+// login throttle was the only thing between an attacker and a guess.
 export function generateCodeword(): string {
-  return `${randomWord()}-${randomWord()}-${randomDigits(3)}`;
+  return `${randomWord()}-${randomWord()}-${randomWord()}-${randomWord()}-${randomDigits(4)}`;
 }
 
 export function generateInviteCode(): string {

@@ -9,6 +9,7 @@ import {
   requireAdminPowers,
   requireStaff,
   hasOwnerPowers,
+  hasAdminPowers,
 } from "@/lib/session";
 import { MAX_CO_OWNERS } from "@/lib/roles";
 import { generateInviteCode } from "@/lib/codeword";
@@ -132,9 +133,18 @@ export async function setClearanceAction(formData: FormData) {
 
   const before = await db.user.findUnique({
     where: { id: userId },
-    select: { displayName: true, email: true, clearance: true, designation: true },
+    select: {
+      displayName: true,
+      email: true,
+      clearance: true,
+      designation: true,
+      isAdmin: true,
+    },
   });
   if (!before) return;
+  // Plain Staff cannot change an Admin's clearance — a lower role must not be
+  // able to strip a higher one.
+  if (before.isAdmin && !canGrantTop) return;
 
   await db.user.update({
     where: { id: userId, isInsurgent: false, isOwner: false, isCoOwner: false },
@@ -493,8 +503,11 @@ export async function setSuspendedAction(formData: FormData) {
   if (!userId || userId === actor.id) return;
 
   const target = await db.user.findUnique({ where: { id: userId } });
-  // Never suspend the owner or the co-owner.
+  // Never suspend the owner or the co-owner, and only Admin and above may
+  // suspend an Admin — otherwise one Staff account could lock out the whole
+  // admin team.
   if (!target || hasOwnerPowers(target)) return;
+  if (target.isAdmin && !hasAdminPowers(actor)) return;
 
   await db.user.update({
     where: { id: userId, isOwner: false, isCoOwner: false },
@@ -638,6 +651,7 @@ export async function bulkMemberAction(
       designation: true,
       isOwner: true,
       isCoOwner: true,
+      isAdmin: true,
     },
   });
 
@@ -648,6 +662,16 @@ export async function bulkMemberAction(
     // The owner and the co-owner are never bulk-targetable. Appointing or
     // removing a co-owner stays a deliberate, single, confirmed act.
     if (target.isOwner || target.isCoOwner) {
+      skipped++;
+      continue;
+    }
+    // Same rule as the single-member actions: plain Staff cannot change an
+    // Admin's clearance or suspension.
+    if (
+      target.isAdmin &&
+      !adminPowers &&
+      (op === "clearance" || op === "suspend" || op === "reinstate")
+    ) {
       skipped++;
       continue;
     }

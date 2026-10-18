@@ -642,12 +642,21 @@ export async function submitSiegeAnswer(
     return { ok: true, correct: false, settled: true, attemptsLeft: 0, delta: 0, note: "TIME EXPIRED." };
   }
 
+  // Spend the guess before grading, as a compare-and-set, so a burst of
+  // simultaneous submissions cannot all guess against the same budget.
+  const spent = await db.ciSiegeChallenge.updateMany({
+    where: { id: ch.id, answeredAt: null, attemptsLeft: { gt: 0 } },
+    data: { attemptsLeft: { decrement: 1 } },
+  });
+  if (spent.count === 0) return { ok: false, error: "THAT PUZZLE IS ALREADY SETTLED." };
+
   const graded = gradeAnswer(ch.game, JSON.parse(ch.solution) as unknown, answer);
-  const attemptsLeft = Math.max(0, ch.attemptsLeft - 1);
+  const attemptsLeft =
+    (await db.ciSiegeChallenge.findUnique({ where: { id: ch.id }, select: { attemptsLeft: true } }))
+      ?.attemptsLeft ?? 0;
   const settled = graded.correct || attemptsLeft === 0;
 
   if (!settled) {
-    await db.ciSiegeChallenge.update({ where: { id: ch.id }, data: { attemptsLeft } });
     return { ok: true, correct: false, settled: false, feedback: graded.feedback, attemptsLeft, delta: 0 };
   }
 
@@ -683,6 +692,8 @@ export async function submitSiegeAnswer(
  * is an atomic increment/decrement followed by a clamp, and every state change
  * (fall, back online, restored) is a conditional updateMany whose count says
  * whether THIS request made it — so racing submissions cannot double-fire one.
+ * The puzzle itself is claimed the same way before any effect is applied, so
+ * two answers to one puzzle cannot both land their damage.
  */
 async function settleAnswer(
   ch: CiSiegeChallenge,
@@ -690,6 +701,12 @@ async function settleAnswer(
   now: Date,
   tooFast = false
 ): Promise<{ delta: number; note?: string }> {
+  const claimed = await db.ciSiegeChallenge.updateMany({
+    where: { id: ch.id, answeredAt: null },
+    data: { answeredAt: now, correct, attemptsLeft: 0 },
+  });
+  if (claimed.count === 0) return { delta: 0, note: "THAT PUZZLE IS ALREADY SETTLED." };
+
   const side = ch.side as SiegeSide;
   let delta = 0;
   let note: string | undefined;
@@ -711,10 +728,9 @@ async function settleAnswer(
     }
   }
 
-  await db.ciSiegeChallenge.update({
-    where: { id: ch.id },
-    data: { answeredAt: now, correct, delta, attemptsLeft: 0 },
-  });
+  if (delta !== 0) {
+    await db.ciSiegeChallenge.update({ where: { id: ch.id }, data: { delta } });
+  }
   return { delta, note };
 }
 

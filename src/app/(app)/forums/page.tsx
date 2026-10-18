@@ -18,11 +18,18 @@ export default async function ForumsPage() {
   const forums = await db.forum.findMany({
     where: { minClearance: { lte: authoringClearance(user) } },
     orderBy: { createdAt: "desc" },
-    include: {
-      creator: { select: { displayName: true } },
-      _count: { select: { posts: true } },
-    },
+    // No `creator` join: a topic outlives the member who opened it, and a
+    // required join to a deleted account throws for the whole page.
+    include: { _count: { select: { posts: true } } },
   });
+  const creators = new Map(
+    (
+      await db.user.findMany({
+        where: { id: { in: [...new Set(forums.map((f) => f.creatorId))] } },
+        select: { id: true, displayName: true },
+      })
+    ).map((u) => [u.id, u.displayName ?? ""])
+  );
 
   return (
     <>
@@ -79,7 +86,9 @@ export default async function ForumsPage() {
                 </p>
               )}
               <p className="hud-recid">
-                OPENED BY {renderRedactedName(f.creator.displayName ?? "", user)} ·{" "}
+                OPENED BY {creators.has(f.creatorId)
+                  ? renderRedactedName(creators.get(f.creatorId)!, user)
+                  : "[DELETED ACCOUNT]"} ·{" "}
                 {f._count.posts} {f._count.posts === 1 ? "POST" : "POSTS"}
               </p>
             </Link>

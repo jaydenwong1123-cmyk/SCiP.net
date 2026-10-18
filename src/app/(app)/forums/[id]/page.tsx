@@ -28,23 +28,35 @@ export default async function ForumPage({
   const user = await requireUser();
   const { id } = await params;
 
+  // No `creator` join, for the same reason as the topic index: the opener's
+  // account may be gone.
   const forum = await db.forum.findUnique({
     where: { id },
-    include: { creator: { select: { displayName: true } } },
+    include: { _count: { select: { posts: true } } },
   });
   // A topic below the viewer's clearance is treated as if it doesn't exist —
   // same 404 as a bad id, so its title, description and post count never
   // reach a client who guesses or bookmarks the URL.
   if (!forum || !canAccessForum(user, forum)) notFound();
 
-  const posts = await db.forumPost.findMany({
-    where: { forumId: id },
-    orderBy: { createdAt: "asc" },
-    take: 500,
-    include: {
-      author: { select: { displayName: true, clearance: true, designation: true } },
-    },
-  });
+  // The NEWEST 500, shown oldest-first. Taking the first 500 in ascending
+  // order would freeze a long thread: every post after the 500th, including
+  // the one the member just wrote, would never load.
+  const [newest, creator] = await Promise.all([
+    db.forumPost.findMany({
+      where: { forumId: id },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+      include: {
+        author: { select: { displayName: true, clearance: true, designation: true } },
+      },
+    }),
+    db.user.findUnique({
+      where: { id: forum.creatorId },
+      select: { displayName: true },
+    }),
+  ]);
+  const posts = newest.reverse();
 
   return (
     <>
@@ -56,10 +68,12 @@ export default async function ForumPage({
         code="SEC-08 // FORUM"
         title={renderRedacted(forum.title, user.clearance, canBypassRedaction(user))}
       >
-        <Readout label="Posts" value={posts.length} small />
+        <Readout label="Posts" value={forum._count.posts} small />
         <Readout
           label="Opened By"
-          value={renderRedactedName(forum.creator.displayName ?? "", user)}
+          value={
+            creator ? renderRedactedName(creator.displayName ?? "", user) : "[DELETED ACCOUNT]"
+          }
           small
         />
         <Link href="/forums" className="term-link text-sm">
@@ -85,7 +99,7 @@ export default async function ForumPage({
         <ForumPostForm forumId={forum.id} />
       </HudPanel>
 
-      <HudPanel code="02" title="THREAD" status={`${posts.length} POSTS`}>
+      <HudPanel code="02" title="THREAD" status={`${forum._count.posts} POSTS`}>
         <div className="hud-list">
           {posts.length === 0 && (
             <EmptyState glyph="◈" title="No posts yet">

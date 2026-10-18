@@ -19,7 +19,8 @@ import { db } from "@/lib/db";
 // application can produce. Treat it like the database itself, because it is.
 
 // Bumped when the shape below changes in a way a restorer would care about.
-export const BACKUP_FORMAT_VERSION = 1;
+// 2: added forums, sanctions and the Discord bot tables.
+export const BACKUP_FORMAT_VERSION = 2;
 
 export type BackupOptions = {
   // Include Attachment.data (the file bytes) as base64.
@@ -47,7 +48,9 @@ export type Backup = {
 // One entry per model in schema.prisma. Listed exhaustively rather than derived
 // from the Prisma client's runtime metadata, for the same reason purgeSite()
 // lists them: adding a model without adding it here should be a visible
-// omission in a diff, not a table that silently stops being backed up.
+// omission in a diff, not a table that silently stops being backed up. A diff
+// alone was not enough — forums, sanctions and both bots once went missing —
+// so purge-coverage.test.ts now fails until a new model is listed here.
 //
 // Attachment is handled separately below because of its Bytes column.
 const TABLES = {
@@ -83,6 +86,25 @@ const TABLES = {
   incidentReport: () => db.incidentReport.findMany(),
   revision: () => db.revision.findMany(),
   auditLog: () => db.auditLog.findMany(),
+  forum: () => db.forum.findMany(),
+  forumPost: () => db.forumPost.findMany(),
+  hackSanction: () => db.hackSanction.findMany(),
+  // The Discord bots. Not part of the website's network — the OMEGA purge
+  // leaves them standing — but Turso is still their only copy.
+  engineGuildConfig: () => db.engineGuildConfig.findMany(),
+  engineMember: () => db.engineMember.findMany(),
+  enginePointEntry: () => db.enginePointEntry.findMany(),
+  engineRank: () => db.engineRank.findMany(),
+  enginePromotionRequest: () => db.enginePromotionRequest.findMany(),
+  councilGuildConfig: () => db.councilGuildConfig.findMany(),
+  councilDivisionConfig: () => db.councilDivisionConfig.findMany(),
+  councilRank: () => db.councilRank.findMany(),
+  councilMember: () => db.councilMember.findMany(),
+  councilStanding: () => db.councilStanding.findMany(),
+  councilPointEntry: () => db.councilPointEntry.findMany(),
+  councilPromotionRequest: () => db.councilPromotionRequest.findMany(),
+  councilShift: () => db.councilShift.findMany(),
+  botAction: () => db.botAction.findMany(),
   // AuthAttempt is deliberately NOT exported. It is a throttling ledger whose
   // rows are meaningless more than an hour after they are written, and it is
   // usually the largest table on the site. Restoring it would restore nothing

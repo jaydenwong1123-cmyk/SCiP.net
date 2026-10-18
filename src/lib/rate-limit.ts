@@ -149,6 +149,56 @@ export async function recordAttempt(
   }
 }
 
+// Spend one guess against a bucket BEFORE the guess is checked.
+//
+// checkRateLimit-then-recordAttempt leaves a gap: a burst of requests all
+// count the bucket before any of them records, so every one of them gets to
+// guess. Writing the row first and counting afterwards closes it — each
+// request sees every row written ahead of it, so no more than `limit` guesses
+// can ever be let through, however many arrive at once.
+//
+// The row stays as the record of the guess. Call refundAttempt(attemptId)
+// when the request turns out not to be a failed guess (a correct one, or a
+// refusal for some other reason). A blocked request refunds its own row here,
+// so a bucket under attack still unlocks when its window ends.
+//
+// Fails open, like checkRateLimit.
+export async function spendAttempt(
+  scope: string,
+  id: string,
+  rule: RateLimitRule,
+  ip = ""
+): Promise<RateLimitStatus & { attemptId: string | null }> {
+  let attemptId: string | null = null;
+  try {
+    attemptId = (
+      await db.authAttempt.create({
+        data: { key: bucketKey(scope, id), ip: ip.slice(0, 64) },
+        select: { id: true },
+      })
+    ).id;
+  } catch (err) {
+    console.warn("[rate-limit] spend failed", scope, err);
+    return { blocked: false, remaining: rule.limit, retryAfterMs: 0, attemptId };
+  }
+
+  // Counted including the row just written, so the limit-th guess is the last
+  // one through.
+  const status = await checkRateLimit(scope, id, { ...rule, limit: rule.limit + 1 });
+  if (status.blocked) await refundAttempt(attemptId);
+  return { ...status, remaining: Math.max(0, status.remaining - 1), attemptId };
+}
+
+// Remove one attempt row written by spendAttempt.
+export async function refundAttempt(attemptId: string | null): Promise<void> {
+  if (!attemptId) return;
+  try {
+    await db.authAttempt.deleteMany({ where: { id: attemptId } });
+  } catch (err) {
+    console.warn("[rate-limit] refund failed", err);
+  }
+}
+
 // Check a bucket and, if there is room, spend one slot in the same call.
 //
 // The counterpart to checkRateLimit/recordAttempt for the content rules above,

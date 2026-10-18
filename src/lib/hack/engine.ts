@@ -343,6 +343,17 @@ export async function submitIntrusionAnswer(
     );
   }
 
+  // Spend the guess BEFORE grading, as a compare-and-set. Reading
+  // attemptsLeft and writing it back afterwards let a burst of simultaneous
+  // submissions all see the same budget, so sending every candidate word at
+  // once was a guaranteed win. Only as many requests as there are guesses get
+  // past this; the rest resync as stale.
+  const spent = await db.hackChallenge.updateMany({
+    where: { id: challenge.id, correct: null, attemptsLeft: { gt: 0 } },
+    data: { attemptsLeft: { decrement: 1 } },
+  });
+  if (spent.count === 0) return { kind: "stale" };
+
   const result = gradeAnswer(
     challenge.game,
     JSON.parse(challenge.solution),
@@ -367,30 +378,34 @@ export async function submitIntrusionAnswer(
 
   if (!result.correct) {
     // A guess-carrying game burns an attempt instead of the round. The
-    // deadline is untouched, so spending guesses spends time.
-    if (challenge.attemptsLeft > 1) {
-      const updated = await db.hackChallenge.update({
-        where: { id: challenge.id },
-        data: { attemptsLeft: challenge.attemptsLeft - 1 },
-      });
+    // deadline is untouched, so spending guesses spends time. The attempt was
+    // already spent above; re-read to see what is left.
+    const current = await db.hackChallenge.findUnique({
+      where: { id: challenge.id },
+    });
+    if (current && current.correct === null && current.attemptsLeft > 0) {
       return {
         kind: "wrong",
         feedback: result.feedback,
-        challenge: publicChallenge(updated),
+        challenge: publicChallenge(current),
       };
     }
-    await db.hackChallenge.update({
-      where: { id: challenge.id },
+    // Settle only if nothing else settled it first — a correct guess racing
+    // this one must not have its round failed out from under it.
+    const settled = await db.hackChallenge.updateMany({
+      where: { id: challenge.id, correct: null },
       data: { correct: false, answeredAt: new Date() },
     });
+    if (settled.count === 0) return { kind: "stale" };
     const reason = result.feedback ?? "INVALID CREDENTIAL";
     return failureOutcome(await failRun(run, reason), reason);
   }
 
-  await db.hackChallenge.update({
-    where: { id: challenge.id },
+  const won = await db.hackChallenge.updateMany({
+    where: { id: challenge.id, correct: null },
     data: { correct: true, answeredAt: new Date() },
   });
+  if (won.count === 0) return { kind: "stale" };
 
   const spec = stageSpec(run.stage);
 

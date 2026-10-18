@@ -111,6 +111,20 @@ export async function purgeUser(userId: string): Promise<void> {
   // Siege puzzles they were issued or answered, on either side. The siege
   // itself keeps its systems' final integrity; only the per-player ledger goes.
   await db.ciSiegeChallenge.deleteMany({ where: { userId } });
+  // Their toolkit, practice drills, and the sanctions held against them all
+  // name only them. Sanctions they ISSUED stay: lifting a punishment because
+  // the officer left would be wrong, and the conduct desk resolves a missing
+  // issuer by id rather than through a required join.
+  await db.hackTool.deleteMany({ where: { userId } });
+  await db.hackDrill.deleteMany({ where: { userId } });
+  await db.hackSanction.deleteMany({ where: { userId } });
+  // Forum topics they opened stay, with everyone else's posts in them; the
+  // forum pages resolve a missing creator the same way. Their own posts keep
+  // the denormalized authorName and detach from the account.
+  await db.forumPost.updateMany({
+    where: { authorId: userId },
+    data: { authorId: null },
+  });
   // Traces and revocations they performed against OTHER members' runs stay —
   // that is RAISA's work product, and it outlives the officer who did it.
   await db.hackRun.updateMany({

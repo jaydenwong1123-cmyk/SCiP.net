@@ -6,8 +6,8 @@ import { generateCodeword } from "@/lib/codeword";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import {
-  checkRateLimit,
-  recordAttempt,
+  spendAttempt,
+  refundAttempt,
   clearAttempts,
   pruneAttempts,
   formatRetryAfter,
@@ -45,11 +45,12 @@ export async function registerAction(
   }
 
   // Invite codes are short and guessable at volume, so redemption attempts are
-  // throttled per client IP. Checked before the lookup so a locked-out client
-  // cannot keep probing the code space.
+  // throttled per client IP. The guess is spent before the lookup, so a
+  // locked-out client cannot keep probing the code space and a burst of
+  // simultaneous requests cannot all slip under the limit (see spendAttempt).
   const ip = await clientIp();
   await pruneAttempts();
-  const limit = await checkRateLimit("invite", ip || "unknown", INVITE_RULE);
+  const limit = await spendAttempt("invite", ip || "unknown", INVITE_RULE, ip);
   if (limit.blocked) {
     return {
       ok: false,
@@ -65,17 +66,17 @@ export async function registerAction(
 
   const exhausted = !!invite && invite.useCount >= invite.maxUses;
   if (!invite || !invite.active || exhausted) {
-    await recordAttempt("invite", ip || "unknown", ip);
     return { ok: false, error: "INVALID OR ALREADY-USED INVITE CODE." };
   }
   if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
-    await recordAttempt("invite", ip || "unknown", ip);
     return { ok: false, error: "THIS INVITE CODE HAS EXPIRED." };
   }
 
   const email = `${username}@${EMAIL_DOMAIN}`;
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
+    // The code was right; only the username clashed. Not a failed guess.
+    await refundAttempt(limit.attemptId);
     return { ok: false, error: "THAT EMAIL IS ALREADY REGISTERED." };
   }
 
@@ -91,7 +92,6 @@ export async function registerAction(
     data: { useCount: { increment: 1 } },
   });
   if (claimed.count === 0) {
-    await recordAttempt("invite", ip || "unknown", ip);
     return { ok: false, error: "INVALID OR ALREADY-USED INVITE CODE." };
   }
 

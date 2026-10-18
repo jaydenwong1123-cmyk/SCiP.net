@@ -82,10 +82,9 @@ export default async function ConductLogPage({
     db.hackSanction.findMany({
       orderBy: { createdAt: "desc" },
       take: 25,
-      include: {
-        user: { select: { id: true, displayName: true, email: true } },
-        issuedBy: { select: { displayName: true, email: true } },
-      },
+      // No `user` / `issuedBy` joins: a sanction outlives the officer who
+      // issued it, and a required join to a deleted account throws for the
+      // whole page. Both names are resolved by id below instead.
     }),
     // The owner is excluded here as well as in the action: an option that can
     // only be refused is worse than no option.
@@ -96,13 +95,24 @@ export default async function ConductLogPage({
     }),
   ]);
 
+  const names = new Map(
+    (
+      await db.user.findMany({
+        where: {
+          id: { in: [...new Set(sanctionRows.flatMap((s) => [s.userId, s.issuedById]))] },
+        },
+        select: { id: true, displayName: true, email: true },
+      })
+    ).map((u) => [u.id, u.displayName ?? u.email])
+  );
+
   const sanctions = sanctionRows.map((s) => ({
     id: s.id,
     level: s.level,
     reason: s.reason,
-    memberId: s.user.id,
-    memberName: s.user.displayName ?? s.user.email,
-    issuedByName: s.issuedBy.displayName ?? s.issuedBy.email,
+    memberId: s.userId,
+    memberName: names.get(s.userId) ?? "[DELETED ACCOUNT]",
+    issuedByName: names.get(s.issuedById) ?? "[DELETED ACCOUNT]",
     createdAtLabel: s.createdAt.toISOString().slice(0, 16).replace("T", " "),
     expiresAtLabel: s.expiresAt
       ? s.expiresAt.toISOString().slice(0, 16).replace("T", " ")

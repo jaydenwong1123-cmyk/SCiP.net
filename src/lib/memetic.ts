@@ -72,10 +72,10 @@ export function findCadence(slug: string): MemeticCadence | null {
 }
 
 export const MIN_EXPOSURE_SECONDS = 1;
-// Four hours. Long enough for "however long I want" to mean it, short enough
-// that a forgotten exposure is not permanent — and the recall control clears it
-// instantly regardless.
-export const MAX_EXPOSURE_SECONDS = 4 * 60 * 60;
+// Five minutes, the longest preset. The target cannot dismiss the plate, so
+// anything longer stops being a scare and becomes being locked out of the
+// site behind a flashing screen. The recall control still clears it instantly.
+export const MAX_EXPOSURE_SECONDS = 5 * 60;
 
 export const EXPOSURE_PRESETS = [3, 10, 30, 60, 300] as const;
 

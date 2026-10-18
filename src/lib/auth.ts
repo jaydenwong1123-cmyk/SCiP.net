@@ -4,22 +4,14 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import {
-  checkRateLimit,
-  recordAttempt,
+  spendAttempt,
+  refundAttempt,
   clearAttempts,
   pruneAttempts,
   LOGIN_RULE,
   LOGIN_IP_RULE,
 } from "@/lib/rate-limit";
 import { logAuditNow, clientIp, AUDIT_ACTIONS } from "@/lib/audit";
-
-// Both throttle buckets advance on every failed credential attempt.
-async function recordFailure(email: string, ip: string) {
-  await Promise.all([
-    recordAttempt("login", email, ip),
-    recordAttempt("login-ip", ip || "unknown", ip),
-  ]);
-}
 
 // The full instance: session strategy, pages and callbacks come from
 // lib/auth.config (shared with the proxy), and only the database-backed
@@ -47,12 +39,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Two buckets: one per account (stops a targeted password guess) and
         // one per client IP (stops a spray across many accounts). Either
         // tripping refuses the attempt.
+        //
+        // The guess is spent BEFORE the password is checked, so a burst of
+        // simultaneous requests cannot all slip in under the limit — see
+        // spendAttempt. A failed attempt keeps its rows whether or not the
+        // account exists, so the throttle can't be used to probe which emails
+        // are registered.
         const [perAccount, perIp] = await Promise.all([
-          checkRateLimit("login", normalizedEmail, LOGIN_RULE),
-          checkRateLimit("login-ip", ip || "unknown", LOGIN_IP_RULE),
+          spendAttempt("login", normalizedEmail, LOGIN_RULE, ip),
+          spendAttempt("login-ip", ip || "unknown", LOGIN_IP_RULE, ip),
         ]);
 
         if (perAccount.blocked || perIp.blocked) {
+          // Whichever bucket still had room took a slot; give it back, since
+          // this request never got to guess.
+          await Promise.all([
+            perAccount.blocked ? null : refundAttempt(perAccount.attemptId),
+            perIp.blocked ? null : refundAttempt(perIp.attemptId),
+          ]);
           // Logged so staff can see a lockout in the access log. Recorded
           // synchronously: `authorize` runs outside a request scope where
           // `after()` callbacks would be honored.
@@ -75,26 +79,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { email: normalizedEmail },
         });
 
-        // A failed attempt is recorded whether or not the account exists, so
-        // the throttle can't be used to probe which emails are registered.
-        if (!user) {
-          await recordFailure(normalizedEmail, ip);
-          return null;
-        }
+        if (!user) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) {
-          await recordFailure(normalizedEmail, ip);
-          return null;
-        }
+        if (!valid) return null;
 
-        // Suspended accounts cannot authenticate. Not a credential failure, so
-        // it doesn't count against the throttle.
+        // A correct password is not a failed guess: it costs nothing on the IP
+        // bucket, and it clears the account bucket so an honest member who
+        // mistyped a few times starts clean. This also covers suspended
+        // accounts, which cannot authenticate but did not guess wrong.
+        await Promise.all([
+          refundAttempt(perIp.attemptId),
+          clearAttempts("login", normalizedEmail),
+        ]);
         if (user.suspended) return null;
-
-        // Success clears the account bucket so an honest member who mistyped
-        // a few times starts clean.
-        await clearAttempts("login", normalizedEmail);
 
         return {
           id: user.id,

@@ -166,15 +166,3 @@ export function nextLevel(current: ActiveSanction | null): SanctionLevel {
   const i = SANCTION_ORDER.indexOf(current.level);
   return SANCTION_ORDER[Math.min(i + 1, SANCTION_ORDER.length - 1)]!;
 }
-
-/** Full sanction history for one member, newest first. */
-export async function sanctionHistory(userId: string, take = 20) {
-  return db.hackSanction.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    take,
-    include: {
-      issuedBy: { select: { displayName: true, email: true } },
-    },
-  });
-}
