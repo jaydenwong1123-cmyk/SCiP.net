@@ -11,7 +11,7 @@ export default async function DossierPage() {
 
   return (
     <>
-      <StationHead code="CI // OPERATIVE DOSSIER" title="MY DOSSIER">
+      <StationHead code="CI // OPERATIVE DOSSIER" title="DOSSIER">
         <Link href="/insurgency/roster" className="term-link text-sm">
           [OPERATIVE ROSTER]
         </Link>

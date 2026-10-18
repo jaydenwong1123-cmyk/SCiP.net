@@ -22,7 +22,7 @@ export const CI_SECTIONS: Section[] = [
   },
   {
     base: "/insurgency/dossier",
-    label: "MY DOSSIER",
+    label: "DOSSIER",
     code: "CI-03",
     desc: "Your own operative file",
     group: "operations",
