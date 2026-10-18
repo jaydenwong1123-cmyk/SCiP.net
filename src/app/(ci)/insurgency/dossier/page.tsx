@@ -3,17 +3,17 @@ import { requireInsurgent } from "@/lib/session";
 import { StationHead, HudPanel, Lamp } from "@/components/hud";
 import { DossierForm } from "./dossier-form";
 
-// The operative's own dossier. Visible to this account alone: it is not linked
-// from, rendered on, or queryable through anything on the Foundation network,
-// and the layout's requireInsurgent() keeps Foundation accounts out.
+// The operative's own dossier, editable here. Other operatives read it through
+// the roster. It is not linked from, rendered on, or queryable through anything
+// on the Foundation network, and requireInsurgent() keeps Foundation accounts out.
 export default async function DossierPage() {
   const user = await requireInsurgent();
 
   return (
     <>
       <StationHead code="CI // OPERATIVE DOSSIER" title="MY DOSSIER">
-        <Link href="/insurgency" className="term-link text-sm">
-          [BACK TO UPLINK]
+        <Link href="/insurgency/roster" className="term-link text-sm">
+          [OPERATIVE ROSTER]
         </Link>
       </StationHead>
 
@@ -40,7 +40,7 @@ export default async function DossierPage() {
         </div>
       </div>
 
-      <HudPanel code="01" title="DOSSIER" status="CI EYES ONLY">
+      <HudPanel code="01" title="DOSSIER" status="VISIBLE TO ALL OPERATIVES">
         <p className="text-[10px] text-[var(--term-fg-dim)] mb-2">
           [OOC] THIS FILE IS NOT VISIBLE TO FOUNDATION PERSONNEL.
         </p>

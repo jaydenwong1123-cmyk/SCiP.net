@@ -36,6 +36,8 @@ export function CommandRail({
   facility = "SCiP-NULL",
   callsign,
   linkState = "SECURE",
+  brandHref = "/menu",
+  mobilePrimary = MOBILE_PRIMARY,
 }: {
   sections: Section[];
   counts: BadgeCounts;
@@ -43,13 +45,17 @@ export function CommandRail({
   /** Rank label shown under the facility block, e.g. "L-5". */
   callsign?: string;
   linkState?: string;
+  /** Where the facility block links; the Chaos Insurgency portal has no /menu. */
+  brandHref?: string;
+  /** Stations kept on the phone bar; the rest sit behind the overflow drawer. */
+  mobilePrimary?: string[];
 }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const railRef = useRef<HTMLElement>(null);
 
   const active = activeBase(pathname, sections);
-  const onMenu = pathname === "/menu";
+  const onMenu = pathname === brandHref;
 
   // Close the overflow drawer on navigation — otherwise it stays over the page
   // the member just asked for. Adjusted during render rather than in an effect:
@@ -89,7 +95,7 @@ export function CommandRail({
     items[(current + delta + items.length) % items.length]?.focus();
   }
 
-  const primary = sections.filter((s) => MOBILE_PRIMARY.includes(s.base));
+  const primary = sections.filter((s) => mobilePrimary.includes(s.base));
 
   return (
     <>
@@ -101,7 +107,7 @@ export function CommandRail({
       >
         {/* Facility identity. Doubles as the link home to the station board. */}
         <Link
-          href="/menu"
+          href={brandHref}
           className="hud-rail__brand block no-underline"
           data-station
           aria-current={onMenu ? "page" : undefined}
@@ -166,7 +172,7 @@ export function CommandRail({
         <div className="hud-drawer sm:hidden" role="dialog" aria-label="All stations">
           <div className="hud-station-head mb-3">
             <div>
-              <span className="hud-station-head__code">SCiP-NULL</span>
+              <span className="hud-station-head__code">{facility}</span>
               <span className="hud-station-head__title">STATION INDEX</span>
             </div>
             <button
