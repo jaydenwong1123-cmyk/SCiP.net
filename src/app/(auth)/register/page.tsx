@@ -61,7 +61,7 @@ export default function RegisterPage() {
                 name="username"
                 required
                 className="term-input"
-                placeholder="lcheung"
+                placeholder="noob@foundation.scp"
                 autoComplete="off"
               />
             </div>
