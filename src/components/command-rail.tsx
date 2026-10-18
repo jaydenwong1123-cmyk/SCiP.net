@@ -55,7 +55,8 @@ export function CommandRail({
   const railRef = useRef<HTMLElement>(null);
 
   const active = activeBase(pathname, sections);
-  const onMenu = pathname === brandHref;
+  // The CI portal's home is also one of its stations; mark only the station.
+  const onMenu = pathname === brandHref && !active;
 
   // Close the overflow drawer on navigation — otherwise it stays over the page
   // the member just asked for. Adjusted during render rather than in an effect:

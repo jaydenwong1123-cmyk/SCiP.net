@@ -116,7 +116,9 @@ export async function setEarlyAccessAction(formData: FormData) {
 }
 
 // Suspension and deletion are the only things that apply to a CI account.
-// Scoped to isInsurgent so these cannot be pointed at a member.
+// Scoped to isInsurgent so these cannot be pointed at a member. Suspending also
+// wipes the dossier: staff cannot read CI dossiers, so this is how a reported
+// one is taken down without it returning on reinstatement.
 export async function setCiSuspendedAction(formData: FormData) {
   const actor = await requireRootOwner();
   if (findNonAsciiFormField(formData)) return;
@@ -126,7 +128,11 @@ export async function setCiSuspendedAction(formData: FormData) {
   if (!target) return;
   await db.user.update({
     where: { id: userId },
-    data: { suspended: suspend, suspendedReason: suspend ? "Chaos Insurgency access revoked" : null },
+    data: {
+      suspended: suspend,
+      suspendedReason: suspend ? "Chaos Insurgency access revoked" : null,
+      personalFile: suspend ? "" : undefined,
+    },
   });
   await logAudit({
     action: AUDIT_ACTIONS.suspensionSet,
