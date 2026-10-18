@@ -36,7 +36,12 @@ model User {
   // (R5) designation alone; now a grant in its own right, so recordkeeping
   // duty can be handed out without also handing out a clearance designation.
   canEditPersonnel Boolean  @default(false)
-  isOwner          Boolean  @default(false)
+  // Reaching the training range (/training) without holding Helper or above.
+  // Granted from the member's personnel file by a RAISA administrator (or an
+  // Admin and above). Confers nothing but the drills — see canAccessTraining()
+  // in src/lib/session.ts.
+  canAccessTraining Boolean @default(false)
+  isOwner         Boolean  @default(false)
   // Co-Owner: owner-equivalent powers, held by at most MAX_CO_OWNERS members
   // at a time (see src/lib/roles.ts). Only the seeded owner can grant or
   // revoke it.

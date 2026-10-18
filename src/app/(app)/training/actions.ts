@@ -1,6 +1,6 @@
 "use server";
 
-import { requireUser, hasHelperPowers } from "@/lib/session";
+import { requireUser, canAccessTraining } from "@/lib/session";
 import { containsNonAscii, NON_ASCII_ERROR } from "@/lib/validation";
 import { issueDrill, gradeDrill, pruneDrills } from "@/lib/hack/drill-store";
 import type { PublicDrill, DrillResult } from "@/lib/hack/drills";
@@ -32,7 +32,7 @@ export async function startDrillAction(
   band: number
 ): Promise<StartDrillState> {
   const user = await requireUser();
-  if (!hasHelperPowers(user)) return { ok: false, error: FORBIDDEN };
+  if (!canAccessTraining(user)) return { ok: false, error: FORBIDDEN };
   if (containsNonAscii(game)) return { ok: false, error: NON_ASCII_ERROR };
 
   const issued = await issueDrill(user.id, game, band);
@@ -47,7 +47,7 @@ export async function submitDrillAction(
   answer: string
 ): Promise<SubmitDrillState> {
   const user = await requireUser();
-  if (!hasHelperPowers(user)) return { ok: false, error: FORBIDDEN };
+  if (!canAccessTraining(user)) return { ok: false, error: FORBIDDEN };
   if (containsNonAscii(answer)) return { ok: false, error: NON_ASCII_ERROR };
 
   return gradeDrill(user.id, nonce, answer);

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser, hasHelperPowers } from "@/lib/session";
+import { requireUser, canAccessTraining } from "@/lib/session";
 import { drillRoster, DRILL_BANDS, drillBandLabel } from "@/lib/hack/drills";
 import { StationHead, HudPanel, Readout, TickRule } from "@/components/hud";
 import { DrillConsole } from "./drill-console";
@@ -16,10 +16,13 @@ import { DrillConsole } from "./drill-console";
 // requireStaff() would be the wrong guard here: it is one tier too high and
 // would lock out the people who actually work the ticket queue these puzzles
 // generate.
+//
+// Below Helper, a RAISA administrator can open the range to an individual
+// member from their personnel file (the canAccessTraining grant).
 
 export default async function TrainingRangePage() {
   const user = await requireUser();
-  if (!hasHelperPowers(user)) notFound();
+  if (!canAccessTraining(user)) notFound();
 
   const roster = drillRoster();
 

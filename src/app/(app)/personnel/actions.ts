@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireUser, canAnnotateMembers, hasStaffPowers } from "@/lib/session";
+import {
+  requireUser,
+  canAnnotateMembers,
+  hasStaffPowers,
+  canGrantTrainingAccess,
+} from "@/lib/session";
 import {
   ATTACHMENT_ENTITIES,
   PERSONNEL_ATTACH_CLEARANCE,
@@ -236,4 +241,42 @@ export async function deleteInfractionAction(formData: FormData) {
   });
 
   revalidatePath(`/personnel/${infraction.subjectId}`);
+}
+
+// Open or close the training range for one member. RAISA administrators hold
+// this as part of their recordkeeping duty; Admin and above hold it because
+// they already appoint Helpers, who reach the range by role. Members who are
+// Helper or above keep their access regardless of this flag.
+export async function toggleTrainingAccessAction(formData: FormData) {
+  const actor = await requireUser();
+  if (!canGrantTrainingAccess(actor)) return;
+
+  const subjectId = String(formData.get("subjectId") ?? "");
+  const canAccessTraining = formData.get("canAccessTraining") === "true";
+  if (!subjectId) return;
+
+  // No self-grants: an administrator who wants the range asks a colleague, so
+  // every grant in the audit log has a second pair of eyes behind it.
+  if (subjectId === actor.id) return;
+
+  const subject = await db.user.findUnique({ where: { id: subjectId } });
+  if (!subject || subject.isInsurgent) return;
+
+  await db.user.update({
+    where: { id: subjectId, isInsurgent: false },
+    data: { canAccessTraining },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.trainingAccessToggled,
+    actor,
+    targetType: "user",
+    targetId: subjectId,
+    targetName: subject.displayName ?? subject.email,
+    summary: canAccessTraining
+      ? "Granted training range access"
+      : "Revoked training range access",
+  });
+
+  revalidatePath(`/personnel/${subjectId}`);
 }

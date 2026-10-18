@@ -24,7 +24,7 @@ export type Gate =
   | "messageLogs"
   | "counterIntel"
   | "staff"
-  | "helper";
+  | "training";
 
 export type Gates = Record<Gate, boolean>;
 
@@ -157,16 +157,17 @@ export const SECTIONS: Section[] = [
     gate: "counterIntel",
   },
   {
-    // The only station a Helper can reach. Nothing here touches a live run —
-    // see the HackDrill comment in schema.prisma — so it is safe at a tier
-    // that has no other panel access.
+    // The only station a Helper can reach, and the only one a RAISA
+    // administrator can open to an individual member. Nothing here touches a
+    // live run — see the HackDrill comment in schema.prisma — so it is safe at
+    // a tier that has no other panel access.
     base: "/training",
     label: "TRAINING RANGE",
     code: "TRN",
     desc: "Countermeasure drills — simulated, no live systems",
     group: "restricted",
     accent: "amber",
-    gate: "helper",
+    gate: "training",
   },
   {
     base: "/admin",

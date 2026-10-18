@@ -91,6 +91,7 @@ export const getCurrentUser = cache(async () => {
       isAdmin: false,
       isStaff: false,
       isHelper: false,
+      canAccessTraining: false,
       realClearance: user.clearance,
       viewAsClearance: viewAs,
       // A simulation suppresses an intrusion grant outright. "View as" exists
@@ -215,6 +216,10 @@ export async function requireInsurgent() {
 //                          ticket queue, and reaches /training, which grades
 //                          practice puzzles and touches nothing else. Granted
 //                          only by an Admin or above.
+//   Training (canAccessTraining) — not a role: a single grant that opens
+//                          /training to a member below Helper. A RAISA
+//                          administrator or an Admin and above may toggle it
+//                          from the member's personnel file.
 
 // Owner-equivalent: the seeded owner or the appointed co-owner.
 export function hasOwnerPowers(user: { isOwner: boolean; isCoOwner: boolean }) {
@@ -248,6 +253,35 @@ export function hasHelperPowers(user: {
   isHelper: boolean;
 }) {
   return hasStaffPowers(user) || user.isHelper;
+}
+
+// The training range: Helper and above, plus anyone holding the per-member
+// grant. The grant is safe to hand out below Helper for the same reason the
+// station is safe at Helper — a drill issues no clearance, spends no cooldown
+// and writes no conduct record.
+export function canAccessTraining(user: {
+  canAccessTraining?: boolean;
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+  isHelper: boolean;
+}): boolean {
+  return user.canAccessTraining === true || hasHelperPowers(user);
+}
+
+// Who may hand out (or take back) the training-range grant: RAISA
+// administrators, as part of their recordkeeping duty, and Admin and above,
+// who already appoint Helpers. Staff are deliberately absent, matching
+// toggleHelperAction. A "view as" persona carries no designation, so a
+// simulation can never grant.
+export function canGrantTrainingAccess(user: {
+  designation?: string | null;
+  isOwner: boolean;
+  isCoOwner: boolean;
+  isAdmin: boolean;
+}): boolean {
+  return user.designation === R5_DESIGNATION || hasAdminPowers(user);
 }
 
 // Owner or co-owner.

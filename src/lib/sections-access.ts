@@ -1,7 +1,7 @@
 import { canAccessSecureChannel } from "@/lib/clearance";
 import { canAccessMessageLogs } from "@/lib/message-logs";
 import { canAccessCounterIntel } from "@/lib/counter-intel";
-import { hasStaffPowers, hasHelperPowers } from "@/lib/session";
+import { hasStaffPowers, canAccessTraining } from "@/lib/session";
 import type { Gates } from "@/lib/sections";
 
 // Server-side half of the station registry.
@@ -21,6 +21,7 @@ export type GateUser = {
   isAdmin: boolean;
   isStaff: boolean;
   isHelper: boolean;
+  canAccessTraining: boolean;
 };
 
 export function resolveGates(user: GateUser): Gates {
@@ -29,6 +30,6 @@ export function resolveGates(user: GateUser): Gates {
     messageLogs: canAccessMessageLogs(user),
     counterIntel: canAccessCounterIntel(user),
     staff: hasStaffPowers(user),
-    helper: hasHelperPowers(user),
+    training: canAccessTraining(user),
   };
 }
