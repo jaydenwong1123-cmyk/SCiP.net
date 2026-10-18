@@ -67,7 +67,7 @@ export default function LoginPage() {
               name="username"
               required
               className="term-input"
-              placeholder="lcheung"
+              placeholder="noob@foundation.scp"
               autoComplete="username"
             />
           </div>
