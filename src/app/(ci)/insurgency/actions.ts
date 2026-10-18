@@ -1,10 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
 import { requireInsurgent } from "@/lib/session";
 import { getSiteConfig } from "@/lib/site-config";
-import { containsNonAscii, NON_ASCII_ERROR } from "@/lib/validation";
-import { consumeRateLimit, contentLimitError, SIEGE_RULE } from "@/lib/rate-limit";
+import { containsNonAscii, findNonAsciiFormField, NON_ASCII_ERROR } from "@/lib/validation";
+import {
+  consumeRateLimit,
+  contentLimitError,
+  CONTENT_RULE,
+  CONTENT_SCOPES,
+  SIEGE_RULE,
+} from "@/lib/rate-limit";
 import { ciEnabled } from "@/lib/ci/access";
 import {
   abandonChallenge,
@@ -65,4 +72,25 @@ export async function submitAttackAnswerAction(
 export async function abandonAttackAction(nonce: string): Promise<void> {
   const user = await requireInsurgent();
   await abandonChallenge(user.id, nonce);
+}
+
+// The operative's own dossier. Stored in User.personalFile, the same column the
+// Foundation personnel file uses, but written and read only through this portal:
+// the member profile and /personnel pages refuse CI accounts, and the member
+// edit action refuses a CI subject. There is no subjectId here: an operative
+// can edit their own file and nobody else's.
+export async function updateDossierAction(
+  _prev: { ok: boolean; error?: string } | null,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireInsurgent();
+  if (findNonAsciiFormField(formData)) return { ok: false, error: NON_ASCII_ERROR };
+  const limit = await consumeRateLimit(CONTENT_SCOPES.document, user.id, CONTENT_RULE);
+  if (limit.blocked) return { ok: false, error: contentLimitError(limit.retryAfterMs) };
+
+  const content = String(formData.get("dossier") ?? "").slice(0, 20000);
+  await db.user.update({ where: { id: user.id }, data: { personalFile: content } });
+
+  revalidatePath("/insurgency/dossier");
+  return { ok: true };
 }

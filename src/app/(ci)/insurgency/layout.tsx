@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireInsurgent } from "@/lib/session";
 import { enforceMaintenance } from "@/lib/site-config";
 import { LogoutButton } from "@/components/logout-button";
@@ -19,6 +20,8 @@ export default async function InsurgencyLayout({ children }: { children: React.R
         <span>FIELD UPLINK</span>
         <span aria-hidden>{"//"}</span>
         <span>{user.displayName}</span>
+        <span aria-hidden>{"//"}</span>
+        <Link href="/insurgency/dossier">DOSSIER</Link>
         <span aria-hidden>{"//"}</span>
         <LogoutButton />
       </div>

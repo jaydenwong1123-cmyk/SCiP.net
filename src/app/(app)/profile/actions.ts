@@ -62,9 +62,9 @@ export async function updatePersonalFileAction(
   if (targetId !== user.id) {
     const subject = await db.user.findUnique({
       where: { id: targetId },
-      select: { id: true },
+      select: { id: true, isInsurgent: true },
     });
-    if (!subject) return { ok: false, error: "MEMBER NOT FOUND." };
+    if (!subject || subject.isInsurgent) return { ok: false, error: "MEMBER NOT FOUND." };
   }
 
   const redactCheck = checkRedactionAuthorization(content, user);
