@@ -326,12 +326,14 @@ function MinesweeperGame({ payload, value, onChange, disabled, signals }: GamePr
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [detonatedAt, setDetonatedAt] = useState<string | null>(null);
   const [flagMode, setFlagMode] = useState(false);
+  const [firstClickDone, setFirstClickDone] = useState(false);
   const [seenPayload, setSeenPayload] = useState(payload);
   if (payload !== seenPayload) {
     setSeenPayload(payload);
     setRevealed(new Set());
     setDetonatedAt(null);
     setFlagMode(false);
+    setFirstClickDone(false);
   }
 
   const locked = disabled || detonatedAt !== null;
@@ -354,7 +356,17 @@ function MinesweeperGame({ payload, value, onChange, disabled, signals }: GamePr
     const key = `${r}-${c}`;
     if (revealed.has(key) || flagged.includes(`R${r + 1}C${c + 1}`)) return;
 
+    const isFirstClick = !firstClickDone;
+    if (isFirstClick) setFirstClickDone(true);
+
     if (p.cells[r][c] === null) {
+      // The first click can never detonate. The mine layout is fixed and
+      // graded server-side so it can't be relocated like in a classic
+      // minesweeper; instead the mine is safely marked for the player.
+      if (isFirstClick) {
+        onChange([...flagged, `R${r + 1}C${c + 1}`].join(" "));
+        return;
+      }
       setDetonatedAt(key);
       onChange(DETONATED_ANSWER);
       return;
@@ -383,8 +395,8 @@ function MinesweeperGame({ payload, value, onChange, disabled, signals }: GamePr
   return (
     <div className="space-y-3">
       <Hint>
-        {p.mineCount} MINES ON THE FIELD. CLICK A COVERED CELL TO UNCOVER IT.
-        {" "}FLAG EVERY MINE — RIGHT-CLICK, OR TOGGLE FLAG MODE BELOW. TRANSMIT
+        {p.mineCount} MINES ON THE FIELD. CLICK A COVERED CELL TO UNCOVER IT —
+        {" "}YOUR FIRST CLICK IS ALWAYS SAFE. FLAG EVERY MINE — RIGHT-CLICK, OR TOGGLE FLAG MODE BELOW. TRANSMIT
         ONCE THE FIELD IS FULLY CLEARED AND EVERY MINE IS FLAGGED.
       </Hint>
       <div className="flex items-center gap-2">
