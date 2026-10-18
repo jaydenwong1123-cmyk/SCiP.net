@@ -43,7 +43,7 @@ export default async function PersonnelFilePage({
   const viewer = await requireUser();
   const { id } = await params;
   const person = await db.user.findUnique({
-    where: { id },
+    where: { id, isInsurgent: false },
     select: {
       id: true,
       displayName: true,
@@ -80,7 +80,7 @@ export default async function PersonnelFilePage({
       })
     : [];
 
-  // Dossier attachments are L-5+ material: the same bar gates uploading,
+  // Dossier attachments are L-6+ material: the same bar gates uploading,
   // listing, and the route that serves the bytes.
   const canSeeAttachments = viewer.clearance >= PERSONNEL_ATTACH_CLEARANCE;
   const attachments = canSeeAttachments
@@ -150,7 +150,7 @@ export default async function PersonnelFilePage({
         <HudPanel
           code="02"
           title={<span className="text-[var(--term-amber)]">⧉ ATTACHED EVIDENCE</span>}
-          status="L-5+ ONLY"
+          status="L-6+ ONLY"
           variant="secure"
         >
           {attachments.length === 0 ? (
@@ -206,7 +206,10 @@ export default async function PersonnelFilePage({
                       <SeverityMeter severity={inf.severity as InfractionSeverity} />
                       <span style={{ color }}>{inf.severity}</span>
                       <span className="hud-recid">
-                        {inf.issuerName || "UNKNOWN"} ·{" "}
+                        {inf.issuerName
+                          ? renderRedactedName(inf.issuerName, viewer)
+                          : "UNKNOWN"}{" "}
+                        ·{" "}
                         {inf.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                       </span>
                     </span>
@@ -244,7 +247,7 @@ export default async function PersonnelFilePage({
               ⚑ CLASSIFIED PERSONNEL NOTES
             </span>
           }
-          status="L-5+ / STAFF ONLY"
+          status="L-6+ / STAFF ONLY"
           variant="secure"
         >
           <p className="text-[10px] text-[var(--term-fg-dim)] mb-2">

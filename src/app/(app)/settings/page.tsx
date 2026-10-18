@@ -2,6 +2,8 @@ import { requireUser, getRealUser } from "@/lib/session";
 import { SettingsForm } from "./settings-form";
 import { NotificationPreferencesForm } from "./notification-preferences-form";
 import { getNotificationPreferences } from "@/lib/notifications";
+import { getSiteConfig } from "@/lib/site-config";
+import { ciVisibleTo } from "@/lib/ci/access";
 import { clearanceDisplay, clearanceLabel } from "@/lib/clearance";
 import { canViewAs, getViewAsClearance, viewAsOptions } from "@/lib/view-as";
 import { setViewAsAction } from "./view-as-actions";
@@ -13,7 +15,11 @@ export default async function SettingsPage() {
   // back out of a simulation, so it must never be downgraded.
   const real = (await getRealUser())!;
   const viewAs = await getViewAsClearance(real);
-  const notificationPreferences = await getNotificationPreferences(real.id);
+  // Siege alerts exist only for members who can see the siege at all.
+  const showSiege = ciVisibleTo(real, await getSiteConfig());
+  const notificationPreferences = (await getNotificationPreferences(real.id)).filter(
+    (p) => showSiege || p.type !== "siege"
+  );
 
   return (
     <>

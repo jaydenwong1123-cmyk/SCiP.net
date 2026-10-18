@@ -26,6 +26,8 @@ export const CONDUCT_SURFACES = {
   trace: "trace",
   duelAttacker: "duel_attacker",
   duelDefender: "duel_defender",
+  siegeCi: "siege_ci",
+  siegeRaisa: "siege_raisa",
 } as const;
 
 export type ConductSurface =
@@ -36,6 +38,8 @@ export const CONDUCT_SURFACE_LABELS: Record<string, string> = {
   trace: "RAISA TRACE",
   duel_attacker: "DUEL — INTRUDER SEAT",
   duel_defender: "DUEL — OFFICER SEAT",
+  siege_ci: "SIEGE — INSURGENT SEAT",
+  siege_raisa: "SIEGE — RAISA SEAT",
 };
 
 type RecordInput = ScoreInput & {

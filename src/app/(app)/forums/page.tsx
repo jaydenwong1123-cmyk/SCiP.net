@@ -36,7 +36,7 @@ export default async function ForumsPage() {
       </StationHead>
 
       <p className="text-[10px] text-[var(--term-fg-dim)]">
-        L-5+ MAY OPEN A NEW TOPIC · EACH TOPIC SETS ITS OWN CLEARANCE FLOOR ·
+        L-6+ MAY OPEN A NEW TOPIC · EACH TOPIC SETS ITS OWN CLEARANCE FLOOR ·
         A TOPIC ABOVE YOUR CLEARANCE DOES NOT APPEAR HERE
       </p>
 
@@ -46,7 +46,7 @@ export default async function ForumsPage() {
             <EmptyState glyph="◈" title="No forums open yet">
               {canCreateForum(authoringClearance(user)) ? (
                 <p className="text-xs">
-                  L-5+ PERSONNEL MAY OPEN THE FIRST ONE.
+                  L-6+ PERSONNEL MAY OPEN THE FIRST ONE.
                 </p>
               ) : (
                 <p className="text-xs">

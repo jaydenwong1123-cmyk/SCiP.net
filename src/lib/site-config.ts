@@ -35,6 +35,15 @@ export type SiteConfig = {
   memeticCadence: string;
   memeticEndsAt: Date | null;
   memeticIssuedById: string | null;
+  // CHAOS INSURGENCY SIEGE — see lib/ci/. ciMode gates who sees any of it;
+  // the three hint columns let the hot path skip the siege tables entirely.
+  ciMode: string;
+  ciSignupEnabled: boolean;
+  ciAttacksEnabled: boolean;
+  ciCooldownUntil: Date | null;
+  ciSiegeEndsAt: Date | null;
+  ciDefacedUntil: Date | null;
+  ciLockHorizon: Date | null;
 };
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -57,6 +66,13 @@ const DEFAULT_CONFIG: SiteConfig = {
   memeticCadence: "",
   memeticEndsAt: null,
   memeticIssuedById: null,
+  ciMode: "off",
+  ciSignupEnabled: false,
+  ciAttacksEnabled: false,
+  ciCooldownUntil: null,
+  ciSiegeEndsAt: null,
+  ciDefacedUntil: null,
+  ciLockHorizon: null,
 };
 
 // Read-only fetch of the singleton config. Returns an in-memory default if the

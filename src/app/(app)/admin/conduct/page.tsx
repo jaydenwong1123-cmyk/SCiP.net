@@ -19,6 +19,7 @@ import {
   SANCTION_LEVELS,
 } from "@/lib/hack/sanctions";
 import { IssueSanctionForm, LiftSanctionForm } from "./sanction-console";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
 // The conduct log: every graded puzzle round, and what its timing looked like.
 //
@@ -89,7 +90,7 @@ export default async function ConductLogPage({
     // The owner is excluded here as well as in the action: an option that can
     // only be refused is worse than no option.
     db.user.findMany({
-      where: { displayName: { not: null }, isOwner: false },
+      where: { displayName: { not: null }, isOwner: false, ...NOT_INSURGENT },
       orderBy: [{ displayName: "asc" }],
       select: { id: true, displayName: true, email: true },
     }),

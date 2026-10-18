@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import {
+  renderRedacted,
+  renderRedactedName,
+  redactToText,
+  canBypassRedaction,
+} from "@/lib/redact";
 import { canCreateIncident } from "@/lib/doc-permissions";
 import { db } from "@/lib/db";
 import { CLEARANCE_LEVELS, clearanceLabel } from "@/lib/clearance";
@@ -13,7 +19,6 @@ import {
   pickOption,
   pickRank,
   pickQuery,
-  containsFilter,
 } from "@/lib/filters";
 
 export default async function IncidentsPage({
@@ -35,7 +40,7 @@ export default async function IncidentsPage({
   const activeLevel = pickRank(levelParam, 1, user.clearance);
   const query = pickQuery(qParam);
 
-  const reports = await db.incidentReport.findMany({
+  const allReports = await db.incidentReport.findMany({
     where: {
       // The clearance ceiling is applied first and always. A level facet may
       // only narrow within it, never reach above it.
@@ -43,21 +48,25 @@ export default async function IncidentsPage({
         ? { equals: activeLevel }
         : { lte: user.clearance },
       ...(activeSeverity ? { severity: activeSeverity } : {}),
-      // Title and location, not body — same reasoning as the SCP archive: both
-      // of these are already displayed on this page, so searching them cannot
-      // surface text the viewer could not otherwise see.
-      ...(query
-        ? {
-            OR: [
-              { title: containsFilter(query) },
-              { location: containsFilter(query) },
-            ],
-          }
-        : {}),
     },
     orderBy: { createdAt: "desc" },
     include: { author: { select: { displayName: true } } },
   });
+
+  // TITLE/LOCATION SEARCH IS APPLIED IN MEMORY, AGAINST THE REDACTED FORM, for
+  // the same reason as the personnel roster: a title or location may carry
+  // redaction markup, and a database `contains` would confirm hidden text to a
+  // viewer who is only shown block characters. Matching what the viewer would
+  // actually read means text they cannot see is text they cannot find.
+  const bypass = canBypassRedaction(user);
+  const needle = query?.toUpperCase() ?? null;
+  const reports = needle
+    ? allReports.filter(
+        (r) =>
+          redactToText(r.title, user.clearance, bypass).toUpperCase().includes(needle) ||
+          redactToText(r.location, user.clearance, bypass).toUpperCase().includes(needle)
+      )
+    : allReports;
 
   const readableLevels = CLEARANCE_LEVELS.filter((l) => l.rank <= user.clearance);
 
@@ -163,7 +172,9 @@ export default async function IncidentsPage({
                 <span className="hud-recid">
                   IR-{String(r.id).slice(0, 4).toUpperCase()}
                 </span>
-                <span className="text-[var(--term-fg-bright)]">{r.title}</span>
+                <span className="text-[var(--term-fg-bright)]">
+                  {renderRedacted(r.title, user.clearance, bypass)}
+                </span>
                 {r.revisionCount > 0 && (
                   <span className="hud-recid">REV {r.revisionCount}</span>
                 )}
@@ -171,7 +182,8 @@ export default async function IncidentsPage({
               <span className="shrink-0 flex items-center gap-2">
                 <SeverityBadge severity={r.severity} />
                 <span className="hud-recid">
-                  [{clearanceLabel(r.clearanceRequired)}] — {r.author.displayName}
+                  [{clearanceLabel(r.clearanceRequired)}] —{" "}
+                  {renderRedactedName(r.author.displayName ?? "", user)}
                 </span>
               </span>
             </Link>

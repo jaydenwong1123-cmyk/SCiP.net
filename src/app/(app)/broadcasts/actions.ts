@@ -29,6 +29,7 @@ import {
   CONTENT_RULE,
   CONTENT_SCOPES,
 } from "@/lib/rate-limit";
+import { systemOfflineError } from "@/lib/ci/lockdown";
 
 // The audience a directive is aimed at: the minimum clearance needed to read
 // it. A directive may be aimed no higher than the issuer's own authoring
@@ -59,6 +60,10 @@ export async function createBroadcastAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  // A section taken down by a siege refuses writes from anywhere, not only
+  // from its own pages — see lib/ci/lockdown.ts.
+  const offline = await systemOfflineError(user, "broadcasts");
+  if (offline) return { ok: false, error: offline };
   if (!canPostBroadcast(authoringClearance(user))) {
     return { ok: false, error: "INSUFFICIENT CLEARANCE TO BROADCAST." };
   }

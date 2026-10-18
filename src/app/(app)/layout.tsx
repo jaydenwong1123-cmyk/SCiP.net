@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser, enforceSentinel } from "@/lib/session";
+import { requireUser, enforceSentinel, hasStaffPowers } from "@/lib/session";
 import { clearanceLabel } from "@/lib/clearance";
 import { formatDuration } from "@/lib/hack/config";
 import { enforceMaintenance, enforceShutdown, getSiteConfig } from "@/lib/site-config";
@@ -12,6 +12,10 @@ import { messageRetentionCutoff } from "@/lib/message-retention";
 import { resolveGates } from "@/lib/sections-access";
 import { visibleSections, type BadgeCounts } from "@/lib/sections";
 import { getStationCounts } from "@/lib/station-counts";
+import { canAccessCounterIntel } from "@/lib/counter-intel";
+import { ciVisibleTo } from "@/lib/ci/access";
+import { siegeFeed } from "@/lib/ci/siege-store";
+import { SiegeOverlay } from "@/components/ci/siege-overlay";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Independent gates — run concurrently instead of one after the other so the
@@ -34,7 +38,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   //
   // Matched against user.id, which is the real account even under a "view as"
   // simulation — the persona swap downgrades clearance, not identity.
-  const exposure = memeticFor(await getSiteConfig(), user.id);
+  const siteConfig = await getSiteConfig();
+  const exposure = memeticFor(siteConfig, user.id);
+  // Members who cannot see the siege (everyone, while it is off; everyone but
+  // the testers, in early access) get no overlay mounted at all, so not even
+  // its poll reaches the server on their behalf.
+  const siegeVisible = ciVisibleTo(user, siteConfig);
   const memetic = exposure
     ? {
         agent: exposure.agent.slug,
@@ -49,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // page alone; the rail shows the same numbers on every route, so they moved
   // up here and the menu now reads them from the shared helper's cache rather
   // than issuing its own queries.
-  const [unreadMessages, notificationRows, unreadNotifications, counts] =
+  const [unreadMessages, notificationRows, unreadNotifications, counts, siege] =
     await Promise.all([
       db.message.count({
         where: {
@@ -61,6 +70,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       getRecentNotifications(user.id),
       getUnreadNotificationCount(user.id),
       getStationCounts(user),
+      // CHAOS INSURGENCY SIEGE. Free when nothing is happening — the hint
+      // columns on the cached SiteConfig answer that without a query — and
+      // null for anyone outside early access while it is in early access.
+      siegeFeed(siegeVisible),
     ]);
 
   const badgeCounts: BadgeCounts = { ...counts, unreadMessages };
@@ -78,6 +91,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const banners = (
     <>
+      {siegeVisible && (
+        <SiegeOverlay
+          initial={siege}
+          isRaisa={canAccessCounterIntel(user)}
+          staffOverride={hasStaffPowers(user)}
+        />
+      )}
       {user.viewAsClearance !== null && (
         <div className="hud-banner hud-banner--alert">
           <span>

@@ -34,12 +34,17 @@ import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
+import { systemOfflineError } from "@/lib/ci/lockdown";
 
 export async function createScpFileAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  // A section taken down by a siege refuses writes from anywhere, not only
+  // from its own pages — see lib/ci/lockdown.ts.
+  const offline = await systemOfflineError(user, "archives");
+  if (offline) return { ok: false, error: offline };
   if (!canCreateScpFile(user)) {
     return { ok: false, error: "YOU DO NOT HAVE PERMISSION TO POST SCP FILES." };
   }
@@ -113,6 +118,10 @@ export async function updateScpFileAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  // A section taken down by a siege refuses writes from anywhere, not only
+  // from its own pages — see lib/ci/lockdown.ts.
+  const offline = await systemOfflineError(user, "archives");
+  if (offline) return { ok: false, error: offline };
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, error: "MISSING FILE ID." };
 

@@ -9,6 +9,7 @@ import { StationHead, HudPanel, Readout, TickRule } from "@/components/hud";
 import { OmegaConsole } from "./omega-console";
 import { RestoreConsole } from "./restore-console";
 import { MemeticConsole, type LiveExposure } from "./memetic-console";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
 // Live arming state and shutdown posture; never prerendered.
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function OmegaPage() {
   // refuses it too, but there is no reason to offer it — and suspended members,
   // who cannot reach a page to be exposed on in the first place.
   const roster = await db.user.findMany({
-    where: { suspended: false, id: { not: owner.id } },
+    where: { suspended: false, id: { not: owner.id }, ...NOT_INSURGENT },
     select: {
       id: true,
       displayName: true,

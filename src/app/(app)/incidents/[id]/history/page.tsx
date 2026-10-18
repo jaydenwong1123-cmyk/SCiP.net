@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser, hasAdminPowers } from "@/lib/session";
 import { db } from "@/lib/db";
 import { listRevisions, REVISION_ENTITIES } from "@/lib/revisions";
+import { redactNameToText } from "@/lib/redact";
 import { RevisionHistory } from "@/components/revision-history";
 import { StationHead, HudPanel, Readout } from "@/components/hud";
 
@@ -27,7 +28,7 @@ export default async function IncidentHistoryPage({
     <>
       <StationHead
         code="SEC-04 // REVISION HISTORY"
-        title={report.title.toUpperCase()}
+        title={redactNameToText(report.title, user).toUpperCase()}
       >
         <Readout label="Archived" value={revisions.length} />
         <Link href={`/incidents/${report.id}`} className="term-link text-sm">

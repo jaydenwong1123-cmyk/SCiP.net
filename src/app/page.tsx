@@ -7,6 +7,7 @@ export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.suspended) redirect("/suspended");
+  if (user.isInsurgent) redirect("/insurgency");
   if (!user.displayName) redirect("/set-name");
   redirect("/menu");
 }

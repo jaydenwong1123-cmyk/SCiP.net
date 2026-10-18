@@ -6,12 +6,17 @@ export const OPEN_DEPARTMENTS = [
   "Facility Management",
 ] as const;
 
+// RAISA. Lives here rather than in lib/counter-intel.ts (which re-exports it)
+// so client-safe modules like lib/ci/access.ts can use it without pulling in db.
+export const RAISA_DEPARTMENT =
+  "Recordkeeping & Information Security Administration";
+
 // Restricted departments only staff (owner/admin/staff) may assign to a member.
 export const RESTRICTED_DEPARTMENTS = [
   "Ethics Committee",
   "O5 Command",
   "The Administrator",
-  "Recordkeeping & Information Security Administration",
+  RAISA_DEPARTMENT,
   "Site Directorate",
   "Mobile Task Force",
   "Alpha-1",

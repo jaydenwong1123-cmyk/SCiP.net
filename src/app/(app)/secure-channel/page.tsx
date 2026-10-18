@@ -49,11 +49,11 @@ export default async function SecureChannelPage() {
   return (
     <>
       <HudBanner level="secret">
-        SECRET // AES-256 // L-5+ EYES ONLY // ALL TRAFFIC LOGGED
+        SECRET // AES-256 // L-6+ EYES ONLY // ALL TRAFFIC LOGGED
       </HudBanner>
 
       <StationHead
-        code="L-5+ // ENCRYPTED CHANNEL"
+        code="L-6+ // ENCRYPTED CHANNEL"
         title={<span className="text-[var(--term-amber)]">SECURE CHANNEL</span>}
       >
         <Readout label="Transmissions" value={messages.length} tone="amber" />

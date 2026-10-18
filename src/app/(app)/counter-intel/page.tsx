@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { getSiteConfig } from "@/lib/site-config";
+import { ciVisibleTo } from "@/lib/ci/access";
 import {
   anonymiseRun,
   canAccessCounterIntel,
@@ -40,6 +42,8 @@ export default async function CounterIntelPage({
   // notFound rather than redirect: a member who is not RAISA should not learn
   // that this section exists at all.
   if (!canAccessCounterIntel(user)) notFound();
+  // The siege desk is signposted only to officers who can see the siege.
+  const siegeVisible = ciVisibleTo(user, await getSiteConfig());
 
   // Lazy retention sweep — see purgeExpiredCounterIntelLogs() for why there's
   // no cron doing this instead.
@@ -225,6 +229,15 @@ export default async function CounterIntelPage({
         />
         <Readout label="Yours" value={myCases} small />
         <Readout label="Retention" value={`${COUNTER_INTEL_RETENTION_DAYS}D`} small />
+        {siegeVisible && (
+          <Link
+            href="/counter-intel/siege"
+            className="term-link text-sm"
+            style={{ color: "var(--term-red)" }}
+          >
+            [SIEGE DEFENSE]
+          </Link>
+        )}
       </StationHead>
 
       <HudBanner level="secret">

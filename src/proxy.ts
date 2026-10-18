@@ -21,9 +21,12 @@ const { auth } = NextAuth(authConfig);
 // `/sentinel` is deliberately NOT public: it is only ever reached by an
 // already-authenticated owner. `/privacy` and `/terms` are public so a visitor
 // can read them before registering.
+// `/enlist` is the Chaos Insurgency signup screen. It is public for the same
+// reason `/register` is, and it is useless without the out-of-roleplay code.
 const PUBLIC_PATHS = [
   "/login",
   "/register",
+  "/enlist",
   "/maintenance",
   "/terminated",
   "/privacy",
@@ -49,11 +52,20 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (req.auth && (pathname === "/login" || pathname === "/register")) {
+  if (
+    req.auth &&
+    (pathname === "/login" || pathname === "/register" || pathname === "/enlist")
+  ) {
     return NextResponse.redirect(new URL("/", req.nextUrl.origin));
   }
 
-  return NextResponse.next();
+  // Tell the server which path this request is for. Layouts never learn their
+  // pathname, and the Chaos Insurgency section locks (lib/ci/lockdown.ts) need
+  // it from inside requireUser(). `set` overwrites, so a client cannot supply
+  // its own value; Next re-applies its internal flight headers on top.
+  const headers = new Headers(req.headers);
+  headers.set("x-scip-path", pathname);
+  return NextResponse.next({ request: { headers } });
 });
 
 // Everything except Next's own build output and the static assets in public/.

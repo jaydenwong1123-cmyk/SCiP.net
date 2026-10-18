@@ -29,12 +29,12 @@ export const MAX_CLEARANCE = 7;
 // must be assigned by staff and cannot be requested.
 export const MAX_REQUESTABLE_CLEARANCE = 3;
 export const OWNER_CLEARANCE = 7;
-export const BROADCAST_POST_CLEARANCE = 5;
-export const MEMBER_NOTE_CLEARANCE = 5;
-export const SECURE_CHANNEL_CLEARANCE = 5;
+export const BROADCAST_POST_CLEARANCE = 6;
+export const MEMBER_NOTE_CLEARANCE = 6;
+export const SECURE_CHANNEL_CLEARANCE = 6;
 // Who may open a new forum topic. The forums section itself is visible to
 // everyone; this only gates creating one.
-export const FORUM_CREATE_CLEARANCE = 5;
+export const FORUM_CREATE_CLEARANCE = 6;
 
 export function canAccessSecureChannel(rank: number): boolean {
   return rank >= SECURE_CHANNEL_CLEARANCE;

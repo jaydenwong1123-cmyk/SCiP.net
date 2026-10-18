@@ -6,7 +6,7 @@ export default async function SuspendedPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   // Not actually suspended? Send them back into the app.
-  if (!user.suspended) redirect("/personnel");
+  if (!user.suspended) redirect(user.isInsurgent ? "/insurgency" : "/personnel");
 
   return (
     <div className="min-h-screen flex flex-col">

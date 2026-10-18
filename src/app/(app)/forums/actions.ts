@@ -31,7 +31,7 @@ export async function createForumAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
   if (!canCreateForum(authoringClearance(user))) {
-    return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED TO OPEN A FORUM." };
+    return { ok: false, error: "CLEARANCE L-6 OR HIGHER REQUIRED TO OPEN A FORUM." };
   }
   if (findNonAsciiFormField(formData)) {
     return { ok: false, error: NON_ASCII_ERROR };

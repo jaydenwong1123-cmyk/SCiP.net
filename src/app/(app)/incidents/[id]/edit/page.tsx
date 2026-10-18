@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { redactNameToText } from "@/lib/redact";
 import { db } from "@/lib/db";
 import { canEditIncident } from "@/lib/doc-permissions";
 import { authoringClearance } from "@/lib/clearance";
@@ -23,7 +24,7 @@ export default async function EditIncidentPage({
     <>
       <StationHead
         code="SEC-04 // AMEND REPORT"
-        title={report.title.toUpperCase()}
+        title={redactNameToText(report.title, user).toUpperCase()}
       >
         <Link href={`/incidents/${report.id}`} className="term-link text-sm">
           [BACK TO REPORT]

@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   infraction: "INFRACTIONS",
   ticket: "TICKETS",
   intrusion: "INTRUSION ALERTS",
+  siege: "SIEGE ALERTS",
 };
 
 export function NotificationPreferencesForm({

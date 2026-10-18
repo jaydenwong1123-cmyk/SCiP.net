@@ -29,7 +29,7 @@ export async function GET() {
   });
 
   const user = await getRealUser();
-  if (!user || user.suspended) return empty;
+  if (!user || user.suspended || user.isInsurgent) return empty;
 
   const cfg = await getSiteConfig();
   const exposure = memeticFor(cfg, user.id);

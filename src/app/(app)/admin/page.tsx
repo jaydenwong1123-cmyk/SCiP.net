@@ -12,6 +12,7 @@ import {
   clearanceDisplay,
   clearanceAssignValue, clearanceChipStyle } from "@/lib/clearance";
 import { getSiteConfig } from "@/lib/site-config";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 import { MemberList } from "./member-list";
 import { Quartermaster } from "./quartermaster";
 import { heldToolCounts, MAX_UNUSED_TOOLS } from "@/lib/hack/tools";
@@ -55,8 +56,10 @@ export default async function AdminPage() {
     activeInviteCount,
     r5Count,
   ] = await Promise.all([
+    // Chaos Insurgency accounts are managed on /admin/insurgency, not here:
+    // none of the member controls on this page apply to them.
     db.user.findMany({
-      where: { isOwner: false },
+      where: { isOwner: false, ...NOT_INSURGENT },
       orderBy: { displayName: "asc" },
     }),
     db.inviteCode.findMany({
@@ -77,8 +80,8 @@ export default async function AdminPage() {
         user: { select: { displayName: true, clearance: true, designation: true } },
       },
     }),
-    db.user.groupBy({ by: ["clearance"], _count: true }),
-    db.user.count({ where: { suspended: true } }),
+    db.user.groupBy({ by: ["clearance"], where: NOT_INSURGENT, _count: true }),
+    db.user.count({ where: { suspended: true, ...NOT_INSURGENT } }),
     db.user.count({ where: { OR: [{ isStaff: true }, { isAdmin: true }] } }),
     db.scpFile.count(),
     db.incidentReport.count(),
@@ -129,6 +132,12 @@ export default async function AdminPage() {
         <Link href="/admin/audit" className="term-link text-sm">
           [ACCESS &amp; ACTION LOG]
         </Link>
+        {/* Seeded owner only; the route enforces the same check itself. */}
+        {viewer.isOwner && (
+          <Link href="/admin/insurgency" className="term-link text-sm">
+            [INSURGENCY CONTROL]
+          </Link>
+        )}
         {/* Admin+ only, and not merely as signposting: the conduct log names
             intruders whose identity RAISA has not traced yet, so Staff must
             not see the link OR the page. The route enforces it too. */}

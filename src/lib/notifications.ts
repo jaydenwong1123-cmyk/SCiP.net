@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = {
   infraction: "infraction",
   ticket: "ticket",
   intrusion: "intrusion",
+  siege: "siege",
 } as const;
 
 export type NotificationType =

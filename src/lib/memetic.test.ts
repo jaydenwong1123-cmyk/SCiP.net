@@ -32,6 +32,13 @@ function cfg(overrides: Partial<SiteConfig> = {}): SiteConfig {
     memeticCadence: "pulse",
     memeticEndsAt: new Date(Date.now() + 30_000),
     memeticIssuedById: "owner-1",
+    ciMode: "off",
+    ciSignupEnabled: false,
+    ciAttacksEnabled: false,
+    ciCooldownUntil: null,
+    ciSiegeEndsAt: null,
+    ciDefacedUntil: null,
+    ciLockHorizon: null,
     ...overrides,
   };
 }

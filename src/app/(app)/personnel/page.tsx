@@ -15,6 +15,7 @@ import {
   pickRank,
   pickQuery,
 } from "@/lib/filters";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
 // Within a single clearance rank, plain members sort ahead of RAISA
 // administrators.
@@ -39,6 +40,7 @@ export default async function PersonnelPage({
   const roster = await db.user.findMany({
     where: {
       displayName: { not: null },
+      ...NOT_INSURGENT,
       ...(activeLevel ? { clearance: activeLevel } : {}),
     },
     orderBy: [{ clearance: "desc" }, { displayName: "asc" }],

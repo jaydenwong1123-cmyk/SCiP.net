@@ -5,6 +5,12 @@ import { db } from "@/lib/db";
 import { clearanceLabel, clearanceChipStyle } from "@/lib/clearance";
 import { canEditIncident } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
+import {
+  renderRedacted,
+  renderRedactedName,
+  redactNameToText,
+  canBypassRedaction,
+} from "@/lib/redact";
 import { SeverityBadge } from "@/components/signal-badge";
 import { deleteIncidentReportAction } from "../actions";
 import { severityColor } from "@/lib/incident";
@@ -34,7 +40,7 @@ export default async function IncidentDetailPage({
     <>
       <StationHead
         code="SEC-04 // INCIDENT REPORT"
-        title={report.title.toUpperCase()}
+        title={redactNameToText(report.title, user).toUpperCase()}
       >
         {canEdit && (
           <Link href={`/incidents/${report.id}/edit`} className="term-link text-sm">
@@ -81,7 +87,11 @@ export default async function IncidentDetailPage({
         </div>
         <div>
           <div className="hud-readout__label">Location</div>
-          <div className="text-sm mt-1">{report.location || "UNSPECIFIED"}</div>
+          <div className="text-sm mt-1">
+            {report.location
+              ? renderRedacted(report.location, user.clearance, canBypassRedaction(user))
+              : "UNSPECIFIED"}
+          </div>
         </div>
         <div>
           <div className="hud-readout__label">Clearance</div>
@@ -91,7 +101,9 @@ export default async function IncidentDetailPage({
         </div>
         <div>
           <div className="hud-readout__label">Filed By</div>
-          <div className="text-sm mt-1">{report.author.displayName}</div>
+          <div className="text-sm mt-1">
+            {renderRedactedName(report.author.displayName ?? "", user)}
+          </div>
         </div>
         <div>
           <div className="hud-readout__label">Filed</div>

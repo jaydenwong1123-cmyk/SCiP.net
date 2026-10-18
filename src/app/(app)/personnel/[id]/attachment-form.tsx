@@ -40,7 +40,7 @@ export function PersonnelAttachmentForm({ subjectId }: { subjectId: string }) {
       />
       <p className="text-[10px] text-[var(--term-fg-dim)]">
         {ACCEPTED_LABEL} · MAX {Math.floor(MAX_ATTACHMENT_BYTES / 1024)}KB · ONE
-        FILE PER UPLOAD · RETAINED INDEFINITELY · VISIBLE TO L-5+ ONLY
+        FILE PER UPLOAD · RETAINED INDEFINITELY · VISIBLE TO L-6+ ONLY
       </p>
       {state?.error && (
         <p className="text-[var(--term-red)] text-sm" role="alert">

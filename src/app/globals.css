@@ -1049,7 +1049,7 @@ select.term-input option {
   opacity: 0.85;
 }
 
-/* Secure L-5+ channel: amber-accented "encrypted" surface. */
+/* Secure L-6+ channel: amber-accented "encrypted" surface. */
 .secure-panel,
 .term-panel--secure {
   position: relative;
@@ -1893,5 +1893,161 @@ select.term-input option {
   .skel {
     animation: none;
     background: rgba(var(--term-glow-rgb), 0.12);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   CHAOS INSURGENCY SIEGE
+   The red palette is applied by redeclaring the theme vars on an element
+   BELOW <html>: the pre-paint appearance script writes the member's theme as
+   inline styles on <html>, which no :root selector can outrank, but a
+   descendant's own declaration wins for everything inside it. The HUD vars
+   are redeclared alongside because they are computed from the theme vars at
+   the element that declares them, and would otherwise stay green.
+   --------------------------------------------------------------------------- */
+
+.ci-portal,
+html[data-ci-defaced] body {
+  --term-fg: #ff4d4d;
+  --term-fg-dim: #a83232;
+  --term-fg-bright: #ffb3b3;
+  --term-border: #a83232;
+  --term-glow-rgb: 255, 77, 77;
+  --term-clearance: var(--term-fg);
+  --hud-line: color-mix(in srgb, var(--term-border) 55%, transparent);
+  --hud-line-soft: color-mix(in srgb, var(--term-border) 25%, transparent);
+  --hud-line-hot: color-mix(in srgb, var(--term-fg) 75%, transparent);
+  --hud-fill: color-mix(in srgb, var(--term-fg) 4%, transparent);
+  --hud-fill-hi: color-mix(in srgb, var(--term-fg) 9%, transparent);
+  --hud-tick: var(--term-fg);
+  --hud-grid: rgba(var(--term-glow-rgb), 0.035);
+  --hud-grid-minor: rgba(var(--term-glow-rgb), 0.018);
+  color: var(--term-fg);
+}
+
+.ci-portal {
+  background-color: var(--term-bg);
+}
+
+.ci-panel {
+  border-color: var(--term-red);
+}
+
+/* The page content jitters now and then while defaced. Scoped to the
+   shell's content column rather than <body>: a transform or filter on an
+   ancestor turns position:fixed into position:absolute for everything under
+   it, which would unpin the memetic overlay and the command rail. */
+html[data-ci-defaced] .hud-content__inner {
+  animation: ci-glitch 7s steps(1, end) infinite;
+}
+
+@keyframes ci-glitch {
+  0%, 93%, 100% { transform: none; filter: none; }
+  94% { transform: translate(2px, -1px) skewX(-1deg); filter: hue-rotate(-20deg); }
+  95% { transform: translate(-3px, 1px); filter: contrast(1.4); }
+  96% { transform: none; filter: none; }
+  97% { transform: translate(1px, 2px) skewX(1deg); }
+}
+
+.ci-propaganda {
+  letter-spacing: 0.12em;
+}
+
+/* Integrity bars. */
+.ci-system {
+  padding: var(--term-row-y) 0;
+  border-bottom: 1px solid var(--hud-line-soft);
+}
+
+.ci-bar {
+  height: 0.5rem;
+  margin-top: 0.25rem;
+  border: 1px solid var(--hud-line);
+  background: var(--hud-fill);
+}
+
+.ci-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--term-fg);
+  transition: width 400ms ease-out;
+}
+
+.ci-bar--low > span {
+  background: var(--term-amber);
+}
+
+.ci-bar--down {
+  border-color: var(--term-red);
+}
+
+.ci-bar--down > span {
+  background: var(--term-red);
+}
+
+/* Siege banner's inline mini bars. */
+.ci-mini-bars {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.ci-mini-bars__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.ci-mini-bars__item i {
+  display: inline-block;
+  width: 2.5rem;
+  height: 0.4rem;
+  border: 1px solid currentColor;
+  position: relative;
+}
+
+.ci-mini-bars__item i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--pct, 100%);
+  background: currentColor;
+}
+
+/* SYSTEM COMPROMISED lock screen. */
+.ci-compromised {
+  --term-fg: #ff4d4d;
+  margin: 2rem auto;
+  max-width: 36rem;
+  padding: 1.5rem;
+  border: 1px solid var(--term-red);
+  background: color-mix(in srgb, var(--term-red) 6%, transparent);
+  color: var(--term-red);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.ci-compromised__title {
+  position: relative;
+  font-size: 1.6rem;
+  letter-spacing: 0.22em;
+  animation: ci-glitch 3s steps(1, end) infinite;
+}
+
+.ci-compromised__mark {
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--term-fg-bright, #ffb3b3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ci-defaced] .hud-content__inner,
+  .ci-compromised__title {
+    animation: none;
+  }
+  .ci-bar > span {
+    transition: none;
   }
 }

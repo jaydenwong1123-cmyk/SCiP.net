@@ -108,6 +108,9 @@ export async function purgeUser(userId: string): Promise<void> {
   // them and nothing else, so it goes with the account on both sides: rounds
   // they played as the intruder AND rounds they played from the desk.
   await db.conductRecord.deleteMany({ where: { userId } });
+  // Siege puzzles they were issued or answered, on either side. The siege
+  // itself keeps its systems' final integrity; only the per-player ledger goes.
+  await db.ciSiegeChallenge.deleteMany({ where: { userId } });
   // Traces and revocations they performed against OTHER members' runs stay —
   // that is RAISA's work product, and it outlives the officer who did it.
   await db.hackRun.updateMany({

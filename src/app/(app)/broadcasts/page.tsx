@@ -10,6 +10,11 @@ import {
 import { canEditBroadcast, canReadBroadcast } from "@/lib/doc-permissions";
 import { renderBody } from "@/lib/render-body";
 import {
+  renderRedacted,
+  renderRedactedName,
+  canBypassRedaction,
+} from "@/lib/redact";
+import {
   liveBroadcastWhere,
   scheduleState,
   toLocalInputValue,
@@ -122,7 +127,7 @@ export default async function BroadcastsPage() {
               <span className="hud-panel-head__code">
                 DIR-{String(i + 1).padStart(3, "0")}
               </span>
-              <span>{b.title}</span>
+              <span>{renderRedacted(b.title, user.clearance, canBypassRedaction(user))}</span>
               <span className="hud-panel-head__status">
                 <Lamp
                   state={
@@ -139,7 +144,7 @@ export default async function BroadcastsPage() {
             </div>
             <div className="flex flex-wrap justify-between gap-x-3 text-xs">
               <span className="hud-recid">
-                {b.author.displayName} —{" "}
+                {renderRedactedName(b.author.displayName ?? "", user)} —{" "}
                 {b.clearanceRequired <= 1
                   ? "ALL PERSONNEL"
                   : `${clearanceLabel(b.clearanceRequired)}+ ONLY`}

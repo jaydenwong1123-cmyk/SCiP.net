@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Fragment, isValidElement, type ReactNode } from "react";
 import { db } from "@/lib/db";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
 // Auto-linking and notification support for "@Display Name" mentions in
 // message bodies.
@@ -49,7 +50,7 @@ function findMentions(
 
 export async function getMentionCandidates(): Promise<MentionCandidate[]> {
   const users = await db.user.findMany({
-    where: { displayName: { not: null } },
+    where: { displayName: { not: null }, ...NOT_INSURGENT },
     select: { id: true, displayName: true },
   });
   return users

@@ -18,12 +18,17 @@ import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
+import { systemOfflineError } from "@/lib/ci/lockdown";
 
 export async function sendMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  // A section taken down by a siege refuses writes from anywhere, not only
+  // from its own pages — see lib/ci/lockdown.ts.
+  const offline = await systemOfflineError(user, "comms");
+  if (offline) return { ok: false, error: offline };
   if (findNonAsciiFormField(formData)) {
     return { ok: false, error: NON_ASCII_ERROR };
   }
@@ -49,7 +54,7 @@ export async function sendMessageAction(
   }
 
   const recipient = await db.user.findUnique({ where: { id: recipientId } });
-  if (!recipient) {
+  if (!recipient || recipient.isInsurgent) {
     return { ok: false, error: "RECIPIENT NOT FOUND." };
   }
 

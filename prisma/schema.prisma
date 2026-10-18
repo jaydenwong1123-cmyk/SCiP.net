@@ -54,6 +54,14 @@ model User {
   personalFile     String   @default("")
   suspended        Boolean  @default(false)
   suspendedReason  String?
+  // CHAOS INSURGENCY operative. Created only through /enlist with the
+  // out-of-roleplay signup code, and walled off from the whole member network:
+  // requireUser() sends these accounts to the /insurgency portal and nowhere
+  // else. Never flipped on or off after creation — deletion is the only exit.
+  isInsurgent      Boolean  @default(false)
+  // Early-access tester for features still behind SiteConfig.ciMode = "early".
+  // Ticked by staff; grants no authority, only visibility.
+  earlyAccess      Boolean  @default(false)
   createdAt        DateTime @default(now())
 
   usedInvite              InviteCode?              @relation("InviteCodeUser")
@@ -95,6 +103,8 @@ model User {
   hackDrills              HackDrill[]              @relation("HackDrillOwner")
   createdForums           Forum[]                  @relation("ForumCreator")
   forumPosts              ForumPost[]              @relation("ForumPostAuthor")
+
+  @@index([isInsurgent])
 }
 
 // A discussion topic, gated to a minimum clearance. The forum's existence is
@@ -915,6 +925,21 @@ model SiteConfig {
   // exposure expires on time even if the network drops mid-flash.
   memeticEndsAt     DateTime?
   memeticIssuedById String?
+
+  // --- CHAOS INSURGENCY SIEGE -----------------------------------------------
+  // "off" | "early" | "live". Early shows the siege only to members with
+  // User.earlyAccess; live shows it to everyone. See lib/ci/access.ts.
+  ciMode           String    @default("off")
+  // Staff kill switches, on top of the env-held codes (lib/ci/codes.ts).
+  ciSignupEnabled  Boolean   @default(false)
+  ciAttacksEnabled Boolean   @default(false)
+  ciCooldownUntil  DateTime?
+  // Hot-path hints, so the layout and the poll can answer "nothing happening"
+  // from this already-cached row without touching the siege tables. The
+  // CiSiege tables stay the source of truth; a stale hint only costs a query.
+  ciSiegeEndsAt    DateTime?
+  ciDefacedUntil   DateTime?
+  ciLockHorizon    DateTime?
 }
 
 model IncidentReport {
@@ -1402,3 +1427,115 @@ model BotAction {
   @@index([bot, guildId, actorId, kind, createdAt])
   @@index([createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// CHAOS INSURGENCY SIEGE
+//
+// A site-wide attack launched from the /insurgency portal with the
+// out-of-roleplay launch code. CI operatives drain each system's integrity by
+// solving puzzles; RAISA restores it the same way. User ids are plain strings
+// with no relation, so deleting an account never strands a siege record.
+// ---------------------------------------------------------------------------
+
+model CiSiege {
+  id             String    @id @default(cuid())
+  // "active" | "ci_won" | "foundation_held" | "aborted"
+  status         String    @default("active")
+  // "live" while active, NULL once settled. Unique, so the database itself
+  // refuses a second concurrent siege.
+  activeSlot     String?   @unique
+  launchedById   String
+  launchedByName String    @default("")
+  startedAt      DateTime  @default(now())
+  endsAt         DateTime
+  resolvedAt     DateTime?
+  abortedById    String?
+  defacedUntil   DateTime?
+
+  systems CiSiegeSystem[]
+
+  @@index([startedAt])
+}
+
+model CiSiegeSystem {
+  id              String    @id @default(cuid())
+  siegeId         String
+  siege           CiSiege   @relation(fields: [siegeId], references: [id])
+  // Key from CI_SYSTEMS in lib/ci/systems.ts.
+  system          String
+  integrity       Int
+  maxIntegrity    Int
+  fallenAt        DateTime?
+  // While in the future, the system's section is offline for non-staff.
+  lockedUntil     DateTime?
+  // Post-siege RAISA restore solves banked against the lock.
+  restoreProgress Int       @default(0)
+  restoredAt      DateTime?
+  restoredById    String?
+
+  @@unique([siegeId, system])
+  @@index([system, lockedUntil])
+}
+
+// One issued puzzle, and — once answered — the contribution ledger.
+model CiSiegeChallenge {
+  id           String    @id @default(cuid())
+  siegeId      String
+  system       String
+  userId       String
+  userName     String    @default("")
+  // "ci" | "raisa"
+  side         String
+  // "siege" (live fight) | "restore" (post-siege lock removal)
+  purpose      String    @default("siege")
+  seq          Int
+  game         String
+  band         Int
+  nonce        String    @unique
+  payload      String
+  // NEVER leaves the server.
+  solution     String
+  attemptsLeft Int       @default(1)
+  issuedAt     DateTime  @default(now())
+  deadlineAt   DateTime
+  answeredAt   DateTime?
+  correct      Boolean?
+  // Signed integrity change actually applied.
+  delta        Int       @default(0)
+
+  @@unique([siegeId, userId, seq])
+  @@index([siegeId, side, correct])
+  @@index([userId])
+}
+
+// The one file CI gets a look at after a winning siege.
+model CiLeak {
+  id        String   @id @default(cuid())
+  siegeId   String   @unique
+  scpFileId String
+  tier      Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// An out-of-roleplay code for the Chaos Insurgency, generated by an owner from
+// /admin/insurgency. ONE USE: a "signup" code creates exactly one CI account,
+// a "launch" code starts exactly one siege, then it is spent. Stored in plain
+// text on purpose — the owner reads unused codes back off the panel to hand
+// them out — and so it is only ever rendered to owner-level viewers.
+model CiCode {
+  id            String    @id @default(cuid())
+  // "signup" | "launch"
+  kind          String
+  code          String    @unique
+  createdById   String
+  createdByName String    @default("")
+  createdAt     DateTime  @default(now())
+  usedAt        DateTime?
+  usedById      String?
+  usedByName    String    @default("")
+  revokedAt     DateTime?
+
+  @@index([kind, usedAt, revokedAt])
+}
+

@@ -25,6 +25,7 @@ import {
   TickRule,
   EmptyState,
 } from "@/components/hud";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
 export default async function ScpDetailPage({
   params,
@@ -92,6 +93,7 @@ export default async function ScpDetailPage({
               where: {
                 displayName: { not: null },
                 clearance: { lt: file.clearanceRequired },
+                ...NOT_INSURGENT,
               },
               orderBy: { displayName: "asc" },
               select: { id: true, displayName: true, clearance: true },

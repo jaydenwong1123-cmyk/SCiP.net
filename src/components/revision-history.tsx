@@ -1,5 +1,9 @@
 import { decodeMeta, summarizeChange } from "@/lib/revisions";
-import { canBypassRedaction, renderRedacted } from "@/lib/redact";
+import {
+  canBypassRedaction,
+  renderRedacted,
+  renderRedactedName,
+} from "@/lib/redact";
 import { clearanceLabel } from "@/lib/clearance";
 import { ClassificationBadge, SeverityBadge } from "@/components/signal-badge";
 
@@ -73,7 +77,10 @@ export function RevisionHistory({
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
               <span className="text-[var(--term-fg-bright)]">
                 REV {revNumber}
-                <span className="text-[var(--term-fg-dim)]"> — {rev.editorName}</span>
+                <span className="text-[var(--term-fg-dim)]">
+                  {" "}
+                  — {renderRedactedName(rev.editorName, viewer)}
+                </span>
               </span>
               <span className="text-xs text-[var(--term-fg-dim)]">
                 {stamp(rev.createdAt)}
@@ -91,19 +98,23 @@ export function RevisionHistory({
               {meta.clearanceRequired !== undefined && (
                 <span>[{clearanceLabel(meta.clearanceRequired)}]</span>
               )}
-              {meta.location && <span>@ {meta.location}</span>}
+              {meta.location && (
+                <span>@ {renderRedacted(meta.location, viewer.clearance, bypass)}</span>
+              )}
             </div>
 
             {rev.title !== successor.title && (
               <p className="text-xs text-[var(--term-fg-dim)] mt-1 break-words">
-                TITLE WAS: <span className="text-[var(--term-fg)]">{rev.title}</span>
+                TITLE WAS: <span className="text-[var(--term-fg)]">
+                  {renderRedacted(rev.title, viewer.clearance, bypass)}
+                </span>
               </p>
             )}
 
             {rev.reason && (
               <p className="text-sm mt-2 break-words">
                 <span className="text-[var(--term-fg-dim)]">NOTE: </span>
-                {rev.reason}
+                {renderRedacted(rev.reason, viewer.clearance, bypass)}
               </p>
             )}
 

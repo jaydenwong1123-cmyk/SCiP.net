@@ -103,6 +103,20 @@ export const AUDIT_ACTIONS = {
   memeticRecalled: "memetic.recall",
   forumCreated: "forum.create",
   forumDeleted: "forum.delete",
+  // CHAOS INSURGENCY SIEGE. Unlike the terminal intrusion, CI-side verbs DO
+  // name their actor: a CI account is an out-of-roleplay role handed out by
+  // staff, and staff need to see who did what with it.
+  ciEnlisted: "ci.enlist",
+  ciSiegeLaunched: "ci.siege.launch",
+  ciSiegeResolved: "ci.siege.resolve",
+  ciSiegeAborted: "ci.siege.abort",
+  ciSystemFallen: "ci.system.fall",
+  ciSystemRestored: "ci.system.restore",
+  ciLeakIssued: "ci.leak.issue",
+  ciConfigChanged: "ci.config.set",
+  ciEarlyAccessChanged: "user.early_access.toggle",
+  ciCodeGenerated: "ci.code.generate",
+  ciCodeRevoked: "ci.code.revoke",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -174,6 +188,17 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.memeticRecalled]: "MEMETIC AGENT RECALLED",
   [AUDIT_ACTIONS.forumCreated]: "FORUM CREATED",
   [AUDIT_ACTIONS.forumDeleted]: "FORUM DELETED",
+  [AUDIT_ACTIONS.ciEnlisted]: "CI ENLISTED",
+  [AUDIT_ACTIONS.ciSiegeLaunched]: "SIEGE LAUNCHED",
+  [AUDIT_ACTIONS.ciSiegeResolved]: "SIEGE RESOLVED",
+  [AUDIT_ACTIONS.ciSiegeAborted]: "SIEGE ABORTED",
+  [AUDIT_ACTIONS.ciSystemFallen]: "SYSTEM FALLEN",
+  [AUDIT_ACTIONS.ciSystemRestored]: "SYSTEM RESTORED",
+  [AUDIT_ACTIONS.ciLeakIssued]: "FILE LEAKED TO CI",
+  [AUDIT_ACTIONS.ciConfigChanged]: "SIEGE CONTROLS SET",
+  [AUDIT_ACTIONS.ciEarlyAccessChanged]: "EARLY ACCESS TOGGLED",
+  [AUDIT_ACTIONS.ciCodeGenerated]: "CI CODE GENERATED",
+  [AUDIT_ACTIONS.ciCodeRevoked]: "CI CODE REVOKED",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

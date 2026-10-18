@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { MIN_CLEARANCE } from "@/lib/clearance";
 
-// "View as" — L-5 and above may walk the site as if they held a lower
+// "View as" — L-6 and above may walk the site as if they held a lower
 // clearance, to check what ordinary personnel can actually read. The chosen
 // rank lives in a cookie so every server render of the session sees it, and it
 // is applied in `getCurrentUser` so no page has to opt in.
@@ -14,7 +14,7 @@ import { MIN_CLEARANCE } from "@/lib/clearance";
 export const VIEW_AS_COOKIE = "scip-view-as";
 
 // Minimum real clearance required to use the feature at all.
-export const VIEW_AS_MIN_CLEARANCE = 5;
+export const VIEW_AS_MIN_CLEARANCE = 6;
 
 export function canViewAs(user: { clearance: number }): boolean {
   return user.clearance >= VIEW_AS_MIN_CLEARANCE;

@@ -24,16 +24,21 @@ import {
   checkRedactionAuthorization,
   redactionAuthorizationError,
 } from "@/lib/redact";
+import { systemOfflineError } from "@/lib/ci/lockdown";
 
 export async function postSecureMessageAction(
   _prevState: { ok: boolean; error?: string } | null,
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  // A section taken down by a siege refuses writes from anywhere, not only
+  // from its own pages — see lib/ci/lockdown.ts.
+  const offline = await systemOfflineError(user, "comms");
+  if (offline) return { ok: false, error: offline };
   // Posting only. Reading the channel still honors the effective clearance —
-  // an intrusion that reaches L-5 may listen in, but not speak.
+  // an intrusion that reaches L-6 may listen in, but not speak.
   if (!canAccessSecureChannel(authoringClearance(user))) {
-    return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED." };
+    return { ok: false, error: "CLEARANCE L-6 OR HIGHER REQUIRED." };
   }
   if (findNonAsciiFormField(formData)) {
     return { ok: false, error: NON_ASCII_ERROR };

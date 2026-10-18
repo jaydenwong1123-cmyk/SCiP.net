@@ -137,7 +137,7 @@ export async function setClearanceAction(formData: FormData) {
   if (!before) return;
 
   await db.user.update({
-    where: { id: userId, isOwner: false, isCoOwner: false },
+    where: { id: userId, isInsurgent: false, isOwner: false, isCoOwner: false },
     data: { clearance, designation },
   });
 
@@ -169,7 +169,7 @@ export async function setDisplayNameAction(formData: FormData) {
   const next = displayName.slice(0, 60);
 
   await db.user.update({
-    where: { id: userId },
+    where: { id: userId, isInsurgent: false },
     data: { displayName: next },
   });
 
@@ -228,7 +228,7 @@ export async function setMemberDepartmentAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId },
+    where: { id: userId, isInsurgent: false },
     data: { department: department === "" ? null : department },
   });
 
@@ -260,7 +260,7 @@ export async function toggleCanPostScpAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId },
+    where: { id: userId, isInsurgent: false },
     data: { canPostScp },
   });
 
@@ -288,7 +288,7 @@ export async function toggleCanFileIncidentAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId },
+    where: { id: userId, isInsurgent: false },
     data: { canFileIncident },
   });
 
@@ -316,7 +316,7 @@ export async function toggleCanLogTestAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId },
+    where: { id: userId, isInsurgent: false },
     data: { canLogTest },
   });
 
@@ -344,7 +344,7 @@ export async function toggleCanEditPersonnelAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId },
+    where: { id: userId, isInsurgent: false },
     data: { canEditPersonnel },
   });
 
@@ -374,7 +374,7 @@ export async function toggleHelperAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId, isOwner: false, isCoOwner: false },
+    where: { id: userId, isInsurgent: false, isOwner: false, isCoOwner: false },
     data: { isHelper },
   });
 
@@ -401,7 +401,7 @@ export async function toggleStaffAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId, isOwner: false, isCoOwner: false },
+    where: { id: userId, isInsurgent: false, isOwner: false, isCoOwner: false },
     data: { isStaff },
   });
 
@@ -428,7 +428,7 @@ export async function toggleAdminAction(formData: FormData) {
   const name = await targetName(userId);
 
   await db.user.update({
-    where: { id: userId, isOwner: false, isCoOwner: false },
+    where: { id: userId, isInsurgent: false, isOwner: false, isCoOwner: false },
     data: { isAdmin },
   });
 
@@ -467,7 +467,7 @@ export async function toggleCoOwnerAction(formData: FormData) {
   }
 
   await db.user.update({
-    where: { id: userId, isOwner: false },
+    where: { id: userId, isInsurgent: false, isOwner: false },
     data: { isCoOwner },
   });
 
@@ -626,8 +626,10 @@ export async function bulkMemberAction(
     reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
   }
 
+  // Only suspension and deletion apply to a Chaos Insurgency account.
+  const ciAllowed = op === "suspend" || op === "reinstate" || op === "delete";
   const targets = await db.user.findMany({
-    where: { id: { in: userIds } },
+    where: { id: { in: userIds }, ...(ciAllowed ? {} : { isInsurgent: false }) },
     select: {
       id: true,
       email: true,

@@ -20,7 +20,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getCurrentUser();
-  if (!user || user.suspended) {
+  // A Chaos Insurgency account reads nothing on the member network.
+  if (!user || user.suspended || user.isInsurgent) {
     return new NextResponse("Not found", { status: 404 });
   }
 

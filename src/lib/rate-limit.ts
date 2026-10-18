@@ -39,6 +39,14 @@ export const SENTINEL_RULE: RateLimitRule = { limit: 5, windowMs: 15 * 60 * 1000
 // here, its caller treats a throttling *outage* as blocked rather than open —
 // see verifyOmega in lib/omega.ts.
 export const OMEGA_RULE: RateLimitRule = { limit: 5, windowMs: 60 * 60 * 1000 };
+// Chaos Insurgency enlistment. The signup code is a single shared secret, so
+// guessing it is the whole attack; tighter than INVITE_RULE accordingly.
+export const CI_ENLIST_RULE: RateLimitRule = { limit: 5, windowMs: 30 * 60 * 1000 };
+// Wrong siege launch codes, per CI account.
+export const CI_LAUNCH_RULE: RateLimitRule = { limit: 5, windowMs: 60 * 60 * 1000 };
+// Siege puzzle submissions, both sides. Abuse headroom only — a person solving
+// band-2 puzzles flat out stays well under it.
+export const SIEGE_RULE: RateLimitRule = { limit: 40, windowMs: 5 * 60 * 1000 };
 
 // ---------------------------------------------------------------------------
 // Content write throttles

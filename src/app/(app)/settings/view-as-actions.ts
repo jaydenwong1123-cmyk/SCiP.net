@@ -12,7 +12,7 @@ import { VIEW_AS_COOKIE, canViewAs, viewAsOptions } from "@/lib/view-as";
 export async function setViewAsAction(formData: FormData) {
   const user = await getRealUser();
   if (!user) redirect("/login");
-  if (!canViewAs(user)) redirect("/");
+  if (user.isInsurgent || !canViewAs(user)) redirect("/");
 
   const raw = String(formData.get("clearance") ?? "");
   const jar = await cookies();

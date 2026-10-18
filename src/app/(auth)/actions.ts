@@ -169,6 +169,9 @@ export async function setNameAction(
   if (!author) {
     return { ok: false, error: "NOT AUTHENTICATED." };
   }
+  if (author.isInsurgent) {
+    return { ok: false, error: "NOT PERMITTED." };
+  }
   const redactCheck = checkRedactionAuthorization(displayName, author);
   if (!redactCheck.ok) {
     return {

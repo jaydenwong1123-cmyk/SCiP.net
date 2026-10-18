@@ -31,6 +31,12 @@ export async function purgeSite(
     () => db.hackGrant.deleteMany({}),
     () => db.hackRun.deleteMany({}),
     () => db.conductRecord.deleteMany({}),
+    // Chaos Insurgency sieges
+    () => db.ciSiegeChallenge.deleteMany({}),
+    () => db.ciSiegeSystem.deleteMany({}),
+    () => db.ciLeak.deleteMany({}),
+    () => db.ciSiege.deleteMany({}),
+    () => db.ciCode.deleteMany({}),
     // Anomaly files and everything hanging off them
     () => db.scpTestLog.deleteMany({}),
     () => db.scpAccessGrant.deleteMany({}),

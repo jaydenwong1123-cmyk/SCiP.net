@@ -13,6 +13,7 @@ import {
   pruneExpiredAttachments,
 } from "@/lib/attachments";
 import { authoringClearance } from "@/lib/clearance";
+import { redactNameToText } from "@/lib/redact";
 import { isInfractionSeverity } from "@/lib/infractions";
 import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
@@ -37,7 +38,7 @@ export async function addMemberNoteAction(formData: FormData) {
   // Can't annotate yourself; subject must exist.
   if (subjectId === author.id) return;
   const subject = await db.user.findUnique({ where: { id: subjectId } });
-  if (!subject) return;
+  if (!subject || subject.isInsurgent) return;
 
   await db.memberNote.create({
     data: {
@@ -51,7 +52,7 @@ export async function addMemberNoteAction(formData: FormData) {
   revalidatePath(`/personnel/${subjectId}`);
 }
 
-// Attach an image to a member's dossier. Restricted to L-5 and above — the
+// Attach an image to a member's dossier. Restricted to L-6 and above — the
 // same bar the serving route enforces when handing the bytes back, so a file
 // can never be attached by someone whose peers cannot view it. Unlike
 // secure-channel attachments, dossier evidence is retained indefinitely.
@@ -61,7 +62,7 @@ export async function addPersonnelAttachmentAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
   if (authoringClearance(user) < PERSONNEL_ATTACH_CLEARANCE) {
-    return { ok: false, error: "CLEARANCE L-5 OR HIGHER REQUIRED." };
+    return { ok: false, error: "CLEARANCE L-6 OR HIGHER REQUIRED." };
   }
 
   if (countUploads(formData) > MAX_ATTACHMENTS_PER_MESSAGE) {
@@ -72,7 +73,7 @@ export async function addPersonnelAttachmentAction(
   if (!subjectId) return { ok: false, error: "MISSING SUBJECT." };
 
   const subject = await db.user.findUnique({ where: { id: subjectId } });
-  if (!subject) return { ok: false, error: "SUBJECT NOT FOUND." };
+  if (!subject || subject.isInsurgent) return { ok: false, error: "SUBJECT NOT FOUND." };
 
   const result = await validateUpload(formData.get("attachment"));
   if (!result.ok) return { ok: false, error: result.error };
@@ -172,7 +173,7 @@ export async function addInfractionAction(
   }
 
   const subject = await db.user.findUnique({ where: { id: subjectId } });
-  if (!subject) return { ok: false, error: "SUBJECT NOT FOUND." };
+  if (!subject || subject.isInsurgent) return { ok: false, error: "SUBJECT NOT FOUND." };
 
   const issuerName = issuer.displayName ?? issuer.email;
 
@@ -189,7 +190,9 @@ export async function addInfractionAction(
   await createNotification({
     userId: subjectId,
     type: NOTIFICATION_TYPES.infraction,
-    body: `${issuerName} filed a ${severity} infraction against you.`,
+    // The bell renders this as plain text, so resolve any redaction markup in
+    // the issuer's name against the subject's clearance before it is stored.
+    body: `${redactNameToText(issuerName, subject)} filed a ${severity} infraction against you.`,
     link: `/personnel/${subjectId}`,
   });
 

@@ -5,6 +5,8 @@ import { SetNameForm } from "./set-name-form";
 export default async function SetNamePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // CI accounts are named at enlistment and never see the member naming screen.
+  if (user.isInsurgent) redirect("/insurgency");
   if (user.displayName) redirect("/personnel");
 
   return (

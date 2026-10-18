@@ -30,7 +30,7 @@ const TTL_MS = ATTACHMENT_TTL_DAYS * 24 * 60 * 60 * 1000;
 export const MAX_ATTACHMENT_BYTES = 512 * 1024;
 
 // Minimum clearance to attach to (or view attachments on) a personnel file.
-export const PERSONNEL_ATTACH_CLEARANCE = 5;
+export const PERSONNEL_ATTACH_CLEARANCE = 6;
 
 // At most one file may ride along with a single message/transmission. The
 // forms omit `multiple`, but the cap is enforced server-side too since a

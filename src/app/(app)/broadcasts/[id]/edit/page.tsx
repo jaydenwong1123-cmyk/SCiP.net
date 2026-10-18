@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { redactNameToText } from "@/lib/redact";
 import { authoringClearance } from "@/lib/clearance";
 import { db } from "@/lib/db";
 import { canEditBroadcast } from "@/lib/doc-permissions";
@@ -23,7 +24,7 @@ export default async function EditBroadcastPage({
     <>
       <StationHead
         code="SEC-05 // AMEND DIRECTIVE"
-        title={broadcast.title.toUpperCase()}
+        title={redactNameToText(broadcast.title, user).toUpperCase()}
       >
         <Link href="/broadcasts" className="term-link text-sm">
           [BACK TO BROADCASTS]

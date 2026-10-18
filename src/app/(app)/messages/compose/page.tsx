@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { ComposeForm } from "./compose-form";
 import { redactNameToText } from "@/lib/redact";
 import { StationHead, HudPanel } from "@/components/hud";
+import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
 export default async function ComposePage({
   searchParams,
@@ -13,7 +14,7 @@ export default async function ComposePage({
   const user = await requireUser();
   const { to, subject, thread } = await searchParams;
   const roster = await db.user.findMany({
-    where: { displayName: { not: null }, id: { not: user.id } },
+    where: { displayName: { not: null }, id: { not: user.id }, ...NOT_INSURGENT },
     orderBy: { displayName: "asc" },
     select: { id: true, displayName: true },
   });

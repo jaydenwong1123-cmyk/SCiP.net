@@ -14,11 +14,12 @@ import { needsSentinel } from "@/lib/sentinel";
 // One-way edge: site-config reaches back into this module with a lazy import
 // inside enforceShutdown, precisely so this one can stay static.
 import { enforceShutdown } from "@/lib/site-config";
+import { enforceSystemOnline } from "@/lib/ci/lockdown";
 
-// Personnel who may flag/annotate members: L-5 and above, plus staff/admin/owner.
+// Personnel who may flag/annotate members: L-6 and above, plus staff/admin/owner.
 //
 // Annotating another member's record is authorship, so the rank check resolves
-// against `authoringClearance` — a terminal intrusion that reaches L-5 buys
+// against `authoringClearance` — a terminal intrusion that reaches L-6 buys
 // read access and nothing else, and must not be able to write into anyone's
 // personnel file.
 export function canAnnotateMembers(user: {
@@ -164,7 +165,36 @@ export async function requireUser() {
   await enforceShutdown();
   // A member suspended mid-session loses access immediately.
   if (user.suspended) redirect("/suspended");
+  // A Chaos Insurgency account holds no permissions on the member network and
+  // never reaches any page behind this function. Checked before set-name
+  // because CI accounts are named at enlistment and must not be offered the
+  // member naming screen.
+  //
+  // Every requireStaff/requireOwner/requireAdminPowers/requireRootOwner wraps
+  // this function, so they inherit the block. Known entry points that do NOT
+  // come through here, and so carry their own isInsurgent check:
+  //   app/page.tsx, app/suspended/page.tsx, app/(auth)/set-name (page and
+  //   setNameAction), app/attachments/[id]/route.ts, app/api/memetic/route.ts,
+  //   app/api/siege/route.ts, app/(app)/settings/view-as-actions.ts.
+  // Anything new that reads the session without requireUser() must add one.
+  if (user.isInsurgent) redirect("/insurgency");
   if (!user.displayName) redirect("/set-name");
+  // A section taken down by a Chaos Insurgency siege. Gated here rather than in
+  // the layout for the same reason as the sentinel above: the page must not
+  // build its content at all.
+  await enforceSystemOnline(user);
+  return user;
+}
+
+// Gate for the Chaos Insurgency portal: the inverse of requireUser. Resolved
+// against the stored row, so neither "view as" nor an intrusion grant plays
+// any part — a CI account is a CI account.
+export async function requireInsurgent() {
+  const user = await getRealUser();
+  if (!user) redirect("/login");
+  await enforceShutdown();
+  if (user.suspended) redirect("/suspended");
+  if (!user.isInsurgent) redirect("/");
   return user;
 }
 

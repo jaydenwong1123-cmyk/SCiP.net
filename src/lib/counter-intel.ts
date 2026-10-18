@@ -2,6 +2,7 @@ import type { HackRun } from "@prisma/client";
 import { db } from "@/lib/db";
 import { REVEAL_MAX, RUN_STATUS } from "@/lib/hack/config";
 import { clearanceLabel, R5_DESIGNATION } from "@/lib/clearance";
+import { RAISA_DEPARTMENT } from "@/lib/departments";
 
 // RAISA's counter-intrusion desk.
 //
@@ -15,8 +16,7 @@ import { clearanceLabel, R5_DESIGNATION } from "@/lib/clearance";
 // The department sits in RESTRICTED_DEPARTMENTS (lib/departments.ts), so only
 // staff may assign it — a member cannot walk into this section by editing
 // their own profile.
-export const RAISA_DEPARTMENT =
-  "Recordkeeping & Information Security Administration";
+export { RAISA_DEPARTMENT };
 
 export function canAccessCounterIntel(user: {
   department?: string | null;

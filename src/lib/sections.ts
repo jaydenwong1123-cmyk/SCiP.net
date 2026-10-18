@@ -119,7 +119,7 @@ export const SECTIONS: Section[] = [
   {
     base: "/secure-channel",
     label: "⚿ SECURE CHANNEL",
-    code: "L-5+",
+    code: "L-6+",
     desc: "Encrypted high-clearance channel",
     group: "restricted",
     accent: "amber",
