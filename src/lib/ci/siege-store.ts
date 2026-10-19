@@ -1,9 +1,10 @@
 import { cache } from "react";
 import { randomUUID } from "crypto";
+import { after } from "next/server";
 import type { CiSiege, CiSiegeChallenge, CiSiegeSystem } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getSiteConfig, updateSiteConfig } from "@/lib/site-config";
-import { createNotification, NOTIFICATION_TYPES } from "@/lib/notifications";
+import { NOTIFICATION_TYPES } from "@/lib/notifications";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
 import { createRng } from "@/lib/hack/rng";
 import { drawGame, gameFor, generateChallenge, gradeAnswer } from "@/lib/hack/games";
@@ -165,28 +166,47 @@ export type SiegeSnapshot = {
   defacedUntil: Date | null;
 };
 
+async function lockedRows(now: Date): Promise<CiSiegeSystem[]> {
+  return db.ciSiegeSystem.findMany({ where: { lockedUntil: { gt: now } } });
+}
+
+// Re-read rather than trusting the request-cached config row: a settle earlier
+// in this request may have just set the defacement.
+async function defacedUntilAt(now: Date): Promise<Date | null> {
+  const fresh = await db.siteConfig.findUnique({
+    where: { id: "singleton" },
+    select: { ciDefacedUntil: true },
+  });
+  return fresh?.ciDefacedUntil && fresh.ciDefacedUntil > now ? fresh.ciDefacedUntil : null;
+}
+
 /**
  * Everything the site needs to know about the siege right now, settling it
  * first if its time is up. Request-cached, and free when nothing is going on:
  * the hint columns on the (already cached) SiteConfig answer that alone.
+ *
+ * The three reads go out together. Only a settle (once per siege) costs a
+ * second round, since it is what changes locks and defacement.
  */
 export const getSiegeSnapshot = cache(async (): Promise<SiegeSnapshot | null> => {
   const cfg = await getSiteConfig();
   const now = new Date();
   if (hintSaysQuiet(cfg, now)) return null;
 
-  const active = await settleSiegeIfDue(now);
-  const locked = await db.ciSiegeSystem.findMany({
-    where: { lockedUntil: { gt: now } },
-  });
-  // Re-read rather than trusting the cached row: a settle a moment ago may
-  // have just set the defacement.
-  const fresh = await db.siteConfig.findUnique({
-    where: { id: "singleton" },
-    select: { ciDefacedUntil: true },
-  });
-  const defacedUntil =
-    fresh?.ciDefacedUntil && fresh.ciDefacedUntil > now ? fresh.ciDefacedUntil : null;
+  const [found, lockedNow, defacedNow] = await Promise.all([
+    findActiveSiege(),
+    lockedRows(now),
+    defacedUntilAt(now),
+  ]);
+  let active = found;
+  let locked = lockedNow;
+  let defacedUntil = defacedNow;
+  if (!found || isSiegeDue(found, found.systems, now)) {
+    active = await settleLoadedSiege(found, now);
+    if (found && !active) {
+      [locked, defacedUntil] = await Promise.all([lockedRows(now), defacedUntilAt(now)]);
+    }
+  }
 
   if (!active && locked.length === 0 && !defacedUntil) return null;
   return { active, locked, defacedUntil };
@@ -217,7 +237,14 @@ async function recomputeLockHorizon(now: Date): Promise<Date | null> {
  * otherwise null.
  */
 export async function settleSiegeIfDue(now: Date): Promise<SiegeWithSystems | null> {
-  const siege = await findActiveSiege();
+  return settleLoadedSiege(await findActiveSiege(), now);
+}
+
+// settleSiegeIfDue for a caller that has already read the live siege.
+async function settleLoadedSiege(
+  siege: SiegeWithSystems | null,
+  now: Date
+): Promise<SiegeWithSystems | null> {
   if (!siege) {
     // The hint says a siege is on but none is — left behind by a crash between
     // the claim and the config write. Clear it so the hot path goes quiet.
@@ -271,7 +298,7 @@ export async function settleSiegeIfDue(now: Date): Promise<SiegeWithSystems | nu
       : "Siege ended — RAISA held the perimeter.",
   });
 
-  await notifyRaisa(
+  notifyRaisaLater(
     won
       ? `SIEGE OVER — NETWORK BREACHED. OFFLINE: ${fallen.join(", ")}. RESTORE AT THE DESK.`
       : "SIEGE OVER — PERIMETER HELD. ALL SYSTEMS NOMINAL."
@@ -313,8 +340,12 @@ async function issueLeak(siegeId: string, tier: number, now: Date): Promise<stri
   return "";
 }
 
-// RAISA officers who can currently see the siege — the whole department in
+// RAISA officers who can currently see the siege: the whole department in
 // both early access and live (see ciVisibleTo), so only "off" stays silent.
+//
+// Same muted/silenced rules as createNotification() in lib/notifications.ts,
+// but one read and one write for the whole department rather than two per
+// officer.
 async function notifyRaisa(body: string): Promise<void> {
   const cfg = await getSiteConfig();
   if (!ciEnabled(cfg)) return;
@@ -326,15 +357,30 @@ async function notifyRaisa(body: string): Promise<void> {
     },
     select: { id: true },
   });
-  await Promise.all(
-    officers.map((o) =>
-      createNotification({
-        userId: o.id,
-        type: NOTIFICATION_TYPES.siege,
-        body,
-        link: "/counter-intel/siege",
-      })
-    )
+  if (officers.length === 0) return;
+  const type = NOTIFICATION_TYPES.siege;
+  const prefs = await db.notificationPreference.findMany({
+    where: { type, userId: { in: officers.map((o) => o.id) } },
+    select: { userId: true, muted: true, silenced: true },
+  });
+  const byUser = new Map(prefs.map((p) => [p.userId, p]));
+  const rows = officers
+    .filter((o) => !byUser.get(o.id)?.silenced)
+    .map((o) => ({
+      userId: o.id,
+      type,
+      body: body.slice(0, 300),
+      link: "/counter-intel/siege",
+      read: byUser.get(o.id)?.muted ?? false,
+    }));
+  if (rows.length > 0) await db.notification.createMany({ data: rows });
+}
+
+// The player who triggered an alert is not waiting on it, so it goes out
+// after the response has been sent.
+function notifyRaisaLater(body: string): void {
+  after(() =>
+    notifyRaisa(body).catch((err) => console.warn("[siege] failed to notify RAISA", err))
   );
 }
 
@@ -429,7 +475,7 @@ export async function launchSiege(
     targetName: `${minutes} MIN`,
     summary: `Chaos Insurgency siege launched for ${minutes} minutes with code ${code.trim().toUpperCase()}`,
   });
-  await notifyRaisa(
+  notifyRaisaLater(
     `⚠ NETWORK UNDER ATTACK — CHAOS INSURGENCY SIEGE IN PROGRESS. ${minutes} MIN. DEFEND NOW.`
   );
   return { ok: true, siegeId: siege.id };
@@ -619,6 +665,9 @@ export type SubmitResult =
       attemptsLeft: number;
       delta: number;
       note?: string;
+      // The board as it stands after this answer, attached by the action so
+      // the console can repaint without waiting for the next poll.
+      feed?: SiegeFeed | null;
     }
   | { ok: false; error: string };
 
@@ -644,16 +693,15 @@ export async function submitSiegeAnswer(
 
   // Spend the guess before grading, as a compare-and-set, so a burst of
   // simultaneous submissions cannot all guess against the same budget.
-  const spent = await db.ciSiegeChallenge.updateMany({
-    where: { id: ch.id, answeredAt: null, attemptsLeft: { gt: 0 } },
-    data: { attemptsLeft: { decrement: 1 } },
-  });
-  if (spent.count === 0) return { ok: false, error: "THAT PUZZLE IS ALREADY SETTLED." };
+  // RETURNING hands back the remaining budget in the same round trip.
+  const spent = await db.$queryRaw<{ attemptsLeft: number | bigint }[]>`
+    UPDATE "CiSiegeChallenge" SET "attemptsLeft" = "attemptsLeft" - 1
+    WHERE "id" = ${ch.id} AND "answeredAt" IS NULL AND "attemptsLeft" > 0
+    RETURNING "attemptsLeft"`;
+  if (spent.length === 0) return { ok: false, error: "THAT PUZZLE IS ALREADY SETTLED." };
 
   const graded = gradeAnswer(ch.game, JSON.parse(ch.solution) as unknown, answer);
-  const attemptsLeft =
-    (await db.ciSiegeChallenge.findUnique({ where: { id: ch.id }, select: { attemptsLeft: true } }))
-      ?.attemptsLeft ?? 0;
+  const attemptsLeft = Number(spent[0].attemptsLeft);
   const settled = graded.correct || attemptsLeft === 0;
 
   if (!settled) {
@@ -664,7 +712,9 @@ export async function submitSiegeAnswer(
   const game = gameFor(ch.game);
   const tooFast = graded.correct && isTooFast(elapsedMs, game?.minHumanMs ?? 0);
 
-  void recordConduct({
+  // Evidence for a human reviewer, not part of the answer. Written after the
+  // response so the player is not kept waiting on it.
+  const conduct = {
     userId,
     surface: ch.side === "ci" ? CONDUCT_SURFACES.siegeCi : CONDUCT_SURFACES.siegeRaisa,
     runId: null,
@@ -673,7 +723,8 @@ export async function submitSiegeAnswer(
     answer,
     correct: graded.correct,
     rawSignals,
-  });
+  };
+  after(() => recordConduct(conduct));
 
   const { delta, note } = await settleAnswer(ch, graded.correct, now, tooFast);
   return {
@@ -741,18 +792,13 @@ async function applyDelta(
   side: SiegeSide,
   now: Date
 ): Promise<string | undefined> {
-  await db.ciSiegeSystem.update({
-    where: { id: row.id },
-    data: { integrity: delta < 0 ? { decrement: -delta } : { increment: delta } },
-  });
-  await db.ciSiegeSystem.updateMany({
-    where: { id: row.id, integrity: { lt: 0 } },
-    data: { integrity: 0 },
-  });
-  await db.ciSiegeSystem.updateMany({
-    where: { id: row.id, integrity: { gt: db.ciSiegeSystem.fields.maxIntegrity } },
-    data: { integrity: row.maxIntegrity },
-  });
+  // One atomic statement applies the change and clamps it to [0, max].
+  // Racing submissions each add their delta to whatever the row holds, so
+  // none is lost and the bounds always hold.
+  await db.$executeRaw`
+    UPDATE "CiSiegeSystem"
+    SET "integrity" = MAX(0, MIN("maxIntegrity", "integrity" + ${delta}))
+    WHERE "id" = ${row.id}`;
 
   const label = systemLabel(row.system);
 
@@ -771,7 +817,7 @@ async function applyDelta(
         targetName: label,
         summary: `${label} taken offline during siege`,
       });
-      await notifyRaisa(`⚠ ${label} HAS FALLEN. RESTORE IT TO ${RESTORE_ONLINE_PCT}% TO BRING IT BACK.`);
+      notifyRaisaLater(`⚠ ${label} HAS FALLEN. RESTORE IT TO ${RESTORE_ONLINE_PCT}% TO BRING IT BACK.`);
       // Taking the last routed system ends the siege on the spot.
       await settleSiegeIfDue(now);
       return `${label} IS DOWN.`;
@@ -884,10 +930,15 @@ export type SiegeFeed = {
  * to show them. Visibility (ciMode, early access) is the caller's question:
  * pass `visible` from ciVisibleTo().
  */
-export async function siegeFeed(visible: boolean): Promise<SiegeFeed | null> {
+export async function siegeFeed(
+  visible: boolean,
+  // A snapshot the caller already fetched (in parallel with something else).
+  // Omitted, it is read here.
+  prefetched?: SiegeSnapshot | null
+): Promise<SiegeFeed | null> {
   if (!visible) return null;
   const cfg = await getSiteConfig();
-  const snapshot = await getSiegeSnapshot();
+  const snapshot = prefetched === undefined ? await getSiegeSnapshot() : prefetched;
   if (!snapshot) return null;
   return {
     serverNow: Date.now(),

@@ -65,7 +65,7 @@ export const FAST_SOLVE_FACTOR = 0.5;
 
 // Poll cadence for the siege overlay.
 export const SIEGE_IDLE_POLL_MS = 10 * SEC;
-export const SIEGE_ACTIVE_POLL_MS = 3 * SEC;
+export const SIEGE_ACTIVE_POLL_MS = 2 * SEC;
 
 export const SIEGE_STATUS = {
   active: "active",

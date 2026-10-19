@@ -17,8 +17,10 @@ import {
   abandonChallenge,
   issueSiegeChallenge,
   launchSiege,
+  siegeFeed,
   submitSiegeAnswer,
   type LaunchResult,
+  type SiegeFeed,
   type SubmitResult,
 } from "@/lib/ci/siege-store";
 import type { IssueState } from "@/components/ci/siege-console";
@@ -66,12 +68,17 @@ export async function submitAttackAnswerAction(
   }
   const limit = await consumeRateLimit("siege", user.id, SIEGE_RULE);
   if (limit.blocked) return { ok: false, error: contentLimitError(limit.retryAfterMs) };
-  return submitSiegeAnswer(user.id, nonce, answer, signals.slice(0, 400));
+  const result = await submitSiegeAnswer(user.id, nonce, answer, signals.slice(0, 400));
+  if (!result.ok || !result.settled) return result;
+  // The board after this answer, so the portal repaints without waiting for
+  // the next poll. An operative always sees the siege while the event is on.
+  return { ...result, feed: await siegeFeed(ciEnabled(await getSiteConfig())) };
 }
 
-export async function abandonAttackAction(nonce: string): Promise<void> {
+export async function abandonAttackAction(nonce: string): Promise<SiegeFeed | null> {
   const user = await requireInsurgent();
   await abandonChallenge(user.id, nonce);
+  return siegeFeed(ciEnabled(await getSiteConfig()));
 }
 
 // The operative's own dossier. Stored in User.personalFile, the same column the

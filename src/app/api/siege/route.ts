@@ -3,7 +3,7 @@ import { getRealUser } from "@/lib/session";
 import { getSiteConfig } from "@/lib/site-config";
 import { ciVisibleTo, ciEnabled } from "@/lib/ci/access";
 import { hintSaysQuiet } from "@/lib/ci/siege";
-import { siegeFeed } from "@/lib/ci/siege-store";
+import { getSiegeSnapshot, siegeFeed } from "@/lib/ci/siege-store";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +27,12 @@ export async function GET() {
   const cfg = await getSiteConfig();
   if (!ciEnabled(cfg) || hintSaysQuiet(cfg, new Date())) return empty;
 
-  const user = await getRealUser();
+  // Past the quiet check, the viewer and the snapshot are looked up together
+  // rather than one after the other.
+  const [user, snapshot] = await Promise.all([getRealUser(), getSiegeSnapshot()]);
   if (!user || user.suspended) return empty;
 
-  const feed = await siegeFeed(ciVisibleTo(user, cfg));
+  const feed = await siegeFeed(ciVisibleTo(user, cfg), snapshot);
   if (!feed) return empty;
 
   return NextResponse.json(feed, { headers: { "Cache-Control": "no-store, private" } });

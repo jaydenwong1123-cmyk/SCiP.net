@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { requestMemo } from "@/lib/request-memo";
 import { redirect } from "next/navigation";
 import {
   MEMBER_NOTE_CLEARANCE,
@@ -13,7 +14,7 @@ import { getActiveHackGrant } from "@/lib/hack/grant";
 import { needsSentinel } from "@/lib/sentinel";
 // One-way edge: site-config reaches back into this module with a lazy import
 // inside enforceShutdown, precisely so this one can stay static.
-import { enforceShutdown } from "@/lib/site-config";
+import { enforceShutdown, getSiteConfig } from "@/lib/site-config";
 import { enforceSystemOnline } from "@/lib/ci/lockdown";
 
 // Personnel who may flag/annotate members: L-6 and above, plus staff/admin/owner.
@@ -59,8 +60,9 @@ export function canEditAnyPersonalFile(user: {
 
 // The member as stored — never downgraded by "view as". Used by the Settings
 // page and the revert action, which must keep working while a simulation is
-// active.
-export const getRealUser = cache(async () => {
+// active. Memoized per request, server actions included (see request-memo.ts):
+// requireUser() reaches it twice, once directly and once via enforceSentinel.
+export const getRealUser = requestMemo(async () => {
   const session = await auth();
   if (!session?.user?.id) return null;
   return db.user.findUnique({ where: { id: session.user.id } });
@@ -149,7 +151,16 @@ export async function enforceSentinel(): Promise<void> {
   if (await needsSentinel(user)) redirect("/sentinel");
 }
 
+// The site config is request-cached and every gate below reads it. Starting it
+// now lets it load alongside the member row instead of after it, which saves
+// one database round trip on every page and server action. The catch only
+// silences an unawaited rejection; later awaits still see the error.
+function warmSiteConfig() {
+  getSiteConfig().catch(() => {});
+}
+
 export async function requireUser() {
+  warmSiteConfig();
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   // The owner's challenge comes before anything else this function would
@@ -191,6 +202,7 @@ export async function requireUser() {
 // against the stored row, so neither "view as" nor an intrusion grant plays
 // any part — a CI account is a CI account.
 export async function requireInsurgent() {
+  warmSiteConfig();
   const user = await getRealUser();
   if (!user) redirect("/login");
   await enforceShutdown();
@@ -268,20 +280,6 @@ export function canAccessTraining(user: {
   isHelper: boolean;
 }): boolean {
   return user.canAccessTraining === true || hasHelperPowers(user);
-}
-
-// Who may hand out (or take back) the training-range grant: RAISA
-// administrators, as part of their recordkeeping duty, and Admin and above,
-// who already appoint Helpers. Staff are deliberately absent, matching
-// toggleHelperAction. A "view as" persona carries no designation, so a
-// simulation can never grant.
-export function canGrantTrainingAccess(user: {
-  designation?: string | null;
-  isOwner: boolean;
-  isCoOwner: boolean;
-  isAdmin: boolean;
-}): boolean {
-  return user.designation === R5_DESIGNATION || hasAdminPowers(user);
 }
 
 // Owner or co-owner.

@@ -9,7 +9,9 @@ import { ciVisibleTo } from "@/lib/ci/access";
 import {
   abandonChallenge,
   issueSiegeChallenge,
+  siegeFeed,
   submitSiegeAnswer,
+  type SiegeFeed,
   type SubmitResult,
 } from "@/lib/ci/siege-store";
 import type { SiegePurpose } from "@/lib/ci/config";
@@ -40,6 +42,9 @@ export async function issueDefenseAction(
   return { ok: true, challenge: issued.challenge, serverNow: Date.now() };
 }
 
+// Every answer hands back the board as it now stands, so the desk repaints
+// the moment the result lands instead of on the next poll. requireDefender
+// already established visibility, hence `true`.
 export async function submitDefenseAction(
   nonce: string,
   answer: string,
@@ -52,11 +57,14 @@ export async function submitDefenseAction(
   }
   const limit = await consumeRateLimit("siege", user.id, SIEGE_RULE);
   if (limit.blocked) return { ok: false, error: contentLimitError(limit.retryAfterMs) };
-  return submitSiegeAnswer(user.id, nonce, answer, signals.slice(0, 400));
+  const result = await submitSiegeAnswer(user.id, nonce, answer, signals.slice(0, 400));
+  if (!result.ok || !result.settled) return result;
+  return { ...result, feed: await siegeFeed(true) };
 }
 
-export async function abandonDefenseAction(nonce: string): Promise<void> {
+export async function abandonDefenseAction(nonce: string): Promise<SiegeFeed | null | undefined> {
   const user = await requireDefender();
-  if (!user) return;
+  if (!user) return undefined;
   await abandonChallenge(user.id, nonce);
+  return siegeFeed(true);
 }

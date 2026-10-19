@@ -12,7 +12,13 @@ import type {
 } from "@/lib/ci/siege-store";
 import type { SiegePurpose, SiegeSide } from "@/lib/ci/config";
 import { SiegeBoard } from "./siege-board";
-import { formatClock, useNow, useSiegeFeed } from "./use-siege-feed";
+import {
+  formatClock,
+  pushSiegeFeed,
+  refreshSiegeFeed,
+  useNow,
+  useSiegeFeed,
+} from "./use-siege-feed";
 
 // The siege console, for both seats. CI drains, RAISA restores; the server
 // decides what each answer is worth, and this component only shows the board,
@@ -27,7 +33,8 @@ type Props = {
   initialFeed: SiegeFeed | null;
   issue: (system: string, purpose: SiegePurpose) => Promise<IssueState>;
   submit: (nonce: string, answer: string, signals: string) => Promise<SubmitResult>;
-  abandon: (nonce: string) => Promise<void>;
+  // Resolves to the board after the walk-away, when the action returns one.
+  abandon: (nonce: string) => Promise<SiegeFeed | null | undefined | void>;
 };
 
 export function SiegeConsole({ side, initialFeed, issue, submit, abandon }: Props) {
@@ -63,6 +70,9 @@ export function SiegeConsole({ side, initialFeed, issue, submit, abandon }: Prop
     if (!challenge || answer.trim() === "") return;
     startTransition(async () => {
       const result = await submit(challenge.nonce, answer, telemetry.snapshot());
+      // Repaint the board from the answer itself rather than the next poll.
+      if (result.ok && result.feed !== undefined) pushSiegeFeed(result.feed);
+      else if (result.ok && result.settled) void refreshSiegeFeed();
       if (!result.ok) {
         setMessage({ text: result.error, tone: "bad" });
         return;
@@ -99,7 +109,9 @@ export function SiegeConsole({ side, initialFeed, issue, submit, abandon }: Prop
   const walkAway = () => {
     if (!challenge) return;
     startTransition(async () => {
-      await abandon(challenge.nonce);
+      const after = await abandon(challenge.nonce);
+      if (after !== undefined) pushSiegeFeed(after);
+      else void refreshSiegeFeed();
       setRound(null);
       setMessage({ text: "PUZZLE ABANDONED.", tone: "info" });
     });
