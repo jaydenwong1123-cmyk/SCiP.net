@@ -10,6 +10,7 @@ import {
   toggleCanLogTestAction,
   toggleCanEditPersonnelAction,
   toggleHelperAction,
+  toggleTrainingAccessAction,
   toggleStaffAction,
   toggleAdminAction,
   toggleCoOwnerAction,
@@ -33,6 +34,7 @@ type Member = {
   isAdmin: boolean;
   isStaff: boolean;
   isHelper: boolean;
+  canAccessTraining: boolean;
   department: string | null;
   suspended: boolean;
 };
@@ -238,6 +240,22 @@ export function MemberRow({
               />
               <button className="term-button text-xs">
                 {member.isHelper ? "REVOKE HELPER" : "GRANT HELPER"}
+              </button>
+            </form>
+          )}
+
+          {canManageHelper && (
+            <form action={toggleTrainingAccessAction}>
+              <input type="hidden" name="userId" value={member.id} />
+              <input
+                type="hidden"
+                name="canAccessTraining"
+                value={(!member.canAccessTraining).toString()}
+              />
+              <button className="term-button text-xs">
+                {member.canAccessTraining
+                  ? "REVOKE TRAINING RANGE"
+                  : "GRANT TRAINING RANGE"}
               </button>
             </form>
           )}

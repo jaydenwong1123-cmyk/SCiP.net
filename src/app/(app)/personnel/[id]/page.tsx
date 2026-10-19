@@ -6,8 +6,6 @@ import {
   canAnnotateMembers,
   hasStaffPowers,
   canEditAnyPersonalFile,
-  canGrantTrainingAccess,
-  hasHelperPowers,
 } from "@/lib/session";
 import { clearanceDisplay, clearanceChipStyle } from "@/lib/clearance";
 import { renderBody } from "@/lib/render-body";
@@ -16,7 +14,6 @@ import {
   deleteMemberNoteAction,
   deletePersonnelAttachmentAction,
   deleteInfractionAction,
-  toggleTrainingAccessAction,
 } from "../actions";
 import { AttachmentList } from "@/components/attachment-list";
 import { PersonnelAttachmentForm } from "./attachment-form";
@@ -58,7 +55,6 @@ export default async function PersonnelFilePage({
       isAdmin: true,
       isStaff: true,
       isHelper: true,
-      canAccessTraining: true,
     },
   });
 
@@ -90,12 +86,6 @@ export default async function PersonnelFilePage({
   // listing, and the route that serves the bytes.
   const canSeeAttachments = viewer.clearance >= PERSONNEL_ATTACH_CLEARANCE;
 
-  // Training range grant: RAISA administrators (and Admin+) may open the range
-  // to anyone but themselves. A member at Helper or above reaches it by role,
-  // so for them the grant changes nothing and the panel says so.
-  const showTrainingGrant =
-    canGrantTrainingAccess(viewer) && viewer.id !== person.id;
-  const trainingByRole = hasHelperPowers(person);
   const attachments = canSeeAttachments
     ? await listAttachments(ATTACHMENT_ENTITIES.personnel, [person.id])
     : [];
@@ -333,45 +323,6 @@ export default async function PersonnelFilePage({
         </HudPanel>
       )}
 
-      {showTrainingGrant && (
-        <HudPanel
-          code="05"
-          title={<span className="text-[var(--term-amber)]">⧉ TRAINING RANGE ACCESS</span>}
-          status="RAISA"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Lamp
-              state={trainingByRole || person.canAccessTraining ? "on" : "off"}
-            >
-              {trainingByRole
-                ? "CLEARED BY ROLE"
-                : person.canAccessTraining
-                  ? "CLEARED BY GRANT"
-                  : "NOT CLEARED"}
-            </Lamp>
-            <form action={toggleTrainingAccessAction}>
-              <input type="hidden" name="subjectId" value={person.id} />
-              <input
-                type="hidden"
-                name="canAccessTraining"
-                value={(!person.canAccessTraining).toString()}
-              />
-              <button
-                className={`term-button term-button--sm${
-                  person.canAccessTraining ? " term-button--danger" : ""
-                }`}
-              >
-                {person.canAccessTraining ? "REVOKE ACCESS" : "GRANT ACCESS"}
-              </button>
-            </form>
-          </div>
-          <p className="text-[10px] text-[var(--term-fg-dim)] mt-2">
-            {trainingByRole
-              ? "THIS MEMBER HOLDS HELPER OR ABOVE AND REACHES THE RANGE REGARDLESS OF THIS GRANT."
-              : "THE RANGE IS SIMULATION ONLY: NO CLEARANCE, NO COOLDOWN, NO CONDUCT RECORD."}
-          </p>
-        </HudPanel>
-      )}
     </>
   );
 }

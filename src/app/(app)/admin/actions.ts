@@ -400,6 +400,36 @@ export async function toggleHelperAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function toggleTrainingAccessAction(formData: FormData) {
+  // Same bar as the Helper grant: Admin and above. Helpers reach the range by
+  // role, so this flag only matters for members below Helper.
+  const actor = await requireAdminPowers();
+  const userId = String(formData.get("userId") ?? "");
+  const canAccessTraining = formData.get("canAccessTraining") === "true";
+
+  if (!userId) return;
+
+  const name = await targetName(userId);
+
+  await db.user.update({
+    where: { id: userId, isInsurgent: false, isOwner: false, isCoOwner: false },
+    data: { canAccessTraining },
+  });
+
+  await logAudit({
+    action: AUDIT_ACTIONS.trainingAccessToggled,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: name,
+    summary: canAccessTraining
+      ? "Granted training range access"
+      : "Revoked training range access",
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function toggleStaffAction(formData: FormData) {
   // Owner or admin may grant/revoke the Staff role.
   const actor = await requireAdminPowers();

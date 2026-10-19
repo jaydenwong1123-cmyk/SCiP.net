@@ -26,6 +26,7 @@ type Member = {
   isAdmin: boolean;
   isStaff: boolean;
   isHelper: boolean;
+  canAccessTraining: boolean;
   department: string | null;
   suspended: boolean;
 };

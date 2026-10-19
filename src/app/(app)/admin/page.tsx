@@ -410,6 +410,7 @@ export default async function AdminPage() {
             isAdmin: m.isAdmin,
             isStaff: m.isStaff,
             isHelper: m.isHelper,
+            canAccessTraining: m.canAccessTraining,
             department: m.department,
             suspended: m.suspended,
           }))}
