@@ -64,6 +64,10 @@ model User {
   // requireUser() sends these accounts to the /insurgency portal and nowhere
   // else. Never flipped on or off after creation — deletion is the only exit.
   isInsurgent      Boolean  @default(false)
+  // CI command rank: "operative" | "squadron_leader" | "delta_command" (see
+  // lib/ci/ranks.ts). Set only by the owner. Squadron Leader+ may host a siege;
+  // Delta Command may also generate enlist/launch codes. Ignored on members.
+  ciRank           String   @default("operative")
   // Early-access tester for features still behind SiteConfig.ciMode = "early".
   // Ticked by staff; grants no authority, only visibility.
   earlyAccess      Boolean  @default(false)

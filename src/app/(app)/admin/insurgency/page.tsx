@@ -5,6 +5,7 @@ import { getSiteConfig } from "@/lib/site-config";
 import { CI_MODES, CI_MODE_LABELS, ciModeOf } from "@/lib/ci/access";
 import { CI_CODE_KINDS, CI_CODE_LABELS, isCiCodeKind } from "@/lib/ci/codes";
 import { liveCiCodes, recentlyUsedCiCodes } from "@/lib/ci/code-store";
+import { CI_RANKS, CI_RANK_LABELS, ciRankOf } from "@/lib/ci/ranks";
 import { cooldownState, isDefaced } from "@/lib/ci/siege";
 import { SIEGE_STATUS_LABELS } from "@/lib/ci/config";
 import { systemLabel } from "@/lib/ci/systems";
@@ -21,6 +22,7 @@ import {
   setEarlyAccessAction,
   setCiSuspendedAction,
   deleteCiAccountAction,
+  setCiRankAction,
   generateCiCodeAction,
   revokeCiCodeAction,
 } from "./actions";
@@ -54,7 +56,7 @@ export default async function InsurgencyControlPage() {
     db.user.findMany({
       where: { isInsurgent: true },
       orderBy: { createdAt: "desc" },
-      select: { id: true, displayName: true, email: true, suspended: true, createdAt: true },
+      select: { id: true, displayName: true, email: true, suspended: true, createdAt: true, ciRank: true },
     }),
     db.ciSiegeSystem.findMany({ where: { lockedUntil: { gt: now } } }),
     liveCiCodes(),
@@ -310,6 +312,11 @@ export default async function InsurgencyControlPage() {
       </HudPanel>
 
       <HudPanel code="06" title="CHAOS INSURGENCY ACCOUNTS" status={`${ciAccounts.length} ON FILE`}>
+        <p className="text-xs text-[var(--term-fg-dim)] leading-snug mb-3">
+          RANK: an OPERATIVE fights in sieges. A SQUADRON LEADER can also host one — start it with a
+          launch code — but cannot make codes. DELTA COMMAND can host and generate ENLIST and
+          LAUNCH codes from the /insurgency portal.
+        </p>
         {ciAccounts.length === 0 ? (
           <EmptyState title="NO CI ACCOUNTS" />
         ) : (
@@ -323,7 +330,25 @@ export default async function InsurgencyControlPage() {
                     {a.suspended && " · SUSPENDED"}
                   </span>
                 </span>
-                <span className="flex gap-2">
+                <span className="flex flex-wrap gap-2">
+                  <form action={setCiRankAction} className="flex gap-1">
+                    <input type="hidden" name="userId" value={a.id} />
+                    <select
+                      name="rank"
+                      className="term-input"
+                      defaultValue={ciRankOf(a)}
+                      aria-label={`Rank for ${a.displayName ?? a.email}`}
+                    >
+                      {CI_RANKS.map((r) => (
+                        <option key={r} value={r}>
+                          {CI_RANK_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="submit" className="term-button term-button--sm">
+                      [SET]
+                    </button>
+                  </form>
                   <form action={setCiSuspendedAction}>
                     <input type="hidden" name="userId" value={a.id} />
                     <input type="hidden" name="suspend" value={String(!a.suspended)} />

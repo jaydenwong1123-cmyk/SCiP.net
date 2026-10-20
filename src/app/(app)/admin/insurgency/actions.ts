@@ -11,6 +11,7 @@ import { CI_MODE_LABELS, isCiMode } from "@/lib/ci/access";
 import { abortSiege, forceRestoreSystem } from "@/lib/ci/siege-store";
 import { createCiCode, revokeCiCode } from "@/lib/ci/code-store";
 import { CI_CODE_LABELS, isCiCodeKind } from "@/lib/ci/codes";
+import { CI_RANK_LABELS, isCiRank } from "@/lib/ci/ranks";
 
 // The owner's controls for the Chaos Insurgency siege. Strictly the seeded
 // owner, like OMEGA: every action here re-checks requireRootOwner(), because a
@@ -141,6 +142,27 @@ export async function setCiSuspendedAction(formData: FormData) {
     targetId: userId,
     targetName: target.displayName ?? target.email,
     summary: suspend ? "Suspended CI account" : "Reinstated CI account",
+  });
+  done();
+}
+
+// CI command rank. Owner-only: Squadron Leader may host a siege, Delta Command
+// may also generate codes from the portal. Scoped to isInsurgent like the rest.
+export async function setCiRankAction(formData: FormData) {
+  const actor = await requireRootOwner();
+  const userId = String(formData.get("userId") ?? "");
+  const rank = String(formData.get("rank") ?? "");
+  if (!isCiRank(rank)) return;
+  const target = await db.user.findFirst({ where: { id: userId, isInsurgent: true } });
+  if (!target || target.ciRank === rank) return;
+  await db.user.update({ where: { id: userId }, data: { ciRank: rank } });
+  await logAudit({
+    action: AUDIT_ACTIONS.ciRankChanged,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    targetName: target.displayName ?? target.email,
+    summary: `CI rank set to ${CI_RANK_LABELS[rank]}`,
   });
   done();
 }

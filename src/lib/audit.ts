@@ -118,6 +118,7 @@ export const AUDIT_ACTIONS = {
   ciEarlyAccessChanged: "user.early_access.toggle",
   ciCodeGenerated: "ci.code.generate",
   ciCodeRevoked: "ci.code.revoke",
+  ciRankChanged: "ci.rank.set",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -201,6 +202,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   [AUDIT_ACTIONS.ciEarlyAccessChanged]: "EARLY ACCESS TOGGLED",
   [AUDIT_ACTIONS.ciCodeGenerated]: "CI CODE GENERATED",
   [AUDIT_ACTIONS.ciCodeRevoked]: "CI CODE REVOKED",
+  [AUDIT_ACTIONS.ciRankChanged]: "CI RANK SET",
 };
 
 type Actor = { id: string; displayName: string | null; email: string };

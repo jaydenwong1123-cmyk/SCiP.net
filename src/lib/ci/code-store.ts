@@ -78,8 +78,15 @@ export async function attributeCiCode(
   });
 }
 
-export async function revokeCiCode(id: string): Promise<{ kind: string; code: string } | null> {
-  const row = await db.ciCode.findFirst({ where: { id, usedAt: null, revokedAt: null } });
+// Pass createdById to limit the revoke to that creator's own codes — how a
+// Delta Command revokes from the portal. The owner's panel omits it.
+export async function revokeCiCode(
+  id: string,
+  createdById?: string
+): Promise<{ kind: string; code: string } | null> {
+  const row = await db.ciCode.findFirst({
+    where: { id, usedAt: null, revokedAt: null, ...(createdById ? { createdById } : {}) },
+  });
   if (!row) return null;
   await db.ciCode.update({ where: { id }, data: { revokedAt: new Date() } });
   return { kind: row.kind, code: row.code };
@@ -88,6 +95,14 @@ export async function revokeCiCode(id: string): Promise<{ kind: string; code: st
 export async function liveCiCodes() {
   return db.ciCode.findMany({
     where: { usedAt: null, revokedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+// One creator's unspent codes — what a Delta Command sees on the portal.
+export async function liveCiCodesBy(createdById: string) {
+  return db.ciCode.findMany({
+    where: { createdById, usedAt: null, revokedAt: null },
     orderBy: { createdAt: "desc" },
   });
 }

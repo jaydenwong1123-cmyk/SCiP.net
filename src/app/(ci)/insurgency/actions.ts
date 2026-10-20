@@ -24,6 +24,16 @@ import {
   type SubmitResult,
 } from "@/lib/ci/siege-store";
 import type { IssueState } from "@/components/ci/siege-console";
+import { logAudit, AUDIT_ACTIONS } from "@/lib/audit";
+import {
+  CI_RANK_LABELS,
+  canCommandSetRank,
+  canCreateCiCodes,
+  isCiRank,
+  MAX_LIVE_CODES_PER_COMMANDER,
+} from "@/lib/ci/ranks";
+import { createCiCode, liveCiCodesBy, revokeCiCode } from "@/lib/ci/code-store";
+import { CI_CODE_LABELS, isCiCodeKind } from "@/lib/ci/codes";
 
 // The CI portal's actions. Each re-runs requireInsurgent(): a server action is
 // its own request and never renders the layout that checked it.
@@ -100,4 +110,68 @@ export async function updateDossierAction(
 
   revalidatePath("/insurgency/dossier");
   return { ok: true };
+}
+
+// DELTA COMMAND's code desk. The same one-use codes the owner makes from
+// /admin/insurgency, but a commander only ever sees and revokes the codes they
+// made themselves, and holds at most MAX_LIVE_CODES_PER_COMMANDER unspent at
+// once. Squadron Leaders and Operatives are refused here even if they post the
+// form by hand.
+export async function generateCommandCodeAction(formData: FormData) {
+  const user = await requireInsurgent();
+  if (!canCreateCiCodes(user)) return;
+  if (!ciEnabled(await getSiteConfig())) return;
+  const kind = String(formData.get("kind") ?? "");
+  if (!isCiCodeKind(kind)) return;
+  if ((await liveCiCodesBy(user.id)).length >= MAX_LIVE_CODES_PER_COMMANDER) return;
+  const code = await createCiCode(user, kind);
+  await logAudit({
+    action: AUDIT_ACTIONS.ciCodeGenerated,
+    actor: user,
+    targetType: "ci_code",
+    targetName: code,
+    summary: `Delta Command generated one-use ${CI_CODE_LABELS[kind]}`,
+  });
+  revalidatePath("/insurgency");
+}
+
+export async function revokeCommandCodeAction(formData: FormData) {
+  const user = await requireInsurgent();
+  if (!canCreateCiCodes(user)) return;
+  const revoked = await revokeCiCode(String(formData.get("id") ?? ""), user.id);
+  if (!revoked) return;
+  await logAudit({
+    action: AUDIT_ACTIONS.ciCodeRevoked,
+    actor: user,
+    targetType: "ci_code",
+    targetName: revoked.code,
+    summary: `Delta Command revoked unused ${isCiCodeKind(revoked.kind) ? CI_CODE_LABELS[revoked.kind] : "code"}`,
+  });
+  revalidatePath("/insurgency");
+}
+
+// DELTA COMMAND promoting an Operative to Squadron Leader, or demoting one back.
+// canCommandSetRank() keeps Delta Command itself owner-only, both ways.
+export async function setSquadRankAction(formData: FormData) {
+  const user = await requireInsurgent();
+  const targetId = String(formData.get("userId") ?? "");
+  const rank = String(formData.get("rank") ?? "");
+  if (!isCiRank(rank)) return;
+  const target = await db.user.findFirst({
+    where: { id: targetId, isInsurgent: true, suspended: false },
+    select: { id: true, displayName: true, email: true, ciRank: true },
+  });
+  if (!target || target.ciRank === rank || !canCommandSetRank(user, target, rank)) return;
+  await db.user.update({ where: { id: target.id }, data: { ciRank: rank } });
+  await logAudit({
+    action: AUDIT_ACTIONS.ciRankChanged,
+    actor: user,
+    targetType: "user",
+    targetId: target.id,
+    targetName: target.displayName ?? target.email,
+    summary: `Delta Command set CI rank to ${CI_RANK_LABELS[rank]}`,
+  });
+  revalidatePath("/insurgency/roster");
+  revalidatePath(`/insurgency/roster/${target.id}`);
+  revalidatePath("/admin/insurgency");
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireInsurgent } from "@/lib/session";
 import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
+import { CI_RANK_LABELS, ciRankOf } from "@/lib/ci/ranks";
 
 // Every Chaos Insurgency operative, for other operatives. Reads only CI rows
 // (isInsurgent: true) and selects no Foundation-facing fields.
@@ -11,7 +12,7 @@ export default async function RosterPage() {
   const operatives = await db.user.findMany({
     where: { isInsurgent: true, suspended: false, displayName: { not: null } },
     orderBy: { displayName: "asc" },
-    select: { id: true, displayName: true, createdAt: true, personalFile: true },
+    select: { id: true, displayName: true, createdAt: true, personalFile: true, ciRank: true },
   });
 
   return (
@@ -32,6 +33,9 @@ export default async function RosterPage() {
               <span className="flex items-center gap-2 min-w-0">
                 <span className="hud-recid">CI-{String(o.id).slice(0, 8).toUpperCase()}</span>
                 <span className="text-[var(--term-fg-bright)]">{o.displayName}</span>
+                {ciRankOf(o) !== "operative" && (
+                  <span className="text-[var(--term-amber)] text-xs">{CI_RANK_LABELS[ciRankOf(o)]}</span>
+                )}
                 {o.id === viewer.id && (
                   <span className="text-[var(--term-fg-dim)] text-xs">(YOU)</span>
                 )}

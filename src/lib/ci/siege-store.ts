@@ -19,6 +19,7 @@ import {
   formatRetryAfter,
 } from "@/lib/rate-limit";
 import { ciEnabled, ciModeOf } from "./access";
+import { canHostSiege, HOST_REFUSED } from "./ranks";
 import { claimCiCode, isLiveCiCode, releaseCiCode } from "./code-store";
 import {
   CI_BAND,
@@ -393,12 +394,15 @@ export type LaunchResult = { ok: true; siegeId: string } | { ok: false; error: s
 const LAUNCH_REJECTED = "LAUNCH CODE REJECTED — INVALID OR ALREADY USED.";
 
 export async function launchSiege(
-  user: Actor,
+  user: Actor & { ciRank?: string | null },
   code: string,
   minutes: number
 ): Promise<LaunchResult> {
   const cfg = await getSiteConfig();
   if (!ciEnabled(cfg)) return { ok: false, error: "UPLINK OFFLINE." };
+  // Checked before the code, so an operative probing codes learns nothing and
+  // spends no rate-limit attempts.
+  if (!canHostSiege(user)) return { ok: false, error: HOST_REFUSED };
 
   const limit = await checkRateLimit("ci-launch", user.id, CI_LAUNCH_RULE);
   if (limit.blocked) {

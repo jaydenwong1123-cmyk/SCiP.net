@@ -15,7 +15,23 @@ import {
 import { StationHead, HudPanel, Readout, EmptyState } from "@/components/hud";
 import { SiegeConsole } from "@/components/ci/siege-console";
 import { LaunchForm } from "./launch-form";
-import { abandonAttackAction, issueAttackAction, submitAttackAnswerAction } from "./actions";
+import { CI_CODE_KINDS, CI_CODE_LABELS, isCiCodeKind } from "@/lib/ci/codes";
+import { liveCiCodesBy } from "@/lib/ci/code-store";
+import {
+  CI_RANK_LABELS,
+  HOST_REFUSED,
+  MAX_LIVE_CODES_PER_COMMANDER,
+  canCreateCiCodes,
+  canHostSiege,
+  ciRankOf,
+} from "@/lib/ci/ranks";
+import {
+  abandonAttackAction,
+  generateCommandCodeAction,
+  issueAttackAction,
+  revokeCommandCodeAction,
+  submitAttackAnswerAction,
+} from "./actions";
 
 export default async function InsurgencyPage() {
   const user = await requireInsurgent();
@@ -30,21 +46,28 @@ export default async function InsurgencyPage() {
     );
   }
 
-  const [feed, sieges, leak] = await Promise.all([
+  const rank = ciRankOf(user);
+  const isHost = canHostSiege(user);
+  const isCommand = canCreateCiCodes(user);
+
+  const [feed, sieges, leak, myCodes] = await Promise.all([
     siegeFeed(true),
     recentSieges(8),
     leakFor(user.id),
+    isCommand ? liveCiCodesBy(user.id) : Promise.resolve([]),
   ]);
   // eslint-disable-next-line react-hooks/purity -- server component; single read of wall-clock
   const now = Date.now();
   const cooldown = cooldownState(cfg, new Date(now));
   const scoreSiege = feed?.active?.id ?? sieges[0]?.id ?? null;
   const scores = scoreSiege ? await siegeScoreboard(scoreSiege, "ci") : [];
-  const canLaunch = !feed?.active && cfg.ciAttacksEnabled && cooldown.ready;
+  const canLaunch = isHost && !feed?.active && cfg.ciAttacksEnabled && cooldown.ready;
+  const atCodeCap = myCodes.length >= MAX_LIVE_CODES_PER_COMMANDER;
 
   return (
     <>
       <StationHead code="CI // FIELD UPLINK" title="OPERATION CONTROL">
+        <Readout label="Rank" value={CI_RANK_LABELS[rank]} tone={isHost ? "fg" : "dim"} small />
         <Readout
           label="Status"
           value={feed?.active ? "SIEGE LIVE" : canLaunch ? "READY" : "HOLDING"}
@@ -85,6 +108,9 @@ export default async function InsurgencyPage() {
               its members; take two and the mainframe opens. RAISA will fight you for every point
               of integrity. Win, and you walk away with a classified file.
             </p>
+            {!isHost && (
+              <p className="text-sm text-[var(--term-amber)]">{HOST_REFUSED}</p>
+            )}
             {!cfg.ciAttacksEnabled && (
               <p className="text-sm text-[var(--term-amber)]">[OOC] Attacks are disabled by staff.</p>
             )}
@@ -93,10 +119,59 @@ export default async function InsurgencyPage() {
                 THE NETWORK IS ON ALERT. NEXT WINDOW IN {formatDuration(cooldown.retryAfterMs)}.
               </p>
             )}
-            <LaunchForm durations={SIEGE_DURATIONS_MIN} disabled={!canLaunch} />
+            {isHost && <LaunchForm durations={SIEGE_DURATIONS_MIN} disabled={!canLaunch} />}
           </div>
         )}
       </HudPanel>
+
+      {isCommand && (
+        <HudPanel code="DC" title="DELTA COMMAND // CODES" status={`${myCodes.length} UNUSED`}>
+          <p className="text-xs text-[var(--term-fg-dim)] leading-snug mb-3">
+            [OOC] Each ENLIST code creates one operative account; each LAUNCH code lets a Squadron
+            Leader (or you) start one siege. A code is spent the moment it works. You can hold up
+            to {MAX_LIVE_CODES_PER_COMMANDER} unused codes at once.
+          </p>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {CI_CODE_KINDS.map((kind) => (
+                <form key={kind} action={generateCommandCodeAction}>
+                  <input type="hidden" name="kind" value={kind} />
+                  <button type="submit" className="term-button term-button--sm" disabled={atCodeCap}>
+                    [GENERATE {CI_CODE_LABELS[kind]}]
+                  </button>
+                </form>
+              ))}
+            </div>
+            {atCodeCap && (
+              <p className="text-sm text-[var(--term-amber)]">
+                CODE LIMIT REACHED. REVOKE OR HAND OUT A CODE FIRST.
+              </p>
+            )}
+            {myCodes.length === 0 ? (
+              <EmptyState title="NO UNUSED CODES" />
+            ) : (
+              <ul className="text-sm space-y-1">
+                {myCodes.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>
+                      <span className="hud-readout__label">
+                        {isCiCodeKind(c.kind) ? CI_CODE_LABELS[c.kind] : c.kind}
+                      </span>{" "}
+                      <code className="text-[var(--term-fg-bright)] select-all">{c.code}</code>
+                    </span>
+                    <form action={revokeCommandCodeAction}>
+                      <input type="hidden" name="id" value={c.id} />
+                      <button type="submit" className="term-button term-button--sm term-button--ghost">
+                        [REVOKE]
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </HudPanel>
+      )}
 
       <HudPanel code="02" title="OPERATIVES" status={scores.length ? `${scores.length} ACTIVE` : "—"}>
         {scores.length === 0 ? (
