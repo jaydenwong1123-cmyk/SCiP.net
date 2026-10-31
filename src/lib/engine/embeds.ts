@@ -162,23 +162,22 @@ export function leaderboardEmbed(
   rows: { discordId: string; username: string; points: number }[],
   viewer?: { position: number | null; points: number }
 ): Embed {
-  // One line per member: a fixed-width position, the mention, and the total
-  // right after a thin separator. No medals — a service record reads the same
-  // for first place as for fifteenth.
+  // One numbered line per member — `1. @member • 42 points` — under a small
+  // bold title, the same shape as the shift leaderboard. No medals: first
+  // place reads the same as fifteenth.
   const lines = rows.map(
-    (row, i) => `${ordinal(i + 1)}  ${mention(row.discordId)}  ·  **${points(row.points)}**`
+    (row, i) =>
+      `${i + 1}. ${mention(row.discordId)} • ${points(row.points)} point${row.points === 1 ? "" : "s"}`
   );
 
-  const header = "-# POSITION · PERSONNEL · POINTS";
-  const body = lines.length
-    ? `${header}\n${lines.join("\n")}`
-    : "_No personnel have been awarded points yet._";
-
-  const embed = panel("Service Record", body, {
+  const embed: Embed = {
+    title: "Points Leaderboard",
+    description: lines.length
+      ? lines.join("\n")
+      : "_No personnel have been awarded points yet._",
     color: COLOR.neutral,
-    footer: { text: `Top ${Math.max(rows.length, 15)} by service points` },
-    timestamp: new Date().toISOString(),
-  });
+    footer: { text: "CI Points System" },
+  };
 
   // Shown only to someone who is not already in the table — repeating a
   // member's own position back at them when they are sitting at #3 is noise.
