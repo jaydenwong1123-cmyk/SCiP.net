@@ -10,7 +10,7 @@ import {
 } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Terms of Service // SCiP.net",
+  title: "Terms of Service",
 };
 
 const sections: LegalSection[] = [

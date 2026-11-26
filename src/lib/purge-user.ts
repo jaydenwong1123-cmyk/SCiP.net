@@ -125,6 +125,10 @@ export async function purgeUser(userId: string): Promise<void> {
     where: { authorId: userId },
     data: { authorId: null },
   });
+  // Reactions and visit days are the member's own and mean nothing without
+  // the account.
+  await db.forumReaction.deleteMany({ where: { userId } });
+  await db.activityDay.deleteMany({ where: { userId } });
   // Traces and revocations they performed against OTHER members' runs stay —
   // that is RAISA's work product, and it outlives the officer who did it.
   await db.hackRun.updateMany({

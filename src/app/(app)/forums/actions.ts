@@ -110,6 +110,13 @@ export async function deleteForumAction(formData: FormData) {
   const existing = await db.forum.findUnique({ where: { id } });
   if (!existing || !canDeleteForum(user, existing)) return;
 
+  // Reactions hang off posts by id only, so they are removed by hand first.
+  const postIds = (
+    await db.forumPost.findMany({ where: { forumId: id }, select: { id: true } })
+  ).map((p) => p.id);
+  if (postIds.length > 0) {
+    await db.forumReaction.deleteMany({ where: { postId: { in: postIds } } });
+  }
   await db.forumPost.deleteMany({ where: { forumId: id } });
   await db.forum.delete({ where: { id } });
 

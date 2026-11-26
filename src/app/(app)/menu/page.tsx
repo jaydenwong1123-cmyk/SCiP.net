@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { clearanceDisplay } from "@/lib/clearance";
@@ -11,7 +12,16 @@ import {
   visibleSections,
   type Section,
 } from "@/lib/sections";
-import { StationHead, Readout, Lamp, HudBanner } from "@/components/hud";
+import { StationHead, Readout, Lamp, HudBanner, HudPanel, EmptyState } from "@/components/hud";
+import { db } from "@/lib/db";
+import { getActivityFeed, agoLabel } from "@/lib/activity-feed";
+import { isNewSince, visitMarker } from "@/lib/activity";
+import { MAX_REQUESTABLE_CLEARANCE } from "@/lib/clearance";
+
+export const metadata: Metadata = { title: "Station Board" };
+
+// How long after joining the first-steps checklist is offered.
+const FIRST_STEPS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export default async function MenuPage() {
   const user = await requireUser();
@@ -19,10 +29,19 @@ export default async function MenuPage() {
 
   // getStationCounts is request-cached and was already resolved by the app
   // layout for the command rail, so this costs nothing.
-  const [counts, activeGrant] = await Promise.all([
+  const now = new Date();
+  const isNewMember =
+    now.getTime() - user.createdAt.getTime() < FIRST_STEPS_WINDOW_MS;
+
+  const [counts, activeGrant, feed, firstSteps] = await Promise.all([
     getStationCounts(user),
     getActiveHackGrant(user.id),
+    getActivityFeed(user),
+    // Three small counts, and only for an account in its first month.
+    isNewMember ? getFirstSteps(user) : Promise.resolve(null),
   ]);
+  const marker = visitMarker(user, now);
+  const newCount = feed.filter((item) => isNewSince(item.at, marker)).length;
 
   const sections = visibleSections(gates);
   const alerts =
@@ -50,6 +69,83 @@ export default async function MenuPage() {
           </Lamp>
         </div>
       </StationHead>
+
+      {firstSteps && firstSteps.some((s) => !s.done) && (
+        <HudPanel
+          code="00"
+          title="FIRST STEPS"
+          status={`${firstSteps.filter((s) => s.done).length} OF ${firstSteps.length} COMPLETE`}
+        >
+          <ul className="list-none space-y-1 text-sm">
+            {firstSteps.map((s) => (
+              <li key={s.href} className="flex flex-wrap items-baseline gap-2">
+                <span
+                  aria-hidden
+                  className={
+                    s.done ? "text-[var(--term-fg-dim)]" : "text-[var(--term-amber)]"
+                  }
+                >
+                  {s.done ? "[x]" : "[ ]"}
+                </span>
+                {s.done ? (
+                  <span className="text-[var(--term-fg-dim)] line-through">
+                    {s.label}
+                  </span>
+                ) : (
+                  <Link href={s.href} className="term-link">
+                    {s.label}
+                  </Link>
+                )}
+                <span className="sr-only">{s.done ? "(done)" : "(to do)"}</span>
+              </li>
+            ))}
+          </ul>
+        </HudPanel>
+      )}
+
+      <HudPanel
+        code="01"
+        title="LATEST ACTIVITY"
+        status={
+          marker === null
+            ? `${feed.length} RECENT`
+            : newCount > 0
+              ? `${newCount} NEW SINCE YOUR LAST VISIT`
+              : "NOTHING NEW SINCE YOUR LAST VISIT"
+        }
+      >
+        <div className="hud-list">
+          {feed.length === 0 && (
+            <EmptyState title="No activity on record">
+              <p className="text-xs">
+                NEW FILES, INCIDENTS, BROADCASTS AND FORUM REPLIES APPEAR HERE.
+              </p>
+              <Link href="/forums" className="term-button term-button--sm mt-1">
+                OPEN THE FORUMS
+              </Link>
+            </EmptyState>
+          )}
+          {feed.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm term-row no-underline px-1"
+            >
+              <span className="flex flex-wrap items-center gap-2 min-w-0 break-words">
+                <span className="hud-recid">[{item.kind}]</span>
+                <span className="text-[var(--term-fg-bright)]">{item.title}</span>
+                {isNewSince(item.at, marker) && (
+                  <span className="clearance-chip text-[10px]">NEW</span>
+                )}
+              </span>
+              <span className="shrink-0 hud-recid">
+                {item.detail && <>{item.detail} · </>}
+                {agoLabel(item.at, now)}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </HudPanel>
 
       <p className="text-[var(--term-fg-dim)] text-xs">
         {"// SELECT A STATION TO CONTINUE"}
@@ -84,6 +180,44 @@ export default async function MenuPage() {
       })}
     </>
   );
+}
+
+// The checklist a new member sees on the board until it is complete. Each step
+// is something they can do at L-1 with no grant, and each is detected from the
+// record it leaves rather than stored as a flag.
+async function getFirstSteps(user: {
+  id: string;
+  clearance: number;
+  department: string | null;
+  personalFile: string;
+}): Promise<{ label: string; href: string; done: boolean }[]> {
+  const [forumPosts, sentMessages, clearanceRequests] = await Promise.all([
+    db.forumPost.count({ where: { authorId: user.id } }),
+    db.message.count({ where: { senderId: user.id } }),
+    db.clearanceRequest.count({ where: { userId: user.id } }),
+  ]);
+  return [
+    {
+      label: "COMPLETE YOUR PERSONNEL DOSSIER",
+      href: "/profile",
+      done: !!user.department && user.personalFile.trim() !== "",
+    },
+    {
+      label: "POST IN A FORUM TOPIC",
+      href: "/forums",
+      done: forumPosts > 0,
+    },
+    {
+      label: "SEND A MESSAGE TO ANOTHER MEMBER",
+      href: "/messages/compose",
+      done: sentMessages > 0,
+    },
+    {
+      label: "REQUEST HIGHER CLEARANCE",
+      href: "/clearance-request",
+      done: clearanceRequests > 0 || user.clearance >= MAX_REQUESTABLE_CLEARANCE,
+    },
+  ];
 }
 
 // A station's lamp and its label, kept together so the colour and the word can

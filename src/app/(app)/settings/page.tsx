@@ -9,6 +9,8 @@ import { canViewAs, getViewAsClearance, viewAsOptions } from "@/lib/view-as";
 import { setViewAsAction } from "./view-as-actions";
 import { StationHead, HudPanel, Readout, Lamp } from "@/components/hud";
 
+export const metadata = { title: "Settings" };
+
 export default async function SettingsPage() {
   await requireUser();
   // The real row, not the simulated persona — this page is how a member gets

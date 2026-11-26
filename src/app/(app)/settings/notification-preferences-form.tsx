@@ -11,6 +11,9 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   ticket: "TICKETS",
   intrusion: "INTRUSION ALERTS",
   siege: "SIEGE ALERTS",
+  forum: "FORUM REPLIES",
+  broadcast: "NEW BROADCASTS",
+  clearance: "CLEARANCE DECISIONS",
 };
 
 export function NotificationPreferencesForm({

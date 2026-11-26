@@ -30,6 +30,8 @@ import {
   EmptyState,
 } from "@/components/hud";
 
+export const metadata = { title: "Broadcasts" };
+
 export default async function BroadcastsPage() {
   const user = await requireUser();
   const canManage = hasAdminPowers(user);

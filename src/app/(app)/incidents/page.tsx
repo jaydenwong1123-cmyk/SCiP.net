@@ -21,6 +21,8 @@ import {
   pickQuery,
 } from "@/lib/filters";
 
+export const metadata = { title: "Incidents" };
+
 export default async function IncidentsPage({
   searchParams,
 }: {

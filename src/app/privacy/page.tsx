@@ -10,7 +10,7 @@ import {
 } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy // SCiP.net",
+  title: "Privacy Policy",
 };
 
 const email = (
@@ -57,6 +57,14 @@ const sections: LegalSection[] = [
           visited, and the date and time of your visit. We do not currently use
           a third-party analytics service; if that changes, this policy will be
           updated first.
+        </p>
+        <p>
+          Activity records. When you are signed in, the site itself records the
+          time of your most recent visit and the calendar days on which you
+          opened it. This is stored in the site&apos;s own database, is not
+          shared with anyone, and does not include which pages you viewed. It
+          is used to mark content as new since your last visit and to show the
+          site owner how many members are active.
         </p>
         <p>
           We do not knowingly collect sensitive information such as financial

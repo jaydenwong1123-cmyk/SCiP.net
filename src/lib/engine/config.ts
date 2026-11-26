@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 
-// The bot's own settings row. Mirrors lib/site-config.ts's singleton shape:
-// one row, fetched through a helper that invents the defaults when the row does
-// not exist yet, so nothing downstream ever has to handle a null config.
+// The bot's settings, one row per server, fetched through a helper that
+// invents the defaults when the row does not exist yet, so nothing downstream
+// ever has to handle a null config.
 
 const SINGLETON = "singleton";
 
@@ -55,26 +55,54 @@ const pickConfig = (row: EngineConfig): EngineConfig => ({
   lockReason: row.lockReason,
 });
 
-export async function getEngineConfig(): Promise<EngineConfig> {
-  const row = await db.engineGuildConfig.findUnique({
-    where: { id: SINGLETON },
-  });
-  return row ? pickConfig(row) : EMPTY_CONFIG;
+// One settings row per server, keyed by the server's id, so each server The
+// Engine is in has its own roles, channels and lockdown.
+//
+// Before multi-server support there was a single row with id "singleton". It
+// still belongs to the server it was set up in (its guildId, or
+// DISCORD_GUILD_ID if setup never saved one), and is moved to that server's id
+// the first time settings are saved there. Reads fall back to it until then.
+
+async function legacyRow(guildId: string) {
+  const row = await db.engineGuildConfig.findUnique({ where: { id: SINGLETON } });
+  if (!row) return null;
+  const owner = row.guildId || process.env.DISCORD_GUILD_ID || "";
+  return owner === guildId ? row : null;
+}
+
+export async function getEngineConfig(guildId: string): Promise<EngineConfig> {
+  const row =
+    (await db.engineGuildConfig.findUnique({ where: { id: guildId } })) ??
+    (await legacyRow(guildId));
+  return row ? pickConfig(row) : { ...EMPTY_CONFIG, guildId };
 }
 
 /**
- * Write the settings a run of `/engine setup` supplied.
+ * Write the settings a run of `/engine setup` supplied, for one server.
  *
  * Only the keys present are touched, so setup can be run repeatedly to adjust
  * one channel without having to re-pick every role each time.
  */
 export async function saveEngineConfig(
+  guildId: string,
   patch: Partial<EngineConfig>
 ): Promise<EngineConfig> {
+  const data = { ...patch, guildId };
+  const existing = await db.engineGuildConfig.findUnique({ where: { id: guildId } });
+  if (!existing) {
+    const legacy = await legacyRow(guildId);
+    if (legacy) {
+      const moved = await db.engineGuildConfig.update({
+        where: { id: SINGLETON },
+        data: { ...data, id: guildId },
+      });
+      return pickConfig(moved);
+    }
+  }
   const row = await db.engineGuildConfig.upsert({
-    where: { id: SINGLETON },
-    create: { id: SINGLETON, ...EMPTY_CONFIG, ...patch },
-    update: patch,
+    where: { id: guildId },
+    create: { ...EMPTY_CONFIG, ...data, id: guildId },
+    update: data,
   });
   return pickConfig(row);
 }

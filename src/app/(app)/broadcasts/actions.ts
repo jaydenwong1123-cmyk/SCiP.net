@@ -30,6 +30,8 @@ import {
   CONTENT_SCOPES,
 } from "@/lib/rate-limit";
 import { systemOfflineError } from "@/lib/ci/lockdown";
+import { redactToText } from "@/lib/redact";
+import { createNotifications, NOTIFICATION_TYPES } from "@/lib/notifications";
 
 // The audience a directive is aimed at: the minimum clearance needed to read
 // it. A directive may be aimed no higher than the issuer's own authoring
@@ -124,6 +126,36 @@ export async function createBroadcastAction(
       expiresAt,
     },
   });
+
+  // Alert everyone cleared to read it, but only a directive that is live the
+  // moment it is issued. A scheduled one is invisible until its publish time
+  // and there is no job to announce it then, so it is left to the station
+  // board's activity feed, which shows it once it goes live.
+  //
+  // The title is flattened at the directive's own audience rank, so text
+  // redacted above that rank is not quoted to members who could not read it.
+  if (!publishAt || publishAt.getTime() <= Date.now()) {
+    try {
+      const audienceMembers = await db.user.findMany({
+        where: {
+          id: { not: user.id },
+          clearance: { gte: audience.rank },
+          suspended: false,
+          isInsurgent: false,
+          displayName: { not: null },
+        },
+        select: { id: true },
+      });
+      await createNotifications({
+        userIds: audienceMembers.map((m) => m.id),
+        type: NOTIFICATION_TYPES.broadcast,
+        body: `New broadcast: ${redactToText(title.slice(0, 200), audience.rank)}`,
+        link: "/broadcasts",
+      });
+    } catch {
+      // The directive is issued either way; alerts are best-effort.
+    }
+  }
 
   revalidatePath("/broadcasts");
   redirect("/broadcasts");

@@ -14,6 +14,8 @@ import {
   EmptyState,
 } from "@/components/hud";
 
+export const metadata = { title: "Clearance" };
+
 export default async function ClearanceRequestPage() {
   const user = await requireUser();
   const myRequests = await db.clearanceRequest.findMany({

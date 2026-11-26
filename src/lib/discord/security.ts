@@ -98,8 +98,15 @@ export function roleGrantProblem(role: GuildRole, guildId: string): string | nul
  */
 export function botPermissionProblem(
   appPermissions: string | undefined,
-  botName: string
+  botName: string,
+  { allowAdministrator = false }: { allowAdministrator?: boolean } = {}
 ): string | null {
+  // The owner has chosen to let some bots run with Administrator. Other
+  // dangerous permissions are still refused.
+  if (allowAdministrator) {
+    const bits = parseBits(appPermissions);
+    if (bits !== null && (bits & ADMINISTRATOR) === ADMINISTRATOR) return null;
+  }
   const extra = dangerousPermissions(appPermissions).filter((p) => p !== "Manage Roles");
   if (extra.length === 0) return null;
   return `${botName} is switched off because its role has ${listOf(extra)}. A bot holding those can wreck the server if its token ever leaks, and ${botName} needs none of them. In Server Settings → Roles → ${botName}, turn them off. It only needs Manage Roles, View Channels, Send Messages and Embed Links. If they are already off there, check this channel's permission overrides.`;

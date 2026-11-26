@@ -8,6 +8,8 @@ import {
 import { ProfileForm } from "./profile-form";
 import { updateDepartmentAction } from "./actions";
 import { StationHead, HudPanel } from "@/components/hud";
+
+export const metadata = { title: "Profile" };
 
 export default async function ProfilePage() {
   const user = await requireUser();

@@ -58,6 +58,8 @@ function TicketRow({
   );
 }
 
+export const metadata = { title: "IT Support" };
+
 export default async function TicketsPage() {
   const user = await requireUser();
   const queues = handleableTicketTypes(user);

@@ -32,6 +32,8 @@ import {
   setMaintenanceAction,
 } from "./actions";
 
+export const metadata = { title: "Administration" };
+
 export default async function AdminPage() {
   const viewer = await requireStaff();
   const ownerPowers = hasOwnerPowers(viewer);
@@ -132,6 +134,12 @@ export default async function AdminPage() {
         <Link href="/admin/audit" className="term-link text-sm">
           [ACCESS &amp; ACTION LOG]
         </Link>
+        {/* Owner and co-owner only; the route enforces the same check. */}
+        {hasOwnerPowers(viewer) && (
+          <Link href="/admin/stats" className="term-link text-sm">
+            [ACTIVITY STATISTICS]
+          </Link>
+        )}
         {/* Seeded owner only; the route enforces the same check itself. */}
         {viewer.isOwner && (
           <Link href="/admin/insurgency" className="term-link text-sm">

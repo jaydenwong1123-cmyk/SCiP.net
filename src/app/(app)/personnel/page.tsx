@@ -23,6 +23,8 @@ function designationWeight(designation?: string | null): number {
   return designation === R5_DESIGNATION ? 1 : 0;
 }
 
+export const metadata = { title: "Personnel" };
+
 export default async function PersonnelPage({
   searchParams,
 }: {

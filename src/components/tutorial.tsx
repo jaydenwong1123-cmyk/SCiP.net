@@ -96,6 +96,7 @@ export function Tutorial() {
                 <li>
                   <code className="text-[var(--term-fg)]">@Display Name</code>{" "}
                   — links to that member&apos;s personnel file and notifies them.
+                  Works in messages and forum posts.
                 </li>
               </ul>
             </section>
@@ -126,8 +127,40 @@ export function Tutorial() {
                   site-wide announcements.
                 </li>
                 <li>
+                  <span className="text-[var(--term-fg)]">FORUMS</span> — open
+                  discussion threads. Reply, react to a post, or hit REPLY on
+                  one to mention its author. Everyone in a thread is alerted
+                  when it gets a new reply.
+                </li>
+                <li>
                   <span className="text-[var(--term-fg)]">CLEARANCE</span> —
-                  request a clearance change; staff review it with a note.
+                  request a clearance change; staff review it with a note, and
+                  you are alerted when it is decided.
+                </li>
+                <li>
+                  <span className="text-[var(--term-fg)]">IT SUPPORT</span> —
+                  ask for help, report a bug, or request access to a file.
+                </li>
+                <li>
+                  <span className="text-[var(--term-fg)]">PROFILE</span> — your
+                  own dossier: pick a department and write your personal file.
+                </li>
+              </ul>
+            </section>
+
+            <section className="space-y-1">
+              <h3 className="text-[var(--term-fg-bright)]">◈ STAYING UP TO DATE</h3>
+              <ul className="list-none space-y-1 pl-2 text-[var(--term-fg-dim)]">
+                <li>
+                  <span className="text-[var(--term-fg)]">MAIN MENU</span> —
+                  the LATEST ACTIVITY list shows the newest files, incidents,
+                  broadcasts and forum replies you are cleared to see, marked
+                  NEW if they arrived since your last visit.
+                </li>
+                <li>
+                  <span className="text-[var(--term-fg)]">ALERTS</span> — the
+                  bell in the top bar updates on its own. Choose which alerts
+                  you get under SETTINGS.
                 </li>
               </ul>
             </section>

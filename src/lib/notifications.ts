@@ -10,6 +10,12 @@ export const NOTIFICATION_TYPES = {
   ticket: "ticket",
   intrusion: "intrusion",
   siege: "siege",
+  // A reply in a forum topic the member opened or has posted in.
+  forum: "forum",
+  // A newly issued broadcast the member is cleared to read.
+  broadcast: "broadcast",
+  // A decision on the member's own clearance request.
+  clearance: "clearance",
 } as const;
 
 export type NotificationType =
@@ -39,6 +45,57 @@ export async function createNotification(input: {
       read: preference?.muted ?? false,
     },
   });
+}
+
+// The same alert for many members at once: a forum reply, a new broadcast.
+//
+// createNotification() costs two round trips per recipient, which is fine for
+// one and far too slow for a roster. This reads every recipient's preference
+// in one query and writes every row in one more, honouring SILENCED and MUTED
+// exactly as the single form does.
+//
+// With `skipIfUnread`, a member who already has an unread alert for the same
+// link is left alone, so a busy thread produces one alert, not one per reply.
+export async function createNotifications(input: {
+  userIds: string[];
+  type: NotificationType;
+  body: string;
+  link: string;
+  skipIfUnread?: boolean;
+}): Promise<void> {
+  const userIds = [...new Set(input.userIds)];
+  if (userIds.length === 0) return;
+
+  const [preferences, pending] = await Promise.all([
+    db.notificationPreference.findMany({
+      where: { userId: { in: userIds }, type: input.type },
+    }),
+    input.skipIfUnread
+      ? db.notification.findMany({
+          where: {
+            userId: { in: userIds },
+            type: input.type,
+            link: input.link,
+            read: false,
+          },
+          select: { userId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const byUser = new Map(preferences.map((p) => [p.userId, p]));
+  const alreadyPending = new Set(pending.map((n) => n.userId));
+
+  const rows = userIds
+    .filter((id) => !byUser.get(id)?.silenced && !alreadyPending.has(id))
+    .map((id) => ({
+      userId: id,
+      type: input.type,
+      body: input.body.slice(0, 300),
+      link: input.link,
+      read: byUser.get(id)?.muted ?? false,
+    }));
+  if (rows.length === 0) return;
+  await db.notification.createMany({ data: rows });
 }
 
 export async function getNotificationPreferences(userId: string) {

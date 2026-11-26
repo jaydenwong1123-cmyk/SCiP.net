@@ -5,4 +5,4 @@ export const LEGAL_SITE_URL = "https://scip-net.vercel.app";
 export const LEGAL_OWNER = "unman";
 export const LEGAL_EMAIL = "unmanf36@gmail.com";
 export const LEGAL_HOSTING_PROVIDER = "Vercel";
-export const LEGAL_EFFECTIVE_DATE = "September 30, 2026";
+export const LEGAL_EFFECTIVE_DATE = "November 14, 2026";

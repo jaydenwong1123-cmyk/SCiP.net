@@ -23,7 +23,11 @@ const { auth } = NextAuth(authConfig);
 // can read them before registering.
 // `/enlist` is the Chaos Insurgency signup screen. It is public for the same
 // reason `/register` is, and it is useless without the out-of-roleplay code.
+// `/` is public because a visitor with no session is shown the landing page
+// there (app/page.tsx); a member is redirected on to their own start screen by
+// that page itself. It is an exact match, so no other path is opened by it.
 const PUBLIC_PATHS = [
+  "/",
   "/login",
   "/register",
   "/enlist",
@@ -44,6 +48,9 @@ export default auth((req) => {
   // fails verification and no command ever reaches the bot.
   const isPublic =
     PUBLIC_PATHS.includes(pathname) ||
+    // The link-preview card (app/opengraph-image.tsx). Fetched by Discord and
+    // other unfurlers, which have no session. It is a static image.
+    pathname.startsWith("/opengraph-image") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/discord");
 

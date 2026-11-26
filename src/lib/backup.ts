@@ -88,6 +88,8 @@ const TABLES = {
   auditLog: () => db.auditLog.findMany(),
   forum: () => db.forum.findMany(),
   forumPost: () => db.forumPost.findMany(),
+  forumReaction: () => db.forumReaction.findMany(),
+  activityDay: () => db.activityDay.findMany(),
   hackSanction: () => db.hackSanction.findMany(),
   // The Discord bots. Not part of the website's network — the OMEGA purge
   // leaves them standing — but Turso is still their only copy.

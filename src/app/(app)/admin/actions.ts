@@ -1058,6 +1058,22 @@ export async function reviewClearanceRequestAction(formData: FormData) {
     }${reviewNote ? ` — ${reviewNote.slice(0, 200)}` : ""}`,
   });
 
+  // Tell the member. Without this the only way to learn a request had been
+  // decided was to come back and look. "Approved" is only claimed when the new
+  // clearance was actually applied.
+  const outcome =
+    decision !== "approve"
+      ? "was denied"
+      : granted
+        ? "was approved"
+        : "was reviewed but not applied";
+  await createNotification({
+    userId: request.userId,
+    type: NOTIFICATION_TYPES.clearance,
+    body: `Your request for ${clearanceLabel(request.requestedLevel)} ${outcome}.`,
+    link: "/clearance-request",
+  });
+
   revalidatePath("/admin");
   revalidatePath("/personnel");
   revalidatePath("/clearance-request");

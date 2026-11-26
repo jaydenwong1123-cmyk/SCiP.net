@@ -15,6 +15,8 @@ import {
   pickQuery,
   containsFilter,
 } from "@/lib/filters";
+
+export const metadata = { title: "SCP Files" };
 
 export default async function ScpListPage({
   searchParams,

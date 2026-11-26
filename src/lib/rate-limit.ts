@@ -81,7 +81,12 @@ export const TICKET_RULE: RateLimitRule = { limit: 5, windowMs: 30 * 60 * 1000 }
 // egress, and unlike a document it cannot be capped by a .slice().
 export const ATTACHMENT_RULE: RateLimitRule = { limit: 10, windowMs: 30 * 60 * 1000 };
 
+// Forum reactions. A toggle writes one tiny row, so this is loose; it only
+// exists to stop a script hammering the button.
+export const REACTION_RULE: RateLimitRule = { limit: 60, windowMs: 5 * 60 * 1000 };
+
 export const CONTENT_SCOPES = {
+  reaction: "content:reaction",
   document: "content:document",
   message: "content:message",
   ticket: "content:ticket",

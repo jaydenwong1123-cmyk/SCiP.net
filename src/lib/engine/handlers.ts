@@ -83,12 +83,15 @@ const SECURITY: SecurityProfile = {
   bot: "engine",
   name: "The Engine",
   guildEnv: "DISCORD_GUILD_ID",
+  // Settings, ranks and points are all kept per server, so The Engine can
+  // serve every server it is invited to.
+  anyServer: true,
   setupCommand: "/engine setup",
   engageLabel: "High Command, Owners and server administrators",
   throttles: ["points", "announce"],
   rest: engineRest,
   panel,
-  saveLock: saveEngineConfig,
+  saveLock: (state, guildId) => saveEngineConfig(guildId, state),
 };
 
 function reply(
@@ -589,7 +592,7 @@ async function handleEngine(
         "Nothing to change — pass at least one role or channel. Run `/engine settings` to see what is set."
       );
     }
-    const saved = await saveEngineConfig(patch);
+    const saved = await saveEngineConfig(guildId, patch);
     await securityAlert(
       SECURITY,
       saved,
@@ -983,10 +986,10 @@ export async function handleInteraction(
     return text("The Engine only works inside the server, not in DMs.");
   }
 
-  const config = await getEngineConfig();
+  const config = await getEngineConfig(guildId);
 
-  // The anti-nuke gate (lib/discord/guard.ts): this server only, never while
-  // the bot holds dangerous permissions, and no changes during a lockdown.
+  // The anti-nuke gate (lib/discord/guard.ts): never while the bot holds
+  // dangerous permissions, and no changes during this server's lockdown.
   const blocked = securityGate(SECURITY, interaction, config, accessOf(interaction));
   if (blocked) return text(blocked);
 

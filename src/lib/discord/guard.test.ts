@@ -69,6 +69,12 @@ describe("securityGate", () => {
     expect(securityGate(PROFILE, foreign, OPEN, "read")).toMatch(/only works in its own server/);
   });
 
+  it("answers any server when the bot keeps its settings per server", () => {
+    const everywhere = { ...PROFILE, anyServer: true };
+    const foreign = interaction({ guild: "elsewhere" });
+    expect(securityGate(everywhere, foreign, OPEN, "write")).toBeNull();
+  });
+
   it("pins to the environment's server over the one saved in settings", () => {
     vi.stubEnv("TEST_GUARD_GUILD_ID", "pinned");
     expect(securityGate(PROFILE, interaction(), OPEN, "read")).not.toBeNull();
@@ -80,9 +86,15 @@ describe("securityGate", () => {
     expect(securityGate(PROFILE, interaction({ guild: "anywhere" }), fresh, "write")).toBeNull();
   });
 
-  it("refuses to run at all while the bot has Administrator", () => {
+  it("lets The Engine run with Administrator", () => {
+    const admin = interaction({ appPermissions: "8", admin: true });
+    expect(securityGate(PROFILE, admin, OPEN, "read")).toBeNull();
+  });
+
+  it("still refuses to run The Crimson Hand with Administrator", () => {
     const risky = interaction({ appPermissions: "8", admin: true });
-    expect(securityGate(PROFILE, risky, OPEN, "read")).toMatch(/switched off/);
+    const council = { ...PROFILE, bot: "council" as const, name: "The Crimson Hand" };
+    expect(securityGate(council, risky, OPEN, "read")).toMatch(/switched off/);
   });
 
   it("freezes changes during a lockdown but not look-ups", () => {

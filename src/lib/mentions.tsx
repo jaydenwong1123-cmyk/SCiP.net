@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Fragment, isValidElement, type ReactNode } from "react";
+import { Fragment, cloneElement, isValidElement, type ReactNode } from "react";
 import { db } from "@/lib/db";
 import { NOT_INSURGENT } from "@/lib/ci/accounts";
 
@@ -126,4 +126,64 @@ export function linkifyMentionNodes(
     // Redaction spans and anything else pass through untouched.
     return <Fragment key={`o${i}`}>{node}</Fragment>;
   });
+}
+
+function isRedactionSpan(node: ReactNode): boolean {
+  return (
+    isValidElement(node) &&
+    typeof (node.props as { className?: unknown }).className === "string" &&
+    (node.props as { className: string }).className
+      .split(/\s+/)
+      .includes("redacted")
+  );
+}
+
+// The elements lib/format.tsx produces. A mention inside bold or centred text
+// should still link, so these are entered; everything else is left alone.
+const FORMAT_TAGS = new Set(["strong", "s", "span"]);
+
+function linkifyMentionDeep(
+  node: ReactNode,
+  candidates: MentionCandidate[],
+  key: string
+): ReactNode {
+  if (typeof node === "string") {
+    return <Fragment key={key}>{linkifyMentions(node, candidates)}</Fragment>;
+  }
+  if (Array.isArray(node)) {
+    return (
+      <Fragment key={key}>
+        {node.map((child, i) =>
+          linkifyMentionDeep(child, candidates, `${key}-${i}`)
+        )}
+      </Fragment>
+    );
+  }
+  if (isValidElement(node) && !isRedactionSpan(node)) {
+    const enter =
+      node.type === Fragment ||
+      (typeof node.type === "string" && FORMAT_TAGS.has(node.type));
+    const child = (node.props as { children?: ReactNode }).children;
+    if (enter && child !== undefined) {
+      return cloneElement(
+        node,
+        { key },
+        linkifyMentionDeep(child, candidates, `${key}-i`)
+      );
+    }
+  }
+  // Redaction spans, SCP links and anything unrecognised pass through
+  // untouched: a mention hidden behind a redaction must stay hidden.
+  return <Fragment key={key}>{node}</Fragment>;
+}
+
+// linkifyMentionNodes for a body that has been through renderBody() — that is,
+// redacted, then formatted, then SCP-linked. That output nests text inside
+// Fragments and formatting elements, which the flat walker above never
+// reaches. Used by the forums.
+export function linkifyMentionsInBody(
+  nodes: ReactNode[],
+  candidates: MentionCandidate[]
+): ReactNode[] {
+  return nodes.map((node, i) => linkifyMentionDeep(node, candidates, `mb${i}`));
 }

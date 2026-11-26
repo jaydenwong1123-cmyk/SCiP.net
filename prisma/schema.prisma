@@ -72,6 +72,12 @@ model User {
   // Ticked by staff; grants no authority, only visibility.
   earlyAccess      Boolean  @default(false)
   createdAt        DateTime @default(now())
+  // Visit tracking, written by recordVisit() in lib/activity.ts at most once
+  // every few minutes. lastSeenAt is the latest page load; prevVisitAt is where
+  // the PREVIOUS session ended, which is what the "new since your last visit"
+  // markers compare against.
+  lastSeenAt       DateTime?
+  prevVisitAt      DateTime?
 
   usedInvite              InviteCode?              @relation("InviteCodeUser")
   sentMessages            Message[]                @relation("MessageSender")
@@ -150,9 +156,37 @@ model ForumPost {
   author     User?   @relation("ForumPostAuthor", fields: [authorId], references: [id])
   // Denormalized so the post survives the author's account being deleted.
   authorName String  @default("")
+  // Set when the author amends the post; null means never edited.
+  editedAt   DateTime?
 
   @@index([forumId, createdAt])
   @@index([authorId])
+}
+
+// One member's reaction to one forum post. `kind` is a key of FORUM_REACTIONS
+// in lib/forums.ts. Plain id columns rather than relations: under
+// relationMode = "prisma" nothing cascades anyway, and every delete path
+// (post, topic, member, purge) removes these rows by hand.
+model ForumReaction {
+  id        String   @id @default(cuid())
+  kind      String
+  createdAt DateTime @default(now())
+  postId    String
+  userId    String
+
+  @@unique([postId, userId, kind])
+  @@index([userId])
+}
+
+// One row per member per UTC day they opened the site ("2026-11-13"). Feeds
+// the owner's activity statistics and nothing else: no page paths, no IPs.
+model ActivityDay {
+  id     String @id @default(cuid())
+  day    String
+  userId String
+
+  @@unique([userId, day])
+  @@index([day])
 }
 
 // An IT support ticket. One table backs all three kinds because they share

@@ -53,6 +53,7 @@ const WIPES = {
   ticketReply: () => db.ticketReply.deleteMany({}),
   ticket: () => db.ticket.deleteMany({}),
   // Forums
+  forumReaction: () => db.forumReaction.deleteMany({}),
   forumPost: () => db.forumPost.deleteMany({}),
   forum: () => db.forum.deleteMany({}),
   // Invites
@@ -71,6 +72,7 @@ const WIPES = {
   // Per-member state. The owner keeps their own notification settings; there
   // is no reason for a purge to reset their preferences.
   notification: () => db.notification.deleteMany({}),
+  activityDay: () => db.activityDay.deleteMany({}),
   notificationPreference: (keepUserId: string) =>
     db.notificationPreference.deleteMany({
       where: { userId: { not: keepUserId } },

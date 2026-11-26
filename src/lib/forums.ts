@@ -37,3 +37,43 @@ export function canDeleteForumPost(
 ): boolean {
   return (post.authorId !== null && post.authorId === actor.id) || hasAdminPowers(actor);
 }
+
+// Any post's author may amend their own line. Nobody else may, staff
+// included: removing a post is moderation, rewriting one is putting words in a
+// member's mouth.
+export function canEditForumPost(
+  actor: { id: string },
+  post: { authorId: string | null }
+): boolean {
+  return post.authorId !== null && post.authorId === actor.id;
+}
+
+// The reactions a member may leave on a post. Keyed by the value stored in
+// ForumReaction.kind; labels are plain ASCII to match the rest of the console.
+export const FORUM_REACTIONS = [
+  { kind: "ack", label: "ACK", title: "Acknowledged" },
+  { kind: "agree", label: "+1", title: "Agree" },
+  { kind: "noted", label: "NOTED", title: "Noted for the record" },
+  { kind: "query", label: "?", title: "Needs clarification" },
+] as const;
+
+export type ForumReactionKind = (typeof FORUM_REACTIONS)[number]["kind"];
+
+export function isForumReactionKind(value: string): value is ForumReactionKind {
+  return FORUM_REACTIONS.some((r) => r.kind === value);
+}
+
+// Posts per page of a thread.
+export const FORUM_PAGE_SIZE = 50;
+
+export function forumPageCount(postCount: number): number {
+  return Math.max(1, Math.ceil(postCount / FORUM_PAGE_SIZE));
+}
+
+// Which page to show. A missing or malformed value means the LAST page, since
+// a member opening a thread wants the newest replies and the reply box.
+export function pickForumPage(raw: string | undefined, postCount: number): number {
+  const pages = forumPageCount(postCount);
+  const n = raw && /^\d+$/.test(raw) ? parseInt(raw, 10) : pages;
+  return Math.min(Math.max(n, 1), pages);
+}

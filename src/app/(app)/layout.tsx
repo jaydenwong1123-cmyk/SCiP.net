@@ -16,6 +16,7 @@ import { canAccessCounterIntel } from "@/lib/counter-intel";
 import { ciVisibleTo } from "@/lib/ci/access";
 import { siegeFeed } from "@/lib/ci/siege-store";
 import { SiegeOverlay } from "@/components/ci/siege-overlay";
+import { recordVisit } from "@/lib/activity";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Independent gates — run concurrently instead of one after the other so the
@@ -74,6 +75,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       // columns on the cached SiteConfig answer that without a query — and
       // null for anyone outside early access while it is in early access.
       siegeFeed(siegeVisible),
+      // Stamps the visit for the NEW markers and the owner's statistics. Writes
+      // at most once every few minutes and never throws.
+      recordVisit(user),
     ]);
 
   const badgeCounts: BadgeCounts = { ...counts, unreadMessages };

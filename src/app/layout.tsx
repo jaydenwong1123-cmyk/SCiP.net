@@ -14,10 +14,34 @@ import {
 import { getSiteConfig } from "@/lib/site-config";
 import { getRealUser } from "@/lib/session";
 import { gradientCss } from "@/lib/hex-color";
+import { LEGAL_SITE_URL } from "@/lib/legal";
+
+const DESCRIPTION =
+  "The member terminal of an SCP Foundation roleplay faction: a clearance-gated anomaly archive, personnel files, incident reports and forums. Invite only. Join through Discord.";
 
 export const metadata: Metadata = {
-  title: "SCiP.net // Secure Terminal",
-  description: "SCP Foundation roleplay member terminal",
+  metadataBase: new URL(LEGAL_SITE_URL),
+  // Pages name themselves ("Forums") and inherit the suffix; a page that sets
+  // no title gets the default.
+  title: {
+    default: "SCiP.net // Secure Terminal",
+    template: "%s // SCiP.net",
+  },
+  description: DESCRIPTION,
+  // What a pasted link unfurls to in Discord and elsewhere. The image comes
+  // from app/opengraph-image.tsx.
+  openGraph: {
+    type: "website",
+    siteName: "SCiP.net",
+    title: "SCiP.net // Secure Terminal",
+    description: DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SCiP.net // Secure Terminal",
+    description: DESCRIPTION,
+  },
 };
 
 // Applied before first paint so a saved theme/font never flashes the default.
