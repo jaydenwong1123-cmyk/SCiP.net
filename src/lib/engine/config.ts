@@ -16,6 +16,8 @@ export type EngineConfig = {
   reviewChannelId: string;
   announceChannelId: string;
   pointsWebhookUrl: string;
+  /** Public copy of every command's reply; see command-log.ts. */
+  commandLogWebhookUrl: string;
   /** Anti-nuke: see lib/discord/guard.ts. */
   securityChannelId: string;
   lockedAt: Date | null;
@@ -33,6 +35,7 @@ export const EMPTY_CONFIG: EngineConfig = {
   reviewChannelId: "",
   announceChannelId: "",
   pointsWebhookUrl: "",
+  commandLogWebhookUrl: "",
   securityChannelId: "",
   lockedAt: null,
   lockedById: "",
@@ -49,6 +52,7 @@ const pickConfig = (row: EngineConfig): EngineConfig => ({
   reviewChannelId: row.reviewChannelId,
   announceChannelId: row.announceChannelId,
   pointsWebhookUrl: row.pointsWebhookUrl,
+  commandLogWebhookUrl: row.commandLogWebhookUrl,
   securityChannelId: row.securityChannelId,
   lockedAt: row.lockedAt,
   lockedById: row.lockedById,

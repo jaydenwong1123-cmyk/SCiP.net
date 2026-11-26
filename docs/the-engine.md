@@ -343,6 +343,7 @@ Set these:
 | `announce_channel` | e.g. `#announcements` | optional — where approvals are announced |
 | `member_role` | leave empty for now | optional — see below |
 | `points_webhook` | a webhook URL | optional — posts every point change publicly (see below) |
+| `command_log` | a webhook URL | optional — posts every command and the bot's reply publicly (see below) |
 | `security_channel` | e.g. `#bot-security`, visible to admins only | where lockdowns and settings changes are reported (see [Security](#security-anti-nuke)) |
 
 `owner_role` and `security_channel` can only be set by a server administrator.
@@ -370,6 +371,15 @@ anything you skipped shown as *not set*.
 > pinged. To stop it, run `/engine setup points_webhook:off`. If the webhook is
 > ever deleted, the points still change and the staff member is told the log
 > failed.
+
+> **About `command_log` (the public command log):** most of The Engine's
+> replies are private, so only the person who ran the command sees them. Make a
+> webhook in your bot command channel the same way as above and paste its URL
+> into `command_log`. From then on every command posts a copy there: who ran it,
+> the command and its options, which channel it was run in, and the bot's reply.
+> Nobody gets pinged. Refusals ("you are not allowed") stay private, and webhook
+> URLs typed into commands show as `[hidden]`. To stop it, run
+> `/engine setup command_log:off`.
 
 > **Worried about locking yourself out?** You can't. Anyone with Discord's
 > **Administrator** permission always keeps full access to the bot, whatever

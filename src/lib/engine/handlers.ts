@@ -30,6 +30,7 @@ import {
   type EngineConfig,
 } from "./config";
 import { applicationPrompt, isFormUrl } from "./applications";
+import { keepPrivate } from "./command-log";
 import {
   leaderboardEmbed,
   mention,
@@ -113,7 +114,7 @@ const text = (content: string, ephemeral = true) =>
 /** Refusals are always ephemeral: a public "you are not allowed" is a telling-off
  *  in front of the whole server, which is not the bot's job. */
 const refuse = (required: TierValue, action?: string) =>
-  text(refusalFor(required, action));
+  keepPrivate(text(refusalFor(required, action)));
 
 // --- option plumbing --------------------------------------------------------
 
@@ -547,8 +548,10 @@ async function handleEngine(
       (id(opts, "owner_role") || id(opts, "security_channel")) &&
       !isGuildAdmin(interaction.member)
     ) {
-      return text(
-        "Only server administrators can change the Owner role or the security channel. Nothing was saved."
+      return keepPrivate(
+        text(
+          "Only server administrators can change the Owner role or the security channel. Nothing was saved."
+        )
       );
     }
 
@@ -586,6 +589,19 @@ async function handleEngine(
         );
       }
       changed.push("`points_webhook`");
+    }
+    const commandLog = str(opts, "command_log").trim();
+    if (commandLog) {
+      if (commandLog.toLowerCase() === "off") {
+        patch.commandLogWebhookUrl = "";
+      } else if (isWebhookUrl(commandLog)) {
+        patch.commandLogWebhookUrl = commandLog;
+      } else {
+        return text(
+          "That is not a Discord webhook URL. In the command channel's settings go to **Integrations → Webhooks → New Webhook → Copy Webhook URL**, and paste that. Nothing was saved."
+        );
+      }
+      changed.push("`command_log`");
     }
     if (changed.length === 0) {
       return text(
@@ -746,6 +762,13 @@ function settingsEmbed(config: EngineConfig): Embed {
         value: config.pointsWebhookUrl
           ? "Webhook set\n_every point change is posted publicly_"
           : "_not set — point changes are not announced_",
+        inline: true,
+      },
+      {
+        name: "Command log",
+        value: config.commandLogWebhookUrl
+          ? "Webhook set\n_every command and its reply is posted publicly_"
+          : "_not set — replies stay private_",
         inline: true,
       },
       {
@@ -991,7 +1014,7 @@ export async function handleInteraction(
   // The anti-nuke gate (lib/discord/guard.ts): never while the bot holds
   // dangerous permissions, and no changes during this server's lockdown.
   const blocked = securityGate(SECURITY, interaction, config, accessOf(interaction));
-  if (blocked) return text(blocked);
+  if (blocked) return keepPrivate(text(blocked));
 
   // The base gate. Everything the bot does, including pressing a button, is
   // behind at least this — which is what makes the optional member role a real

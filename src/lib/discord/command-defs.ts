@@ -239,6 +239,14 @@ export const COMMANDS = [
             required: false,
             max_length: 200,
           },
+          {
+            name: "command_log",
+            description:
+              "Webhook URL that every command and its reply is posted to (\"off\" to stop)",
+            type: OptionType.String,
+            required: false,
+            max_length: 200,
+          },
           securityChannelOption,
         ],
       },

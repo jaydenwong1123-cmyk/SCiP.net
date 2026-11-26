@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { verifyDiscordRequest } from "@/lib/discord/verify";
 import { isFreshTimestamp } from "@/lib/discord/security";
 import type { Interaction } from "@/lib/discord/types";
 import { handleInteraction } from "@/lib/engine/handlers";
+import { mirrorToCommandLog } from "@/lib/engine/command-log";
 
 // THE ENGINE — the Discord bot's front door.
 //
@@ -53,6 +54,13 @@ export async function POST(request: Request) {
 
   try {
     const response = await handleInteraction(interaction);
+    // A public copy for the command log, if one is set. Scheduled after the
+    // response so it never eats into Discord's three-second budget.
+    after(() =>
+      mirrorToCommandLog(interaction, response).catch((err) =>
+        console.error("[engine] command log failed", err)
+      )
+    );
     return NextResponse.json(response);
   } catch (err) {
     // A thrown error would surface to the member as "The application did not

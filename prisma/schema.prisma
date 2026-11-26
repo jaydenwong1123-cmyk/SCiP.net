@@ -1115,6 +1115,11 @@ model EngineGuildConfig {
   // at a different channel from inside Discord with /engine setup.
   pointsWebhookUrl String @default("")
 
+  // Discord webhook URL that a copy of every command's reply is posted to, so
+  // the bot's (otherwise private) answers are visible in a public command log.
+  // Empty = no log. See lib/engine/command-log.ts.
+  commandLogWebhookUrl String @default("")
+
   // Anti-nuke (lib/discord/guard.ts). Where security alerts are posted, and
   // the lockdown switch: while lockedAt is set, nothing that changes roles,
   // points or settings works for anyone but a server administrator.
