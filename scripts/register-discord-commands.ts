@@ -35,9 +35,14 @@ dotenv.config();
 const API = "https://discord.com/api/v10";
 
 // Each bot is its own Discord application with its own set of variables.
+//
+// The Engine serves every server it is invited to, so its commands are
+// registered GLOBALLY (they can take up to an hour to show up in a server the
+// first time). Its old guild-only copy in the home server is cleared at the
+// same time, or that server would list every command twice.
 const BOTS = {
-  engine: { tag: "engine", prefix: "DISCORD", commands: COMMANDS },
-  council: { tag: "council", prefix: "COUNCIL", commands: COUNCIL_COMMANDS },
+  engine: { tag: "engine", prefix: "DISCORD", commands: COMMANDS, global: true },
+  council: { tag: "council", prefix: "COUNCIL", commands: COUNCIL_COMMANDS, global: false },
 } as const;
 
 const choice = (process.argv[2] ?? "engine") as keyof typeof BOTS;
@@ -53,13 +58,12 @@ async function main() {
   const guildId = process.env[`${bot.prefix}_GUILD_ID`];
   const token = process.env[`${bot.prefix}_BOT_TOKEN`];
 
-  const missing = [
+  const required: [string, string | undefined][] = [
     [`${bot.prefix}_APP_ID`, appId],
-    [`${bot.prefix}_GUILD_ID`, guildId],
     [`${bot.prefix}_BOT_TOKEN`, token],
-  ]
-    .filter(([, value]) => !value)
-    .map(([name]) => name);
+  ];
+  if (!bot.global) required.push([`${bot.prefix}_GUILD_ID`, guildId]);
+  const missing = required.filter(([, value]) => !value).map(([name]) => name);
 
   if (missing.length > 0) {
     console.error(
@@ -69,20 +73,38 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(
-    `${tag} registering ${bot.commands.length} top-level commands for guild ${guildId}`
-  );
-
-  const res = await fetch(
-    `${API}/applications/${appId}/guilds/${guildId}/commands`,
-    {
+  const put = (url: string, body: unknown) =>
+    fetch(url, {
       method: "PUT",
       headers: {
         Authorization: `Bot ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(bot.commands),
+      body: JSON.stringify(body),
+    });
+
+  if (bot.global && guildId) {
+    const cleared = await put(`${API}/applications/${appId}/guilds/${guildId}/commands`, []);
+    if (cleared.ok) {
+      console.log(`${tag} cleared the old server-only commands from guild ${guildId}`);
+    } else {
+      console.warn(
+        `${tag} could not clear the old server-only commands from guild ${guildId} (${cleared.status}); that server may show them twice`
+      );
     }
+  }
+
+  console.log(
+    bot.global
+      ? `${tag} registering ${bot.commands.length} top-level commands globally (every server)`
+      : `${tag} registering ${bot.commands.length} top-level commands for guild ${guildId}`
+  );
+
+  const res = await put(
+    bot.global
+      ? `${API}/applications/${appId}/commands`
+      : `${API}/applications/${appId}/guilds/${guildId}/commands`,
+    bot.commands
   );
 
   const body = await res.text();
@@ -103,7 +125,9 @@ async function main() {
   const registered = JSON.parse(body) as { name: string }[];
   for (const command of registered) console.log(`${tag}   /${command.name}`);
   console.log(
-    `${tag} done. ${registered.length} commands are live in that server now.`
+    bot.global
+      ? `${tag} done. ${registered.length} commands registered for every server (new servers can take up to an hour to see them).`
+      : `${tag} done. ${registered.length} commands are live in that server now.`
   );
 }
 

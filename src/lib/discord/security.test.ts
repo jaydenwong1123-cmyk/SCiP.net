@@ -98,6 +98,17 @@ describe("botPermissionProblem", () => {
     expect(problem).toMatch(/Server Settings → Roles → The Engine/);
   });
 
+  it("runs with Administrator when that bot is allowed it", () => {
+    expect(
+      botPermissionProblem(bits(3), "The Engine", { allowAdministrator: true })
+    ).toBeNull();
+  });
+
+  it("still refuses other dangerous permissions when Administrator is allowed", () => {
+    const problem = botPermissionProblem(bits(28, 2), "The Engine", { allowAdministrator: true });
+    expect(problem).toMatch(/Ban Members/);
+  });
+
   it("names the extra permissions but never Manage Roles, which it needs", () => {
     const problem = botPermissionProblem(bits(28, 13, 2), "The Crimson Hand");
     expect(problem).toMatch(/its role has Ban Members and Manage Messages\./);

@@ -57,6 +57,11 @@ export type SecurityProfile = {
   name: string;
   /** The environment variable naming the one server this bot serves. */
   guildEnv: string;
+  /**
+   * Answer every server the bot is in, not just its home one. Only for a bot
+   * whose settings are stored per server, or one server could rewrite another's.
+   */
+  anyServer?: boolean;
   /** The command that sets the security channel. */
   setupCommand: string;
   /** Who may engage a lockdown and read /security status, for refusals. */
@@ -69,7 +74,7 @@ export type SecurityProfile = {
     body?: string,
     rest?: Omit<Embed, "title" | "description" | "author">
   ) => Embed;
-  saveLock: (state: LockState) => Promise<unknown>;
+  saveLock: (state: LockState, guildId: string) => Promise<unknown>;
 };
 
 /** Does an interaction only look things up, or change something? */
@@ -95,11 +100,14 @@ export function securityGate(
   access: Access
 ): string | null {
   const home = process.env[profile.guildEnv] || config.guildId;
-  if (home && interaction.guild_id !== home) {
+  if (!profile.anyServer && home && interaction.guild_id !== home) {
     return `${profile.name} only works in its own server.`;
   }
 
-  const unsafe = botPermissionProblem(interaction.app_permissions, profile.name);
+  // The Engine is allowed to run with Administrator; The Crimson Hand is not.
+  const unsafe = botPermissionProblem(interaction.app_permissions, profile.name, {
+    allowAdministrator: profile.bot === "engine",
+  });
   if (unsafe) return unsafe;
 
   if (access === "read" || !config.lockedAt) return null;
@@ -144,7 +152,10 @@ export async function throttle(
 
   const { limit, label } = THROTTLES[kind];
   const reason = `Automatic: ${mention(actorId)} went past ${limit} ${label} in ${THROTTLE_WINDOW_MINUTES} minutes.`;
-  await profile.saveLock({ lockedAt: new Date(now), lockedById: "system", lockReason: reason });
+  await profile.saveLock(
+    { lockedAt: new Date(now), lockedById: "system", lockReason: reason },
+    guildId
+  );
   await securityAlert(
     profile,
     config,
@@ -199,7 +210,10 @@ export async function handleSecurity(
       };
     }
     if (!config.lockedAt) return { content: `${profile.name} is not in lockdown.` };
-    await profile.saveLock({ lockedAt: null, lockedById: "", lockReason: "" });
+    await profile.saveLock(
+      { lockedAt: null, lockedById: "", lockReason: "" },
+      interaction.guild_id ?? ""
+    );
     // The counts go too. Otherwise whoever tripped the throttle would trip it
     // again with their very next action.
     await db.botAction.deleteMany({
@@ -226,7 +240,10 @@ export async function handleSecurity(
       return { content: `${profile.name} is already in lockdown${since(config)}.` };
     }
     const why = reason.trim().slice(0, 300);
-    await profile.saveLock({ lockedAt: new Date(), lockedById: actorId, lockReason: why });
+    await profile.saveLock(
+      { lockedAt: new Date(), lockedById: actorId, lockReason: why },
+      interaction.guild_id ?? ""
+    );
     await securityAlert(
       profile,
       config,
