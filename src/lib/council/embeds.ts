@@ -7,7 +7,18 @@ import {
   type MessagePayload,
 } from "@/lib/discord/types";
 import type { CouncilShift } from "@prisma/client";
-import { mention, ordinal, points, roleMention } from "@/lib/engine/embeds";
+import {
+  leaderboardBody,
+  mention,
+  ordinal,
+  pagerButtons,
+  pageCount,
+  points,
+  roleMention,
+  viewerField,
+  LEADERBOARD_PAGE_SIZE,
+  type LeaderboardPage,
+} from "@/lib/engine/embeds";
 import { divisionLabel, type DivisionKey } from "./divisions";
 import type { CouncilRung } from "./ranks";
 import { DOUBLE_POINTS, formatDuration, shiftMultiplier } from "./shift-points";
@@ -17,7 +28,7 @@ import type { ShiftTotals } from "./shifts";
 // (lib/engine/embeds.ts) — large heading, small eyebrow — with the division
 // named wherever a rank is.
 
-export { mention, ordinal, points, roleMention };
+export { mention, ordinal, pagerButtons, pageCount, points, roleMention, LEADERBOARD_PAGE_SIZE };
 
 export const EYEBROW = "THE CRIMSON HAND";
 
@@ -189,36 +200,26 @@ export function applicationPrompt(rung: CouncilRung): MessagePayload {
   };
 }
 
-export function leaderboardEmbed(
+/** `council:lb:<division>.<page>.<slot>:<viewerId>` — one dot-joined part, so
+ *  the id still splits into the four parts parseCustomId expects. */
+export const leaderboardButtonId = (
   division: DivisionKey,
-  rows: { discordId: string; points: number }[],
-  viewer?: { position: number | null; points: number }
-): Embed {
-  const lines = rows.map(
-    (row, i) =>
-      `${ordinal(i + 1)}  ${mention(row.discordId)}  ·  **${points(row.points)}**`
-  );
-  const header = "-# POSITION · PERSONNEL · POINTS";
-  const body = lines.length
-    ? `${header}\n${lines.join("\n")}`
-    : "_Nobody in this division has been awarded points yet._";
+  page: number,
+  slot: string,
+  viewerId: string
+) => customId("lb", `${division}.${page}.${slot}`, viewerId);
 
-  const embed = panel(`${divisionLabel(division)} Service Record`, body, {
+export function leaderboardEmbed(division: DivisionKey, input: LeaderboardPage): Embed {
+  const body =
+    input.rows.length === 0
+      ? "_Nobody in this division has been awarded points yet._"
+      : leaderboardBody(input);
+  return panel(`${divisionLabel(division)} Leaderboard`, body, {
     color: COLOR.neutral,
-    footer: { text: `Top ${Math.max(rows.length, 15)} by service points` },
+    fields: viewerField(input),
+    footer: { text: `Division: ${divisionLabel(division)} · ranked by service points` },
     timestamp: new Date().toISOString(),
   });
-
-  if (viewer && viewer.position && viewer.position > rows.length) {
-    embed.fields = [
-      {
-        name: "Your standing",
-        value: `${ordinal(viewer.position)}  ·  **${points(viewer.points)}** points`,
-        inline: false,
-      },
-    ];
-  }
-  return embed;
 }
 
 export const POINTS_LOG_TITLE = "THE CRIMSON HAND | POINTS SYSTEM";

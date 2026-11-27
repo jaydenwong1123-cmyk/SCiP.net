@@ -25,6 +25,7 @@ import { listOf, roleGrantProblem } from "@/lib/discord/security";
 import { isWebhookUrl } from "@/lib/engine/config";
 import { isFormUrl } from "@/lib/engine/applications";
 import { isGuildAdmin } from "@/lib/engine/permissions";
+import { pageOf } from "@/lib/engine/embeds";
 import {
   getCouncilConfig,
   getDivisionConfigs,
@@ -47,7 +48,11 @@ import {
   activeShiftsEmbed,
   applicationPrompt,
   doublePointsEmbed,
+  LEADERBOARD_PAGE_SIZE,
+  leaderboardButtonId,
   leaderboardEmbed,
+  pageCount,
+  pagerButtons,
   mention,
   ordinal,
   panel,
@@ -74,6 +79,7 @@ import {
   adjustPoints,
   getStanding,
   leaderboard,
+  leaderboardSize,
   pointHistory,
   rankPosition,
   setPoints,
@@ -138,9 +144,11 @@ type Ctx = {
   divisions: DivisionConfigs;
 };
 
+/** Answers are posted in the channel by default; see `privately` for the
+ *  exceptions. */
 function reply(
   payload: MessagePayload,
-  { ephemeral = true }: { ephemeral?: boolean } = {}
+  { ephemeral = false }: { ephemeral?: boolean } = {}
 ): InteractionResponse {
   return {
     type: InteractionResponseType.ChannelMessageWithSource,
@@ -148,8 +156,17 @@ function reply(
   };
 }
 
-const text = (content: string, ephemeral = true) =>
+const text = (content: string, ephemeral = false) =>
   reply({ content }, { ephemeral });
+
+/** Visible only to whoever ran it: refusals, anti-nuke and lockdown notices,
+ *  and the bot's own configuration. */
+function privately(response: InteractionResponse): InteractionResponse {
+  if (response.type === InteractionResponseType.ChannelMessageWithSource) {
+    response.data = { ...(response.data as object), flags: MessageFlags.Ephemeral };
+  }
+  return response;
+}
 
 /** Redraw the message a button or modal came from. Content is cleared unless
  *  the payload sets it, so an old status line never lingers. */
@@ -160,7 +177,7 @@ const update = (payload: MessagePayload): InteractionResponse => ({
 
 /** Refusals are always private. */
 const refuse = (what: string, who: string) =>
-  text(`You do not have clearance to ${what}. This is limited to ${who}.`);
+  privately(text(`You do not have clearance to ${what}. This is limited to ${who}.`));
 
 /** "Judicial HR" for Judicial and both of its subdivisions. */
 const hrLabel = (division: DivisionKey) =>
@@ -328,7 +345,7 @@ async function handlePoints(
   // Taking points away is how a leaderboard gets wiped, so it is counted.
   if (path === "set" || path === "remove") {
     const slowed = await throttle(SECURITY, interaction, ctx.config, "points");
-    if (slowed) return text(slowed);
+    if (slowed) return privately(text(slowed));
   }
 
   const reason = str(opts, "reason");
@@ -391,6 +408,41 @@ async function logPoints(
 
 // --- /leaderboard -----------------------------------------------------------
 
+/** One page of a division's leaderboard, with its pager. */
+async function leaderboardPage(
+  guildId: string,
+  division: DivisionKey,
+  viewerId: string,
+  requested: number
+): Promise<MessagePayload> {
+  const [total, me, position] = await Promise.all([
+    leaderboardSize(guildId, division),
+    getStanding(guildId, viewerId, division),
+    rankPosition(guildId, viewerId, division),
+  ]);
+  const page = Math.min(requested, pageCount(total) - 1);
+  const rows = await leaderboard(
+    guildId,
+    division,
+    LEADERBOARD_PAGE_SIZE,
+    page * LEADERBOARD_PAGE_SIZE
+  );
+  return {
+    embeds: [
+      leaderboardEmbed(division, {
+        rows: rows.map((r) => ({ discordId: r.discordId, points: r.points })),
+        page,
+        total,
+        viewer: { id: viewerId, position, points: me?.points ?? 0 },
+      }),
+    ],
+    components: pagerButtons(page, total, (target, slot) =>
+      leaderboardButtonId(division, target, slot, viewerId)
+    ),
+    allowed_mentions: { parse: [] },
+  };
+}
+
 async function handleLeaderboard(
   ctx: Ctx,
   opts: Opts
@@ -401,21 +453,18 @@ async function handleLeaderboard(
   if (!division) {
     return text("Pick a division. You are not in one, so there is no default.");
   }
-  const rows = await leaderboard(ctx.guildId, division, 15);
-  const me = await getStanding(ctx.guildId, actor.id, division);
-  const position = await rankPosition(ctx.guildId, actor.id, division);
-  return reply(
-    {
-      embeds: [
-        leaderboardEmbed(
-          division,
-          rows.map((r) => ({ discordId: r.discordId, points: r.points })),
-          { position, points: me?.points ?? 0 }
-        ),
-      ],
-    },
-    { ephemeral: false }
-  );
+  return reply(await leaderboardPage(ctx.guildId, division, actor.id, 0));
+}
+
+/** council:lb:<division>.<page>.<slot>:<viewerId> — anyone may turn pages. */
+async function handleLeaderboardButton(
+  ctx: Ctx,
+  verb: string,
+  viewerId: string
+): Promise<InteractionResponse> {
+  const [division, page] = verb.split(".");
+  if (!isDivision(division)) return text("Unknown control.");
+  return update(await leaderboardPage(ctx.guildId, division, viewerId, pageOf(page)));
 }
 
 // --- /promote ---------------------------------------------------------------
@@ -456,8 +505,9 @@ async function handlePromote(
 
   const result = await createRequest(ctx.divisions, ctx.guildId, actor.id, actor.name);
   if (!result.ok) {
+    // Private: its "I've submitted it" button files for whoever presses it.
     return "apply" in result
-      ? reply(applicationPrompt(result.apply))
+      ? privately(reply(applicationPrompt(result.apply)))
       : text(result.message);
   }
   return text(
@@ -1308,6 +1358,7 @@ async function handleComponent(ctx: Ctx): Promise<InteractionResponse> {
     };
   }
 
+  if (parsed?.area === "lb") return handleLeaderboardButton(ctx, parsed.verb, parsed.id);
   if (parsed?.area === "shift") return handleShiftButton(ctx, parsed.verb, parsed.id);
   if (parsed?.area === "shiftadm") {
     return handleShiftAdminButton(ctx, parsed.verb, parsed.id);
@@ -1375,7 +1426,8 @@ async function handleModal(ctx: Ctx): Promise<InteractionResponse> {
     }
     const slowed = await throttle(SECURITY, ctx.interaction, ctx.config, "announce");
     if (slowed) return text(slowed);
-    return postAnnouncement(parsed.id, parsed.verb, field);
+    // The announcement is public; "Posted to #channel" is for the author.
+    return privately(await postAnnouncement(parsed.id, parsed.verb, field));
   }
 
   if (parsed.area === "shiftadm") {
@@ -1423,8 +1475,8 @@ async function refreshedEmbed(requestId: string): Promise<InteractionResponse | 
  * /division assign and remove chain several database reads with one or more
  * role calls before they can say anything, and on a cold start that overruns
  * the window ("The application did not respond"). These are acknowledged
- * straight away as a private "thinking…" and the result is edited in after.
- * Every reply they give is private, so deferring them privately loses nothing.
+ * straight away with a public "thinking…" and the result is edited in after;
+ * a refusal swaps it for a private follow-up (see the council route).
  */
 export function shouldDefer(interaction: Interaction): boolean {
   if (interaction.type !== InteractionType.ApplicationCommand) return false;
@@ -1458,8 +1510,10 @@ const READ_ONLY = new Set([
 
 function accessOf(interaction: Interaction): Access {
   if (interaction.type === InteractionType.MessageComponent) {
-    // Redrawing a shift panel (and "Cancel" on a delete) changes nothing.
+    // Redrawing a shift panel (and "Cancel" on a delete) or turning a
+    // leaderboard page changes nothing.
     const parsed = parseCustomId(interaction.data?.custom_id ?? "");
+    if (parsed?.area === "lb") return "read";
     return parsed?.area === "shiftadm" && parsed.verb === "panel" ? "read" : "write";
   }
   if (interaction.type !== InteractionType.ApplicationCommand) return "write";
@@ -1487,14 +1541,20 @@ export async function handleInteraction(
   // The anti-nuke gate (lib/discord/guard.ts): this server only, never while
   // the bot holds dangerous permissions, and no changes during a lockdown.
   const blocked = securityGate(SECURITY, interaction, config, accessOf(interaction));
-  if (blocked) return text(blocked);
+  if (blocked) return privately(text(blocked));
 
   if (!isMember(ctx.member, config, divisions)) {
-    return text("You do not have clearance to use The Crimson Hand.");
+    return privately(text("You do not have clearance to use The Crimson Hand."));
   }
 
-  if (interaction.type === InteractionType.MessageComponent) return handleComponent(ctx);
-  if (interaction.type === InteractionType.ModalSubmit) return handleModal(ctx);
+  // Buttons and forms redraw their own (public) message; any other answer to
+  // a press — "not your panel", "already decided" — is for the presser alone.
+  if (interaction.type === InteractionType.MessageComponent) {
+    return privately(await handleComponent(ctx));
+  }
+  if (interaction.type === InteractionType.ModalSubmit) {
+    return privately(await handleModal(ctx));
+  }
   if (interaction.type !== InteractionType.ApplicationCommand) {
     return text("Unsupported interaction.");
   }
@@ -1513,14 +1573,17 @@ export async function handleInteraction(
       return handleShift(ctx, path, opts);
     case "announce":
       return handleAnnounce(ctx, opts);
+    // The bot's own configuration and its anti-nuke controls stay private.
     case "crimson":
-      return handleCrimson(ctx, path, opts);
+      return privately(await handleCrimson(ctx, path, opts));
     case "security":
-      return reply(
-        await handleSecurity(SECURITY, interaction, config, path, {
-          canEngage: isScarlet(ctx.member, config),
-          reason: str(opts, "reason"),
-        })
+      return privately(
+        reply(
+          await handleSecurity(SECURITY, interaction, config, path, {
+            canEngage: isScarlet(ctx.member, config),
+            reason: str(opts, "reason"),
+          })
+        )
       );
     default:
       return text("Unknown command.");

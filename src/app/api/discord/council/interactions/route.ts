@@ -7,7 +7,7 @@ import {
   type Interaction,
   type MessagePayload,
 } from "@/lib/discord/types";
-import { editOriginalResponse } from "@/lib/discord/rest";
+import { editOriginalResponse, replacePrivately } from "@/lib/discord/rest";
 import { handleInteraction, shouldDefer } from "@/lib/council/handlers";
 
 // THE CRIMSON HAND — the second bot's front door.
@@ -44,8 +44,10 @@ export async function POST(request: Request) {
     return new NextResponse("malformed payload", { status: 400 });
   }
 
-  // Slow commands: acknowledge now, finish after the response is sent, and
-  // edit the result into the "thinking…" message.
+  // Slow commands: acknowledge now (in the open, like every other answer),
+  // finish after the response is sent, and edit the result into the
+  // "thinking…" message. A result meant to be private — a refusal, a fault —
+  // replaces it with a private follow-up instead.
   if (shouldDefer(interaction)) {
     after(async () => {
       let payload: MessagePayload;
@@ -54,20 +56,18 @@ export async function POST(request: Request) {
         payload = (res.data as MessagePayload | undefined) ?? { content: "Done." };
       } catch (err) {
         console.error("[council] deferred interaction failed", err);
-        payload = { content: FAULT };
+        payload = { content: FAULT, flags: MessageFlags.Ephemeral };
       }
-      const edited = await editOriginalResponse(
-        interaction.application_id,
-        interaction.token,
-        payload
-      );
-      if (!edited.ok) {
-        console.error("[council] could not fill deferred reply", edited.error);
+      const isPrivate = ((payload.flags ?? 0) & MessageFlags.Ephemeral) !== 0;
+      const filled = isPrivate
+        ? await replacePrivately(interaction.application_id, interaction.token, payload)
+        : await editOriginalResponse(interaction.application_id, interaction.token, payload);
+      if (!filled.ok) {
+        console.error("[council] could not fill deferred reply", filled.error);
       }
     });
     return NextResponse.json({
       type: InteractionResponseType.DeferredChannelMessageWithSource,
-      data: { flags: MessageFlags.Ephemeral },
     });
   }
 

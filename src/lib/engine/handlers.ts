@@ -32,7 +32,12 @@ import {
 import { applicationPrompt, isFormUrl } from "./applications";
 import { keepPrivate } from "./command-log";
 import {
+  LEADERBOARD_PAGE_SIZE,
+  leaderboardButtonId,
   leaderboardEmbed,
+  pageCount,
+  pageOf,
+  pagerButtons,
   mention,
   ordinal,
   panel,
@@ -55,6 +60,7 @@ import {
   adjustPoints,
   getMember,
   leaderboard,
+  leaderboardSize,
   pointHistory,
   rankPosition,
   setPoints,
@@ -95,9 +101,13 @@ const SECURITY: SecurityProfile = {
   saveLock: (state, guildId) => saveEngineConfig(guildId, state),
 };
 
+/**
+ * Answers are posted in the channel by default, so everyone there sees what
+ * was run and what the bot said. The exceptions go through `privately`.
+ */
 function reply(
   payload: MessagePayload,
-  { ephemeral = true }: { ephemeral?: boolean } = {}
+  { ephemeral = false }: { ephemeral?: boolean } = {}
 ): InteractionResponse {
   return {
     type: InteractionResponseType.ChannelMessageWithSource,
@@ -108,13 +118,27 @@ function reply(
   };
 }
 
-const text = (content: string, ephemeral = true) =>
+const text = (content: string, ephemeral = false) =>
   reply({ content }, { ephemeral });
 
-/** Refusals are always ephemeral: a public "you are not allowed" is a telling-off
- *  in front of the whole server, which is not the bot's job. */
+/**
+ * Make an answer visible only to whoever ran the command, and keep it out of
+ * the command log. Used for refusals (a public "you are not allowed" is a
+ * telling-off in front of the whole server), anti-nuke and lockdown notices,
+ * and the bot's own configuration.
+ */
+function privately(response: InteractionResponse): InteractionResponse {
+  if (response.type === InteractionResponseType.ChannelMessageWithSource) {
+    response.data = {
+      ...(response.data as object),
+      flags: MessageFlags.Ephemeral,
+    };
+  }
+  return keepPrivate(response);
+}
+
 const refuse = (required: TierValue, action?: string) =>
-  keepPrivate(text(refusalFor(required, action)));
+  privately(text(refusalFor(required, action)));
 
 // --- option plumbing --------------------------------------------------------
 
@@ -261,7 +285,7 @@ async function handlePoints(
   // Awarding is not: inflated points still need High Rank to act on them.
   if (path === "set" || path === "remove") {
     const slowed = await throttle(SECURITY, interaction, config, "points");
-    if (slowed) return text(slowed);
+    if (slowed) return privately(text(slowed));
   }
 
   const common = {
@@ -330,31 +354,44 @@ async function logPoints(
 
 // --- /leaderboard -----------------------------------------------------------
 
+/**
+ * One page of the leaderboard, with its pager. `viewerId` is whoever ran
+ * /leaderboard: their standing stays on the panel as others turn its pages.
+ */
+async function leaderboardPage(
+  guildId: string,
+  viewerId: string,
+  requested: number
+): Promise<MessagePayload> {
+  const [total, me, position] = await Promise.all([
+    leaderboardSize(guildId),
+    getMember(guildId, viewerId),
+    rankPosition(guildId, viewerId),
+  ]);
+  // Clamped: the board may have shrunk since the buttons were drawn.
+  const page = Math.min(requested, pageCount(total) - 1);
+  const rows = await leaderboard(guildId, LEADERBOARD_PAGE_SIZE, page * LEADERBOARD_PAGE_SIZE);
+  return {
+    embeds: [
+      leaderboardEmbed({
+        rows: rows.map((r) => ({ discordId: r.discordId, points: r.points })),
+        page,
+        total,
+        viewer: { id: viewerId, position, points: me?.points ?? 0 },
+      }),
+    ],
+    components: pagerButtons(page, total, (target, slot) =>
+      leaderboardButtonId(target, slot, viewerId)
+    ),
+    allowed_mentions: { parse: [] },
+  };
+}
+
 async function handleLeaderboard(
   interaction: Interaction,
   guildId: string
 ): Promise<InteractionResponse> {
-  const actor = actorOf(interaction);
-  const rows = await leaderboard(guildId, 15);
-  const me = await getMember(guildId, actor.id);
-  const position = await rankPosition(guildId, actor.id);
-
-  // Public on purpose: a leaderboard nobody else can see is not a leaderboard.
-  return reply(
-    {
-      embeds: [
-        leaderboardEmbed(
-          rows.map((r) => ({
-            discordId: r.discordId,
-            username: r.username,
-            points: r.points,
-          })),
-          { position, points: me?.points ?? 0 }
-        ),
-      ],
-    },
-    { ephemeral: false }
-  );
+  return reply(await leaderboardPage(guildId, actorOf(interaction).id, 0));
 }
 
 // --- /promote ---------------------------------------------------------------
@@ -393,8 +430,10 @@ async function handlePromote(
   if (!result.ok) {
     // Enough points for a rank that also needs an application: the answer is
     // the form's link, and the request is filed when they say they sent it.
+    // The form prompt stays private: its "I've submitted it" button files a
+    // request for whoever presses it.
     return "apply" in result
-      ? reply(applicationPrompt(result.apply))
+      ? privately(reply(applicationPrompt(result.apply)))
       : text(result.message);
   }
   return text(
@@ -806,6 +845,19 @@ async function handleComponent(
   // Any member may press it (the base gate in handleInteraction already ran);
   // createRequest re-checks the points and the ladder, since both may have
   // moved while they were off filling in the form.
+  // engine:lb:<page>.<slot>:<viewerId> — a leaderboard page button. Anyone
+  // may turn the pages of a public leaderboard.
+  if (parsed?.area === "lb") {
+    return {
+      type: InteractionResponseType.UpdateMessage,
+      data: await leaderboardPage(
+        interaction.guild_id ?? "",
+        parsed.id,
+        pageOf(parsed.verb)
+      ),
+    };
+  }
+
   if (parsed?.area === "apply" && parsed.verb === "done") {
     const actor = actorOf(interaction);
     const result = await createRequest(
@@ -898,8 +950,10 @@ async function handleModal(
   // engine:say:<colour>:<channelId> — the announcement composer.
   if (parsed.area === "say") {
     const slowed = await throttle(SECURITY, interaction, config, "announce");
-    if (slowed) return text(slowed);
-    return postAnnouncement(parsed.id, parsed.verb, field);
+    if (slowed) return privately(text(slowed));
+    // The announcement itself is public; "Posted to #channel" is just for the
+    // author.
+    return privately(await postAnnouncement(parsed.id, parsed.verb, field));
   }
 
   if (parsed.verb !== "denyreason") return text("Unknown form.");
@@ -991,6 +1045,12 @@ const READ_ONLY = new Set([
 ]);
 
 function accessOf(interaction: Interaction): Access {
+  if (interaction.type === InteractionType.MessageComponent) {
+    // Turning a leaderboard page changes nothing.
+    return parseCustomId(interaction.data?.custom_id ?? "")?.area === "lb"
+      ? "read"
+      : "write";
+  }
   if (interaction.type !== InteractionType.ApplicationCommand) return "write";
   const name = interaction.data?.name ?? "";
   const { path } = route(interaction.data?.options);
@@ -1014,7 +1074,7 @@ export async function handleInteraction(
   // The anti-nuke gate (lib/discord/guard.ts): never while the bot holds
   // dangerous permissions, and no changes during this server's lockdown.
   const blocked = securityGate(SECURITY, interaction, config, accessOf(interaction));
-  if (blocked) return keepPrivate(text(blocked));
+  if (blocked) return privately(text(blocked));
 
   // The base gate. Everything the bot does, including pressing a button, is
   // behind at least this — which is what makes the optional member role a real
@@ -1023,11 +1083,14 @@ export async function handleInteraction(
     return refuse(Tier.Member);
   }
 
+  // Buttons and forms either redraw their own (public) message, or answer the
+  // presser with a short note — "already decided", "not yours" — that is for
+  // them alone.
   if (interaction.type === InteractionType.MessageComponent) {
-    return handleComponent(interaction, config);
+    return privately(await handleComponent(interaction, config));
   }
   if (interaction.type === InteractionType.ModalSubmit) {
-    return handleModal(interaction, config);
+    return privately(await handleModal(interaction, config));
   }
   if (interaction.type !== InteractionType.ApplicationCommand) {
     return text("Unsupported interaction.");
@@ -1045,15 +1108,16 @@ export async function handleInteraction(
       return handleAnnounce(interaction, config, opts);
     case "promote":
       return handlePromote(interaction, guildId, config, path);
+    // The bot's own configuration and its anti-nuke controls stay private.
     case "engine":
-      return handleEngine(interaction, guildId, config, path, opts);
+      return privately(await handleEngine(interaction, guildId, config, path, opts));
     case "security":
-      return reply(
+      return privately(reply(
         await handleSecurity(SECURITY, interaction, config, path, {
           canEngage: hasTier(interaction.member, config, Tier.HighCommand),
           reason: str(opts, "reason"),
         })
-      );
+      ));
     default:
       return text("Unknown command.");
   }

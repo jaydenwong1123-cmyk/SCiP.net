@@ -244,6 +244,38 @@ export async function editOriginalResponse(
 }
 
 /**
+ * Swap a public deferred reply for a private one: delete the "thinking…"
+ * message, then send the payload as an ephemeral follow-up. Used when a
+ * command deferred in the open turns out to be answered with a refusal.
+ */
+export async function replacePrivately(
+  applicationId: string,
+  interactionToken: string,
+  payload: MessagePayload
+): Promise<RestResult> {
+  const base = `${API}/webhooks/${applicationId}/${interactionToken}`;
+  const { flags: _flags, ...rest } = payload;
+  void _flags;
+  try {
+    await fetch(`${base}/messages/@original`, { method: "DELETE", cache: "no-store" });
+    const res = await fetch(base, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowed_mentions: { parse: [] }, ...rest, flags: 1 << 6 }),
+      cache: "no-store",
+    });
+    if (res.ok) return { ok: true, status: res.status };
+    return { ok: false, status: res.status, error: `Discord returned ${res.status}.` };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      error: err instanceof Error ? err.message : "Network error.",
+    };
+  }
+}
+
+/**
  * Post through a channel webhook.
  *
  * Needs no bot token — the URL is its own credential — and posts under the

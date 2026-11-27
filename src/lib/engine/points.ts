@@ -145,12 +145,18 @@ export async function getMember(guildId: string, discordId: string) {
 
 /** Top `limit` members by points. Ties break on who reached the total first,
  *  so a leaderboard does not reshuffle itself between two equal members. */
-export async function leaderboard(guildId: string, limit = 15) {
+export async function leaderboard(guildId: string, limit = 15, skip = 0) {
   return db.engineMember.findMany({
     where: { guildId, points: { gt: 0 } },
     orderBy: [{ points: "desc" }, { updatedAt: "asc" }],
     take: limit,
+    skip,
   });
+}
+
+/** How many members are on the leaderboard at all, for the page count. */
+export async function leaderboardSize(guildId: string): Promise<number> {
+  return db.engineMember.count({ where: { guildId, points: { gt: 0 } } });
 }
 
 /**

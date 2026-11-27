@@ -158,40 +158,136 @@ export function promotionButtons(requestId: string): MessageComponent[] {
   ];
 }
 
-export function leaderboardEmbed(
-  rows: { discordId: string; username: string; points: number }[],
-  viewer?: { position: number | null; points: number }
-): Embed {
-  // One numbered line per member — `1. @member • 42 points` — under a small
-  // bold title, the same shape as the shift leaderboard. No medals: first
-  // place reads the same as fifteenth.
-  const lines = rows.map(
-    (row, i) =>
-      `${i + 1}. ${mention(row.discordId)} • ${points(row.points)} point${row.points === 1 ? "" : "s"}`
-  );
+// --- leaderboards -----------------------------------------------------------
 
-  const embed: Embed = {
-    title: "Points Leaderboard",
-    description: lines.length
-      ? lines.join("\n")
-      : "_No personnel have been awarded points yet._",
+/** Rows per leaderboard page. Ten keeps a page on one phone screen. */
+export const LEADERBOARD_PAGE_SIZE = 10;
+
+export type LeaderboardPage = {
+  /** This page's rows, already sorted. */
+  rows: { discordId: string; points: number }[];
+  /** 0-based page shown. */
+  page: number;
+  /** Everyone with points, across all pages. */
+  total: number;
+  /** Who ran the command, so their standing survives page turns. */
+  viewer?: { id: string; position: number | null; points: number };
+};
+
+export const pageCount = (total: number) =>
+  Math.max(1, Math.ceil(total / LEADERBOARD_PAGE_SIZE));
+
+/**
+ * The table itself, shared by both bots.
+ *
+ * Mentions are different widths, so anything after one can never line up.
+ * Each row therefore leads with two fixed-width code spans — position, then
+ * points padded to the widest total on the page — and puts the name last:
+ *
+ *   `#01`  `1,240 pts`  @member
+ *   `#02`  `  980 pts`  @member
+ *
+ * Page one leaves a gap under third place so the podium reads as a group.
+ */
+export function leaderboardBody({ rows, page, total, viewer }: LeaderboardPage): string {
+  if (rows.length === 0) return "_No personnel have been awarded points yet._";
+
+  const start = page * LEADERBOARD_PAGE_SIZE;
+  const width = Math.max(...rows.map((r) => points(r.points).length));
+  const rankWidth = Math.max(2, String(start + rows.length).length);
+
+  const lines: string[] = [];
+  rows.forEach((row, i) => {
+    const pos = start + i + 1;
+    const rank = `\`#${String(pos).padStart(rankWidth, "0")}\``;
+    const pts = `\`${points(row.points).padStart(width, " ")} pts\``;
+    const you = viewer?.id === row.discordId ? "  ◀ you" : "";
+    lines.push(`${rank}  ${pts}  ${mention(row.discordId)}${you}`);
+    if (pos === 3 && i < rows.length - 1) lines.push("");
+  });
+
+  const pages = pageCount(total);
+  const summary = `-# ${total.toLocaleString("en-US")} ranked · page ${page + 1} of ${pages}`;
+  return `${summary}\n\n${lines.join("\n")}`;
+}
+
+/** "Your standing" — only when the viewer is not already on this page. */
+export function viewerField(input: LeaderboardPage) {
+  const v = input.viewer;
+  if (!v) return [];
+  if (input.rows.some((r) => r.discordId === v.id)) return [];
+  return [
+    {
+      name: "Your standing",
+      value: v.position
+        ? `\`#${String(v.position).padStart(2, "0")}\`  \`${points(v.points)} pts\`  ${mention(v.id)}`
+        : `${mention(v.id)} has no points yet.`,
+      inline: false,
+    },
+  ];
+}
+
+/**
+ * « ‹ 1 / 6 › » under a leaderboard. `idFor(target, slot)` builds each
+ * button's custom id; the slot keeps ids unique when two buttons point at the
+ * same page (Discord rejects a message whose buttons share an id).
+ */
+export function pagerButtons(
+  page: number,
+  total: number,
+  idFor: (target: number, slot: string) => string
+): MessageComponent[] {
+  const pages = pageCount(total);
+  if (pages <= 1) return [];
+  const last = pages - 1;
+  const btn = (
+    label: string,
+    target: number,
+    slot: string,
+    disabled: boolean
+  ): MessageComponent => ({
+    type: ComponentType.Button,
+    style: ButtonStyle.Primary,
+    label,
+    custom_id: idFor(target, slot),
+    disabled,
+  });
+  return [
+    {
+      type: ComponentType.ActionRow,
+      components: [
+        btn("«", 0, "first", page === 0),
+        btn("‹", page - 1, "prev", page === 0),
+        {
+          type: ComponentType.Button,
+          style: ButtonStyle.Secondary,
+          label: `${page + 1} / ${pages}`,
+          custom_id: idFor(page, "label"),
+          disabled: true,
+        },
+        btn("›", page + 1, "next", page === last),
+        btn("»", last, "last", page === last),
+      ],
+    },
+  ];
+}
+
+/** Page number out of a pager custom id's `<page>.<slot>` part. */
+export const pageOf = (part: string) => {
+  const n = Number.parseInt(part, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
+export const leaderboardButtonId = (page: number, slot: string, viewerId: string) =>
+  `engine:lb:${page}.${slot}:${viewerId}`;
+
+export function leaderboardEmbed(input: LeaderboardPage): Embed {
+  return panel("Points Leaderboard", leaderboardBody(input), {
     color: COLOR.neutral,
-    footer: { text: "CI Points System" },
-  };
-
-  // Shown only to someone who is not already in the table — repeating a
-  // member's own position back at them when they are sitting at #3 is noise.
-  if (viewer && viewer.position && viewer.position > rows.length) {
-    embed.fields = [
-      {
-        name: "Your standing",
-        value: `${ordinal(viewer.position)}  ·  **${points(viewer.points)}** points`,
-        inline: false,
-      },
-    ];
-  }
-
-  return embed;
+    fields: viewerField(input),
+    footer: { text: "Ranked by points · ties go to whoever got there first" },
+    timestamp: new Date().toISOString(),
+  });
 }
 
 /** Heading on every public points-log post. */

@@ -128,13 +128,23 @@ export async function setPoints(
 export async function leaderboard(
   guildId: string,
   division: DivisionKey,
-  limit = 15
+  limit = 15,
+  skip = 0
 ) {
   return db.councilStanding.findMany({
     where: { guildId, division, points: { gt: 0 } },
     orderBy: [{ points: "desc" }, { updatedAt: "asc" }],
     take: limit,
+    skip,
   });
+}
+
+/** How many members of a division are on its leaderboard, for the page count. */
+export async function leaderboardSize(
+  guildId: string,
+  division: DivisionKey
+): Promise<number> {
+  return db.councilStanding.count({ where: { guildId, division, points: { gt: 0 } } });
 }
 
 export async function rankPosition(
